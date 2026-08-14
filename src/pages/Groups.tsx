@@ -3,8 +3,12 @@ import { supabase } from '../lib/supabase'
 import type { Group } from '../lib/types'
 import type { User } from '@supabase/supabase-js'
 
-function NewGroupModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
-  const [tab, setTab] = useState<'crear' | 'unirme'>('crear')
+// Mientras la app este en pruebas, solo esta cuenta puede crear ligas nuevas.
+// El resto puede unirse con un codigo de invitacion.
+const SUPER_ADMIN_ID = '74e0edbd-0c42-41fc-a001-238fbfd1a19f'
+
+function NewGroupModal({ canCreate, onClose, onDone }: { canCreate: boolean; onClose: () => void; onDone: () => void }) {
+  const [tab, setTab] = useState<'crear' | 'unirme'>(canCreate ? 'crear' : 'unirme')
   const [newName, setNewName] = useState('')
   const [joinCode, setJoinCode] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -38,22 +42,24 @@ function NewGroupModal({ onClose, onDone }: { onClose: () => void; onDone: () =>
           <button onClick={onClose} className="text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)] text-lg leading-none">✕</button>
         </div>
 
-        <div className="flex gap-1 mb-4 rounded-md overflow-hidden border border-[var(--color-field-line)] w-fit">
-          <button
-            onClick={() => setTab('crear')}
-            className={`px-4 py-1.5 text-sm font-medium transition-colors ${tab === 'crear' ? 'bg-[var(--color-light-amber)] text-[var(--color-field-night)]' : 'text-[var(--color-text-muted)]'}`}
-          >
-            Crear
-          </button>
-          <button
-            onClick={() => setTab('unirme')}
-            className={`px-4 py-1.5 text-sm font-medium transition-colors ${tab === 'unirme' ? 'bg-[var(--color-light-amber)] text-[var(--color-field-night)]' : 'text-[var(--color-text-muted)]'}`}
-          >
-            Unirme
-          </button>
-        </div>
+        {canCreate && (
+          <div className="flex gap-1 mb-4 rounded-md overflow-hidden border border-[var(--color-field-line)] w-fit">
+            <button
+              onClick={() => setTab('crear')}
+              className={`px-4 py-1.5 text-sm font-medium transition-colors ${tab === 'crear' ? 'bg-[var(--color-light-amber)] text-[var(--color-field-night)]' : 'text-[var(--color-text-muted)]'}`}
+            >
+              Crear
+            </button>
+            <button
+              onClick={() => setTab('unirme')}
+              className={`px-4 py-1.5 text-sm font-medium transition-colors ${tab === 'unirme' ? 'bg-[var(--color-light-amber)] text-[var(--color-field-night)]' : 'text-[var(--color-text-muted)]'}`}
+            >
+              Unirme
+            </button>
+          </div>
+        )}
 
-        {tab === 'crear' ? (
+        {canCreate && tab === 'crear' ? (
           <form onSubmit={createGroup} className="space-y-3">
             <input
               value={newName}
@@ -99,6 +105,7 @@ export default function Groups({ user, onSelect }: { user: User; onSelect: (g: G
   const [groups, setGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const canCreate = user.id === SUPER_ADMIN_ID
 
   async function loadGroups() {
     setLoading(true)
@@ -119,7 +126,7 @@ export default function Groups({ user, onSelect }: { user: User; onSelect: (g: G
         <h1 className="font-display text-4xl font-800">MIS QUINIELAS</h1>
         <button
           onClick={() => setShowModal(true)}
-          aria-label="Nueva quiniela"
+          aria-label={canCreate ? 'Nueva quiniela' : 'Unirme a una quiniela'}
           className="w-10 h-10 rounded-full bg-[var(--color-light-amber)] text-[var(--color-field-night)] text-2xl font-bold flex items-center justify-center hover:brightness-110 transition shrink-0 leading-none"
         >
           +
@@ -131,7 +138,9 @@ export default function Groups({ user, onSelect }: { user: User; onSelect: (g: G
         <p className="text-[var(--color-text-muted)] text-sm">Cargando...</p>
       ) : groups.length === 0 ? (
         <p className="text-[var(--color-text-muted)] text-sm">
-          Todavia no perteneces a ningun grupo. Da clic en el + para crear uno o unirte con un codigo.
+          {canCreate
+            ? 'Todavia no perteneces a ningun grupo. Da clic en el + para crear uno o unirte con un codigo.'
+            : 'Todavia no perteneces a ningun grupo. Da clic en el + y unete con el codigo de invitacion que te compartieron.'}
         </p>
       ) : (
         <div className="space-y-2">
@@ -155,6 +164,7 @@ export default function Groups({ user, onSelect }: { user: User; onSelect: (g: G
 
       {showModal && (
         <NewGroupModal
+          canCreate={canCreate}
           onClose={() => setShowModal(false)}
           onDone={() => { setShowModal(false); loadGroups() }}
         />

@@ -31,6 +31,24 @@ export default function GroupDashboard({ group: initialGroup, user, onBack }: { 
     setGames(data ?? [])
   }
 
+  useEffect(() => {
+    let cancelled = false
+    supabase
+      .from('group_members')
+      .select('user_id')
+      .eq('group_id', group.id)
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return
+        if (!data) {
+          alert('Ya no perteneces a esta liga.')
+          onBack()
+        }
+      })
+    return () => { cancelled = true }
+  }, [group.id, user.id])
+
   useEffect(() => { loadGames() }, [group.id])
 
   useEffect(() => {

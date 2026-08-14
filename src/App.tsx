@@ -70,6 +70,13 @@ export default function App() {
     return () => sub.subscription.unsubscribe()
   }, [])
 
+  // si cambia el usuario logueado (cerrar sesion y entrar con otra cuenta sin
+  // recargar la pagina), regresa a la lista de quinielas en vez de dejar
+  // abierta la liga de la sesion anterior
+  useEffect(() => {
+    setActiveGroup(null)
+  }, [user?.id])
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">

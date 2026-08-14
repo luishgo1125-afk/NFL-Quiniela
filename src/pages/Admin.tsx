@@ -61,19 +61,18 @@ export default function Admin({
         logoUrl = data.publicUrl
       }
 
-      const { data: updated, error: updErr } = await supabase
-        .from('groups')
-        .update({ name: editName, logo_url: logoUrl })
-        .eq('id', groupId)
-        .select()
-        .single()
+      const { data: updated, error: updErr } = await supabase.rpc('update_group', {
+        p_group_id: groupId,
+        p_name: editName,
+        p_logo_url: logoUrl ?? null,
+      })
       if (updErr) throw updErr
 
       onGroupUpdated(updated)
       setLogoFile(null)
       setGroupMsg('Guardado.')
     } catch (err) {
-      setGroupErr(err instanceof Error ? err.message : 'No se pudo guardar')
+      setGroupErr((err as any)?.message ?? 'No se pudo guardar')
     } finally {
       setSavingGroup(false)
     }

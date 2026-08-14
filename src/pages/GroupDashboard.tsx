@@ -79,7 +79,7 @@ export default function GroupDashboard({ group: initialGroup, user, onBack }: { 
                 onClick={() => setWeek(w)}
                 className={`font-mono-score text-xs px-3 py-1 rounded-full border ${week === w ? 'border-[var(--color-light-amber)] text-[var(--color-light-amber)]' : 'border-[var(--color-field-line)] text-[var(--color-text-muted)]'}`}
               >
-                SEM {String(w).padStart(2, '0')}
+                SEMANA {w}
               </button>
             ))}
           </div>

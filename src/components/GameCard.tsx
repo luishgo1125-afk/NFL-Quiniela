@@ -69,8 +69,10 @@ export default function GameCard({ game, userId }: { game: Game; userId: string 
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
         <div className="text-right">
-          <img src={teamLogoUrl(game.away_team)} alt={game.away_team} className="w-10 h-10 object-contain ml-auto mb-1" loading="lazy" />
-          <div className="font-display text-2xl font-700">{game.away_team}</div>
+          <div className="flex items-center justify-end gap-2 mb-1">
+            <span className="font-display text-2xl font-700">{game.away_team}</span>
+            <img src={teamLogoUrl(game.away_team)} alt={game.away_team} className="w-8 h-8 object-contain" loading="lazy" />
+          </div>
           <div className="text-[10px] text-[var(--color-text-muted)]">VISITANTE</div>
         </div>
 
@@ -95,8 +97,10 @@ export default function GameCard({ game, userId }: { game: Game; userId: string 
         </div>
 
         <div className="text-left">
-          <img src={teamLogoUrl(game.home_team)} alt={game.home_team} className="w-10 h-10 object-contain mb-1" loading="lazy" />
-          <div className="font-display text-2xl font-700">{game.home_team}</div>
+          <div className="flex items-center justify-start gap-2 mb-1">
+            <span className="font-display text-2xl font-700">{game.home_team}</span>
+            <img src={teamLogoUrl(game.home_team)} alt={game.home_team} className="w-8 h-8 object-contain" loading="lazy" />
+          </div>
           <div className="text-[10px] text-[var(--color-text-muted)]">LOCAL</div>
         </div>
       </div>

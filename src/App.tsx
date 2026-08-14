@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useAuth } from './lib/useAuth'
-import { supabase } from './lib/supabase'
 import Login from './pages/Login'
 import Groups from './pages/Groups'
 import GroupDashboard from './pages/GroupDashboard'
+import ProfileMenu from './components/ProfileMenu'
 import type { Group } from './lib/types'
 
 export default function App() {
@@ -24,9 +24,7 @@ export default function App() {
     <div>
       <header className="border-b border-[var(--color-field-line)] px-4 py-3 flex items-center justify-between">
         <span className="font-display text-lg font-700">QUINIELA<span className="text-[var(--color-light-amber)]">.</span></span>
-        <button onClick={() => supabase.auth.signOut()} className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-scoreboard-red)]">
-          Cerrar sesion
-        </button>
+        <ProfileMenu user={user} />
       </header>
 
       {activeGroup ? (

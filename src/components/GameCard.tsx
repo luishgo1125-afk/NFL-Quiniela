@@ -10,7 +10,7 @@ export default function GameCard({ game, userId }: { game: Game; userId: string 
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
-  const locked = new Date(game.kickoff).getTime() - 60 * 60 * 1000 <= Date.now()
+  const locked = new Date(game.kickoff).getTime() - 30 * 60 * 1000 <= Date.now()
   const confirmed = pick != null && home !== '' && away !== '' && String(pick.pred_home_score) === home && String(pick.pred_away_score) === away
 
   useEffect(() => {

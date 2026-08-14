@@ -11,6 +11,8 @@ export interface EspnGame {
   homeScore: number | null
   awayScore: number | null
   completed: boolean
+  live: boolean
+  clock: string | null
 }
 
 // 1 = pretemporada, 2 = temporada regular, 3 = playoffs
@@ -30,7 +32,11 @@ export async function fetchEspnWeek(year: number, week: number, seasonType: Seas
     const competitors = comp?.competitors ?? []
     const home = competitors.find((c: any) => c.homeAway === 'home')
     const away = competitors.find((c: any) => c.homeAway === 'away')
+    const state = comp?.status?.type?.state // 'pre' | 'in' | 'post'
     const completed = Boolean(comp?.status?.type?.completed)
+    const live = state === 'in'
+    // ESPN da marcador en vivo aunque el partido no haya terminado
+    const hasScore = state === 'in' || completed
 
     return {
       espnId: String(ev.id),
@@ -38,9 +44,11 @@ export async function fetchEspnWeek(year: number, week: number, seasonType: Seas
       homeTeam: home?.team?.abbreviation ?? '???',
       awayTeam: away?.team?.abbreviation ?? '???',
       kickoff: ev.date,
-      homeScore: completed ? Number(home?.score ?? 0) : null,
-      awayScore: completed ? Number(away?.score ?? 0) : null,
+      homeScore: hasScore ? Number(home?.score ?? 0) : null,
+      awayScore: hasScore ? Number(away?.score ?? 0) : null,
       completed,
+      live,
+      clock: live ? (comp?.status?.type?.shortDetail ?? null) : null,
     } satisfies EspnGame
   })
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Game, Pick } from '../lib/types'
+import { teamLogoUrl } from '../lib/teamLogos'
 
 export default function GameCard({ game, userId }: { game: Game; userId: string }) {
   const [pick, setPick] = useState<Pick | null>(null)
@@ -54,6 +55,11 @@ export default function GameCard({ game, userId }: { game: Game; userId: string 
         <span className="text-xs text-[var(--color-text-muted)] font-mono-score">{kickoffLabel}</span>
         {game.status === 'final' ? (
           <span className="text-xs font-semibold text-[var(--color-turf-green)]">FINAL</span>
+        ) : game.status === 'live' ? (
+          <span className="text-xs font-semibold text-[var(--color-scoreboard-red)] flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-scoreboard-red)] animate-pulse" />
+            EN VIVO{game.game_clock ? ` · ${game.game_clock}` : ''}
+          </span>
         ) : locked ? (
           <span className="text-xs font-semibold text-[var(--color-scoreboard-red)]">CERRADO</span>
         ) : (
@@ -63,6 +69,7 @@ export default function GameCard({ game, userId }: { game: Game; userId: string 
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
         <div className="text-right">
+          <img src={teamLogoUrl(game.away_team)} alt={game.away_team} className="w-10 h-10 object-contain ml-auto mb-1" loading="lazy" />
           <div className="font-display text-2xl font-700">{game.away_team}</div>
           <div className="text-[10px] text-[var(--color-text-muted)]">VISITANTE</div>
         </div>
@@ -88,14 +95,16 @@ export default function GameCard({ game, userId }: { game: Game; userId: string 
         </div>
 
         <div className="text-left">
+          <img src={teamLogoUrl(game.home_team)} alt={game.home_team} className="w-10 h-10 object-contain mb-1" loading="lazy" />
           <div className="font-display text-2xl font-700">{game.home_team}</div>
           <div className="text-[10px] text-[var(--color-text-muted)]">LOCAL</div>
         </div>
       </div>
 
-      {game.status === 'final' && (
+      {(game.status === 'final' || game.status === 'live') && (
         <div className="text-center mt-2 text-xs text-[var(--color-text-muted)]">
-          Resultado: {game.away_team} {game.away_score} – {game.home_score} {game.home_team}
+          {game.status === 'live' ? 'Marcador actual: ' : 'Resultado: '}
+          {game.away_team} {game.away_score} – {game.home_score} {game.home_team}
           {pick?.points != null && (
             <span className="ml-2 font-semibold text-[var(--color-light-amber)]">+{pick.points} pts</span>
           )}

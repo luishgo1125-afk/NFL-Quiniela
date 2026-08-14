@@ -1,14 +1,33 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { NFL_TEAMS, type Game } from '../lib/types'
+import { NFL_TEAMS, type Game, type Group } from '../lib/types'
 import { fetchEspnWeek, guessCurrentWeek, type SeasonType } from '../lib/espn'
+import { teamLogoUrl } from '../lib/teamLogos'
 
-export default function Admin({ groupId, games, onChange }: { groupId: string; games: Game[]; onChange: () => void }) {
+export default function Admin({
+  group,
+  games,
+  onChange,
+  onGroupUpdated,
+}: {
+  group: Group
+  games: Game[]
+  onChange: () => void
+  onGroupUpdated: (g: Group) => void
+}) {
+  const groupId = group.id
   const [week, setWeek] = useState(1)
   const [homeTeam, setHomeTeam] = useState(NFL_TEAMS[0])
   const [awayTeam, setAwayTeam] = useState(NFL_TEAMS[1])
   const [kickoff, setKickoff] = useState('')
   const [error, setError] = useState<string | null>(null)
+
+  const [editName, setEditName] = useState(group.name)
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [logoPreview, setLogoPreview] = useState<string | null>(group.logo_url)
+  const [savingGroup, setSavingGroup] = useState(false)
+  const [groupMsg, setGroupMsg] = useState<string | null>(null)
+  const [groupErr, setGroupErr] = useState<string | null>(null)
 
   const guess = guessCurrentWeek()
   const [syncYear, setSyncYear] = useState(guess.year)
@@ -16,9 +35,52 @@ export default function Admin({ groupId, games, onChange }: { groupId: string; g
   const [syncType, setSyncType] = useState<SeasonType>(2)
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState<string | null>(null)
+  const [autoSync, setAutoSync] = useState(false)
 
-  async function syncWeekFromEspn(e: React.FormEvent) {
+  function onPickLogo(file: File | null) {
+    setLogoFile(file)
+    if (file) setLogoPreview(URL.createObjectURL(file))
+  }
+
+  async function saveGroupInfo(e: React.FormEvent) {
     e.preventDefault()
+    setSavingGroup(true)
+    setGroupMsg(null)
+    setGroupErr(null)
+    try {
+      let logoUrl = group.logo_url
+
+      if (logoFile) {
+        const ext = logoFile.name.split('.').pop() ?? 'jpg'
+        const path = `${groupId}/logo.${ext}`
+        const { error: upErr } = await supabase.storage
+          .from('group-logos')
+          .upload(path, logoFile, { upsert: true })
+        if (upErr) throw upErr
+        const { data } = supabase.storage.from('group-logos').getPublicUrl(path)
+        logoUrl = data.publicUrl
+      }
+
+      const { data: updated, error: updErr } = await supabase
+        .from('groups')
+        .update({ name: editName, logo_url: logoUrl })
+        .eq('id', groupId)
+        .select()
+        .single()
+      if (updErr) throw updErr
+
+      onGroupUpdated(updated)
+      setLogoFile(null)
+      setGroupMsg('Guardado.')
+    } catch (err) {
+      setGroupErr(err instanceof Error ? err.message : 'No se pudo guardar')
+    } finally {
+      setSavingGroup(false)
+    }
+  }
+
+  async function syncWeekFromEspn(e?: React.FormEvent) {
+    e?.preventDefault()
     setSyncing(true)
     setSyncMsg(null)
     setError(null)
@@ -36,6 +98,7 @@ export default function Admin({ groupId, games, onChange }: { groupId: string; g
         const existing = games.find(
           (g) => g.week === syncWeek && g.home_team === eg.homeTeam && g.away_team === eg.awayTeam
         )
+        const newStatus: 'scheduled' | 'live' | 'final' = eg.completed ? 'final' : eg.live ? 'live' : 'scheduled'
 
         if (!existing) {
           const { data: inserted } = await supabase
@@ -46,9 +109,10 @@ export default function Admin({ groupId, games, onChange }: { groupId: string; g
               home_team: eg.homeTeam,
               away_team: eg.awayTeam,
               kickoff: eg.kickoff,
-              status: eg.completed ? 'final' : 'scheduled',
+              status: newStatus,
               home_score: eg.homeScore,
               away_score: eg.awayScore,
+              game_clock: eg.clock,
             })
             .select()
             .single()
@@ -56,12 +120,20 @@ export default function Admin({ groupId, games, onChange }: { groupId: string; g
           if (eg.completed && inserted) {
             await supabase.rpc('calculate_points_for_game', { p_game_id: inserted.id })
           }
-        } else if (eg.completed && existing.status !== 'final') {
+        } else if (
+          existing.status !== 'final' &&
+          (newStatus !== existing.status ||
+            eg.homeScore !== existing.home_score ||
+            eg.awayScore !== existing.away_score ||
+            eg.clock !== existing.game_clock)
+        ) {
           await supabase
             .from('games')
-            .update({ status: 'final', home_score: eg.homeScore, away_score: eg.awayScore })
+            .update({ status: newStatus, home_score: eg.homeScore, away_score: eg.awayScore, game_clock: eg.clock })
             .eq('id', existing.id)
-          await supabase.rpc('calculate_points_for_game', { p_game_id: existing.id })
+          if (eg.completed) {
+            await supabase.rpc('calculate_points_for_game', { p_game_id: existing.id })
+          }
           updated++
         } else if (!eg.completed && existing.kickoff !== eg.kickoff) {
           // el horario pudo cambiar (ej. flex schedule)
@@ -70,7 +142,7 @@ export default function Admin({ groupId, games, onChange }: { groupId: string; g
         }
       }
 
-      setSyncMsg(`Listo: ${created} partido(s) agregado(s), ${updated} actualizado(s).`)
+      setSyncMsg(`Listo: ${created} agregado(s), ${updated} actualizado(s) — ${new Date().toLocaleTimeString('es-MX')}`)
       onChange()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo sincronizar con ESPN')
@@ -78,6 +150,13 @@ export default function Admin({ groupId, games, onChange }: { groupId: string; g
       setSyncing(false)
     }
   }
+
+  useEffect(() => {
+    if (!autoSync) return
+    const id = setInterval(() => syncWeekFromEspn(), 60000)
+    return () => clearInterval(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSync, syncYear, syncWeek, syncType])
 
   async function addGame(e: React.FormEvent) {
     e.preventDefault()
@@ -108,6 +187,40 @@ export default function Admin({ groupId, games, onChange }: { groupId: string; g
 
   return (
     <div className="space-y-6">
+      <form onSubmit={saveGroupInfo} className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-4 space-y-3">
+        <h2 className="text-sm font-semibold">Nombre y foto de la liga</h2>
+        <div className="flex items-center gap-4">
+          <label className="cursor-pointer shrink-0">
+            <div className="w-16 h-16 rounded-full overflow-hidden bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] flex items-center justify-center">
+              {logoPreview ? (
+                <img src={logoPreview} alt="Logo de la liga" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-2xl">🏈</span>
+              )}
+            </div>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => onPickLogo(e.target.files?.[0] ?? null)}
+            />
+            <span className="block text-center text-[10px] text-[var(--color-light-amber)] mt-1">Cambiar</span>
+          </label>
+          <input
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            required
+            className="flex-1 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
+          />
+        </div>
+        {groupErr && <p className="text-[var(--color-scoreboard-red)] text-xs">{groupErr}</p>}
+        {groupMsg && <p className="text-[var(--color-turf-green)] text-xs">{groupMsg}</p>}
+        <button type="submit" disabled={savingGroup}
+          className="w-full bg-[var(--color-light-amber)] text-[var(--color-field-night)] font-semibold rounded-md py-2 text-sm hover:brightness-110 disabled:opacity-50">
+          {savingGroup ? 'Guardando...' : 'Guardar cambios de la liga'}
+        </button>
+      </form>
+
       <form onSubmit={syncWeekFromEspn} className="bg-[var(--color-field-surface)] border border-[var(--color-light-amber)]/40 rounded-lg p-4 space-y-3">
         <div>
           <h2 className="text-sm font-semibold">Importar semana automaticamente</h2>
@@ -141,6 +254,10 @@ export default function Admin({ groupId, games, onChange }: { groupId: string; g
           className="w-full bg-[var(--color-light-amber)] text-[var(--color-field-night)] font-semibold rounded-md py-2 text-sm hover:brightness-110 disabled:opacity-50">
           {syncing ? 'Sincronizando...' : 'Sincronizar con la NFL'}
         </button>
+        <label className="flex items-center gap-2 text-xs text-[var(--color-text-muted)] cursor-pointer">
+          <input type="checkbox" checked={autoSync} onChange={(e) => setAutoSync(e.target.checked)} />
+          Actualizar automaticamente cada minuto (incluye partidos en curso, no solo terminados) mientras tengas esta pantalla abierta
+        </label>
         <p className="text-[10px] text-[var(--color-text-muted)]">
           Puedes correr esto varias veces: agrega partidos nuevos y actualiza marcadores finales sin duplicar nada.
           Usa una API publica no oficial de ESPN, asi que ocasionalmente puede fallar.
@@ -198,10 +315,13 @@ function AdminGameRow({ game, onFinal, onDelete }: { game: Game; onFinal: (g: Ga
 
   return (
     <div className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-      <div className="text-sm">
-        <span className="font-mono-score text-xs text-[var(--color-text-muted)] mr-2">SEM {game.week}</span>
+      <div className="text-sm flex items-center gap-2">
+        <span className="font-mono-score text-xs text-[var(--color-text-muted)] mr-1">SEM {game.week}</span>
+        <img src={teamLogoUrl(game.away_team)} alt={game.away_team} className="w-5 h-5 object-contain" loading="lazy" />
         {game.away_team} @ {game.home_team}
+        <img src={teamLogoUrl(game.home_team)} alt={game.home_team} className="w-5 h-5 object-contain" loading="lazy" />
         {game.status === 'final' && <span className="ml-2 text-[var(--color-turf-green)] text-xs font-semibold">FINAL</span>}
+        {game.status === 'live' && <span className="ml-2 text-[var(--color-scoreboard-red)] text-xs font-semibold">EN VIVO</span>}
       </div>
       <div className="flex items-center gap-2">
         <input type="number" min={0} value={away} onChange={(e) => setAway(e.target.value)}

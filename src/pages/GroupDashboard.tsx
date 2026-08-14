@@ -6,7 +6,8 @@ import Leaderboard from '../components/Leaderboard'
 import Admin from './Admin'
 import type { User } from '@supabase/supabase-js'
 
-export default function GroupDashboard({ group, user, onBack }: { group: Group; user: User; onBack: () => void }) {
+export default function GroupDashboard({ group: initialGroup, user, onBack }: { group: Group; user: User; onBack: () => void }) {
+  const [group, setGroup] = useState(initialGroup)
   const [tab, setTab] = useState<'picks' | 'tabla' | 'admin'>('picks')
   const [games, setGames] = useState<Game[]>([])
   const [week, setWeek] = useState(1)
@@ -18,6 +19,18 @@ export default function GroupDashboard({ group, user, onBack }: { group: Group; 
   }
 
   useEffect(() => { loadGames() }, [group.id])
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(`games-${group.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'games', filter: `group_id=eq.${group.id}` },
+        () => loadGames()
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [group.id])
 
   const weeks = useMemo(() => {
     const set = new Set(games.map((g) => g.week))
@@ -33,10 +46,15 @@ export default function GroupDashboard({ group, user, onBack }: { group: Group; 
         ← Mis quinielas
       </button>
 
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center gap-3 mb-6">
+        {group.logo_url ? (
+          <img src={group.logo_url} alt={group.name} className="w-12 h-12 rounded-full object-cover border border-[var(--color-field-line)]" />
+        ) : (
+          <div className="w-12 h-12 rounded-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] flex items-center justify-center text-xl">🏈</div>
+        )}
         <div>
-          <h1 className="font-display text-3xl font-800">{group.name}</h1>
-          <p className="text-xs text-[var(--color-text-muted)] font-mono-score">Codigo de invitacion: #{group.invite_code}</p>
+          <h1 className="font-display text-3xl font-800 leading-none">{group.name}</h1>
+          <p className="text-xs text-[var(--color-text-muted)] font-mono-score mt-1">Codigo de invitacion: #{group.invite_code}</p>
         </div>
       </div>
 
@@ -82,7 +100,7 @@ export default function GroupDashboard({ group, user, onBack }: { group: Group; 
       {tab === 'tabla' && <Leaderboard groupId={group.id} />}
 
       {tab === 'admin' && isAdmin && (
-        <Admin groupId={group.id} games={games} onChange={loadGames} />
+        <Admin group={group} games={games} onChange={loadGames} onGroupUpdated={setGroup} />
       )}
     </div>
   )

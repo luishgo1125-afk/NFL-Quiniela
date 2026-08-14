@@ -9,6 +9,7 @@ export interface Group {
   invite_code: string
   created_by: string
   created_at: string
+  logo_url: string | null
 }
 
 export interface GroupMember {
@@ -26,7 +27,8 @@ export interface Game {
   kickoff: string
   home_score: number | null
   away_score: number | null
-  status: 'scheduled' | 'final'
+  status: 'scheduled' | 'live' | 'final'
+  game_clock: string | null
 }
 
 export interface Pick {

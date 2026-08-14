@@ -1,23 +1,29 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { NFL_TEAMS, type Game, type Group } from '../lib/types'
+import { NFL_TEAMS, weekLabel, type Game, type Group } from '../lib/types'
 import { fetchEspnWeek, guessCurrentWeek, type SeasonType } from '../lib/espn'
 import { teamLogoUrl } from '../lib/teamLogos'
 import MembersManager from '../components/MembersManager'
+import DangerZone from '../components/DangerZone'
 
 export default function Admin({
   group,
   games,
   onChange,
   onGroupUpdated,
+  onBack,
+  onLeftAdmin,
 }: {
   group: Group
   games: Game[]
   onChange: () => void
   onGroupUpdated: (g: Group) => void
+  onBack: () => void
+  onLeftAdmin: () => void
 }) {
   const groupId = group.id
   const [week, setWeek] = useState(1)
+  const [manualSeasonType, setManualSeasonType] = useState<SeasonType>(2)
   const [homeTeam, setHomeTeam] = useState(NFL_TEAMS[0])
   const [awayTeam, setAwayTeam] = useState(NFL_TEAMS[1])
   const [kickoff, setKickoff] = useState('')
@@ -118,7 +124,7 @@ export default function Admin({
 
       for (const eg of espnGames) {
         const existing = games.find(
-          (g) => g.week === syncWeek && g.home_team === eg.homeTeam && g.away_team === eg.awayTeam
+          (g) => g.week === syncWeek && g.season_type === syncType && g.home_team === eg.homeTeam && g.away_team === eg.awayTeam
         )
         const newStatus: 'scheduled' | 'live' | 'final' = eg.completed ? 'final' : eg.live ? 'live' : 'scheduled'
 
@@ -128,6 +134,7 @@ export default function Admin({
             .insert({
               group_id: groupId,
               week: syncWeek,
+              season_type: syncType,
               home_team: eg.homeTeam,
               away_team: eg.awayTeam,
               kickoff: eg.kickoff,
@@ -187,6 +194,7 @@ export default function Admin({
     const { error: err } = await supabase.from('games').insert({
       group_id: groupId,
       week,
+      season_type: manualSeasonType,
       home_team: homeTeam,
       away_team: awayTeam,
       kickoff: new Date(kickoff).toISOString(),
@@ -204,6 +212,22 @@ export default function Admin({
 
   async function deleteGame(id: string) {
     await supabase.from('games').delete().eq('id', id)
+    onChange()
+  }
+
+  const gamesByWeek = useMemo(() => {
+    const map = new Map<string, { key: string; seasonType: number; week: number; games: Game[] }>()
+    games.forEach((g) => {
+      const key = `${g.season_type}:${g.week}`
+      if (!map.has(key)) map.set(key, { key, seasonType: g.season_type, week: g.week, games: [] })
+      map.get(key)!.games.push(g)
+    })
+    return Array.from(map.values()).sort((a, b) => a.seasonType - b.seasonType || a.week - b.week)
+  }, [games])
+
+  async function deleteWeek(seasonType: number, week: number) {
+    if (!confirm(`¿Borrar toda la ${weekLabel(seasonType, week)}? Se eliminaran esos partidos y las predicciones de todos.`)) return
+    await supabase.from('games').delete().eq('group_id', groupId).eq('season_type', seasonType).eq('week', week)
     onChange()
   }
 
@@ -327,6 +351,15 @@ export default function Admin({
         <h2 className="text-sm font-semibold">O agregar un partido manualmente</h2>
         <div className="grid grid-cols-2 gap-3">
           <label className="text-xs text-[var(--color-text-muted)]">
+            Temporada
+            <select value={manualSeasonType} onChange={(e) => setManualSeasonType(Number(e.target.value) as SeasonType)}
+              className="w-full mt-1 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]">
+              <option value={2}>Regular</option>
+              <option value={1}>Pretemporada</option>
+              <option value={3}>Playoffs</option>
+            </select>
+          </label>
+          <label className="text-xs text-[var(--color-text-muted)]">
             Semana
             <input type="number" min={1} value={week} onChange={(e) => setWeek(Number(e.target.value))}
               className="w-full mt-1 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]" />
@@ -357,13 +390,28 @@ export default function Admin({
         </button>
       </form>
 
-      <div className="space-y-2">
+      <div className="space-y-4">
         <h2 className="text-sm font-semibold">Partidos capturados</h2>
         {games.length === 0 && <p className="text-xs text-[var(--color-text-muted)]">Ninguno todavia.</p>}
-        {games.map((g) => (
-          <AdminGameRow key={g.id} game={g} onFinal={setFinalScore} onDelete={deleteGame} />
+        {gamesByWeek.map((wk) => (
+          <div key={wk.key} className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-mono-score text-xs text-[var(--color-light-amber)]">{weekLabel(wk.seasonType, wk.week)}</span>
+              <button
+                onClick={() => deleteWeek(wk.seasonType, wk.week)}
+                className="text-xs text-[var(--color-scoreboard-red)] hover:underline"
+              >
+                Borrar semana completa
+              </button>
+            </div>
+            {wk.games.map((g) => (
+              <AdminGameRow key={g.id} game={g} onFinal={setFinalScore} onDelete={deleteGame} />
+            ))}
+          </div>
         ))}
       </div>
+
+      <DangerZone group={group} onGroupUpdated={onGroupUpdated} onLeftAdmin={onLeftAdmin} onDeleted={onBack} />
     </div>
   )
 }
@@ -375,7 +423,7 @@ function AdminGameRow({ game, onFinal, onDelete }: { game: Game; onFinal: (g: Ga
   return (
     <div className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
       <div className="text-sm flex items-center gap-2">
-        <span className="font-mono-score text-xs text-[var(--color-text-muted)] mr-1">SEM {game.week}</span>
+        <span className="font-mono-score text-xs text-[var(--color-text-muted)] mr-1">{weekLabel(game.season_type, game.week)}</span>
         <img src={teamLogoUrl(game.away_team)} alt={game.away_team} className="w-5 h-5 object-contain" loading="lazy" />
         {game.away_team} @ {game.home_team}
         <img src={teamLogoUrl(game.home_team)} alt={game.home_team} className="w-5 h-5 object-contain" loading="lazy" />

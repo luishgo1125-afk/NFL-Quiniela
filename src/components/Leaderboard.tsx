@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { teamLogoUrl } from '../lib/teamLogos'
+import type { Group } from '../lib/types'
 
 interface Row {
   user_id: string
@@ -9,6 +10,8 @@ interface Row {
   points: number
   hits: number
   played: number
+  exactHits: number
+  streak: number
 }
 
 const RANK_STYLES = [
@@ -17,7 +20,7 @@ const RANK_STYLES = [
   { bg: 'rgba(180,120,60,0.10)', border: '#B47A3C', badge: '#C98A4B', text: '#0A0E13' },
 ]
 
-export default function Leaderboard({ groupId }: { groupId: string }) {
+export default function Leaderboard({ group }: { group: Group }) {
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -27,43 +30,70 @@ export default function Leaderboard({ groupId }: { groupId: string }) {
       const { data: members } = await supabase
         .from('group_members')
         .select('user_id, profiles(display_name, favorite_team)')
-        .eq('group_id', groupId)
+        .eq('group_id', group.id)
 
-      const { data: games } = await supabase.from('games').select('id, status').eq('group_id', groupId)
-      const finalGameIds = (games ?? []).filter((g) => g.status === 'final').map((g) => g.id)
+      const { data: games } = await supabase
+        .from('games')
+        .select('id, kickoff')
+        .eq('group_id', group.id)
+        .eq('status', 'final')
+        .order('kickoff', { ascending: false })
+
+      const finalGameIds = (games ?? []).map((g) => g.id)
+      const kickoffByGame: Record<string, string> = {}
+      ;(games ?? []).forEach((g) => { kickoffByGame[g.id] = g.kickoff })
 
       let picks: any[] = []
       if (finalGameIds.length) {
-        const { data } = await supabase.from('picks').select('user_id, points').in('game_id', finalGameIds)
+        const { data } = await supabase.from('picks').select('user_id, game_id, points').in('game_id', finalGameIds)
         picks = data ?? []
       }
 
-      const totals: Record<string, { points: number; hits: number; played: number }> = {}
+      const byUser: Record<string, any[]> = {}
       picks.forEach((p) => {
-        const cur = totals[p.user_id] ?? { points: 0, hits: 0, played: 0 }
-        cur.points += p.points ?? 0
-        cur.played += 1
-        if ((p.points ?? 0) > 0) cur.hits += 1
-        totals[p.user_id] = cur
+        byUser[p.user_id] = byUser[p.user_id] ?? []
+        byUser[p.user_id].push(p)
       })
 
-      const result: Row[] = (members ?? []).map((m: any) => ({
-        user_id: m.user_id,
-        display_name: m.profiles?.display_name ?? 'Jugador',
-        favorite_team: m.profiles?.favorite_team ?? null,
-        points: totals[m.user_id]?.points ?? 0,
-        hits: totals[m.user_id]?.hits ?? 0,
-        played: totals[m.user_id]?.played ?? 0,
-      }))
+      const result: Row[] = (members ?? []).map((m: any) => {
+        const userPicks = (byUser[m.user_id] ?? []).slice().sort(
+          (a, b) => new Date(kickoffByGame[b.game_id]).getTime() - new Date(kickoffByGame[a.game_id]).getTime()
+        )
+        let points = 0
+        let hits = 0
+        let exactHits = 0
+        userPicks.forEach((p) => {
+          points += p.points ?? 0
+          if ((p.points ?? 0) > 0) hits++
+          if (p.points === group.points_exact) exactHits++
+        })
+        let streak = 0
+        for (const p of userPicks) {
+          if ((p.points ?? 0) > 0) streak++
+          else break
+        }
+        return {
+          user_id: m.user_id,
+          display_name: m.profiles?.display_name ?? 'Jugador',
+          favorite_team: m.profiles?.favorite_team ?? null,
+          points,
+          hits,
+          played: userPicks.length,
+          exactHits,
+          streak,
+        }
+      })
       result.sort((a, b) => b.points - a.points)
       setRows(result)
       setLoading(false)
     }
     load()
-  }, [groupId])
+  }, [group.id, group.points_exact])
 
   if (loading) return <p className="text-[var(--color-text-muted)] text-sm">Cargando tabla...</p>
   if (rows.length === 0) return <p className="text-[var(--color-text-muted)] text-sm">Todavia no hay nadie en este grupo.</p>
+
+  const maxExact = Math.max(0, ...rows.map((r) => r.exactHits))
 
   return (
     <div className="space-y-2">
@@ -101,7 +131,15 @@ export default function Leaderboard({ groupId }: { groupId: string }) {
             </div>
 
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium truncate">{r.display_name}</div>
+              <div className="text-sm font-medium truncate flex items-center gap-1.5">
+                {r.display_name}
+                {r.streak >= 3 && (
+                  <span className="text-[10px] font-mono-score" title={`Racha de ${r.streak}`}>🔥{r.streak}</span>
+                )}
+                {maxExact > 0 && r.exactHits === maxExact && (
+                  <span className="text-[10px]" title="Mas marcadores exactos del grupo">🎯</span>
+                )}
+              </div>
               <div className="text-[11px] text-[var(--color-text-muted)] font-mono-score">
                 {r.hits}/{r.played} aciertos
               </div>

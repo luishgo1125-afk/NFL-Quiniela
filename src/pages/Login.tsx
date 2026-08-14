@@ -2,12 +2,13 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 export default function Login() {
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin')
+  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [forgotSent, setForgotSent] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -15,7 +16,11 @@ export default function Login() {
     setBusy(true)
     try {
       if (mode === 'signup') {
-        const { data, error: signErr } = await supabase.auth.signUp({ email, password })
+        const { data, error: signErr } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { display_name: displayName || email.split('@')[0] } },
+        })
         if (signErr) throw signErr
         if (data.user) {
           await supabase.from('profiles').insert({ id: data.user.id, display_name: displayName || email.split('@')[0] })
@@ -29,6 +34,18 @@ export default function Login() {
     } finally {
       setBusy(false)
     }
+  }
+
+  async function handleForgot(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setBusy(true)
+    const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    })
+    setBusy(false)
+    if (err) { setError(err.message); return }
+    setForgotSent(true)
   }
 
   return (
@@ -45,58 +62,99 @@ export default function Login() {
         </div>
 
         <div className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-6">
-          <div className="flex mb-6 rounded-md overflow-hidden border border-[var(--color-field-line)]">
-            <button
-              onClick={() => setMode('signin')}
-              className={`flex-1 py-2 text-sm font-medium transition-colors ${mode === 'signin' ? 'bg-[var(--color-light-amber)] text-[var(--color-field-night)]' : 'text-[var(--color-text-muted)]'}`}
-            >
-              Entrar
-            </button>
-            <button
-              onClick={() => setMode('signup')}
-              className={`flex-1 py-2 text-sm font-medium transition-colors ${mode === 'signup' ? 'bg-[var(--color-light-amber)] text-[var(--color-field-night)]' : 'text-[var(--color-text-muted)]'}`}
-            >
-              Crear cuenta
-            </button>
-          </div>
+          {mode !== 'forgot' && (
+            <div className="flex mb-6 rounded-md overflow-hidden border border-[var(--color-field-line)]">
+              <button
+                onClick={() => setMode('signin')}
+                className={`flex-1 py-2 text-sm font-medium transition-colors ${mode === 'signin' ? 'bg-[var(--color-light-amber)] text-[var(--color-field-night)]' : 'text-[var(--color-text-muted)]'}`}
+              >
+                Entrar
+              </button>
+              <button
+                onClick={() => setMode('signup')}
+                className={`flex-1 py-2 text-sm font-medium transition-colors ${mode === 'signup' ? 'bg-[var(--color-light-amber)] text-[var(--color-field-night)]' : 'text-[var(--color-text-muted)]'}`}
+              >
+                Crear cuenta
+              </button>
+            </div>
+          )}
 
-          <form onSubmit={handleSubmit} className="space-y-3">
-            {mode === 'signup' && (
+          {mode === 'forgot' ? (
+            forgotSent ? (
+              <div className="text-center space-y-3">
+                <p className="text-sm">Te mandamos un enlace a <strong>{email}</strong> para restablecer tu contrasena.</p>
+                <button onClick={() => { setMode('signin'); setForgotSent(false) }} className="text-xs text-[var(--color-light-amber)] hover:underline">
+                  ← Volver a entrar
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleForgot} className="space-y-3">
+                <p className="text-xs text-[var(--color-text-muted)] mb-1">Te mandamos un enlace a tu correo para poner una nueva contrasena.</p>
+                <input
+                  type="email"
+                  placeholder="Correo"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="w-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
+                />
+                {error && <p className="text-[var(--color-scoreboard-red)] text-xs">{error}</p>}
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="w-full bg-[var(--color-light-amber)] text-[var(--color-field-night)] font-semibold rounded-md py-2 text-sm hover:brightness-110 transition disabled:opacity-50"
+                >
+                  {busy ? 'Enviando...' : 'Enviar enlace'}
+                </button>
+                <button type="button" onClick={() => setMode('signin')} className="w-full text-xs text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)]">
+                  ← Volver
+                </button>
+              </form>
+            )
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-3">
+              {mode === 'signup' && (
+                <input
+                  type="text"
+                  placeholder="Tu nombre"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  required
+                  className="w-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
+                />
+              )}
               <input
-                type="text"
-                placeholder="Tu nombre"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
+                type="email"
+                placeholder="Correo"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
                 className="w-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
               />
-            )}
-            <input
-              type="email"
-              placeholder="Correo"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
-            />
-            <input
-              type="password"
-              placeholder="Contrasena"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-              className="w-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
-            />
-            {error && <p className="text-[var(--color-scoreboard-red)] text-xs">{error}</p>}
-            <button
-              type="submit"
-              disabled={busy}
-              className="w-full bg-[var(--color-light-amber)] text-[var(--color-field-night)] font-semibold rounded-md py-2 text-sm hover:brightness-110 transition disabled:opacity-50"
-            >
-              {busy ? 'Un momento...' : mode === 'signin' ? 'Entrar' : 'Crear cuenta'}
-            </button>
-          </form>
+              <input
+                type="password"
+                placeholder="Contrasena"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                className="w-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
+              />
+              {error && <p className="text-[var(--color-scoreboard-red)] text-xs">{error}</p>}
+              <button
+                type="submit"
+                disabled={busy}
+                className="w-full bg-[var(--color-light-amber)] text-[var(--color-field-night)] font-semibold rounded-md py-2 text-sm hover:brightness-110 transition disabled:opacity-50"
+              >
+                {busy ? 'Un momento...' : mode === 'signin' ? 'Entrar' : 'Crear cuenta'}
+              </button>
+              {mode === 'signin' && (
+                <button type="button" onClick={() => setMode('forgot')} className="w-full text-xs text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)]">
+                  ¿Olvidaste tu contrasena?
+                </button>
+              )}
+            </form>
+          )}
         </div>
       </div>
     </div>

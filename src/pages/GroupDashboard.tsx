@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Game, Group } from '../lib/types'
+import { weekLabel } from '../lib/types'
 import GameCard from '../components/GameCard'
 import Leaderboard from '../components/Leaderboard'
 import Admin from './Admin'
@@ -10,7 +11,7 @@ export default function GroupDashboard({ group: initialGroup, user, onBack }: { 
   const [group, setGroup] = useState(initialGroup)
   const [tab, setTab] = useState<'picks' | 'tabla' | 'admin'>('picks')
   const [games, setGames] = useState<Game[]>([])
-  const [week, setWeek] = useState(1)
+  const [weekKey, setWeekKey] = useState<string | null>(null)
   const [leaving, setLeaving] = useState(false)
   const [leaveErr, setLeaveErr] = useState<string | null>(null)
   const isAdmin = group.created_by === user.id
@@ -45,12 +46,21 @@ export default function GroupDashboard({ group: initialGroup, user, onBack }: { 
   }, [group.id])
 
   const weeks = useMemo(() => {
-    const set = new Set(games.map((g) => g.week))
-    if (set.size === 0) set.add(1)
-    return Array.from(set).sort((a, b) => a - b)
+    const map = new Map<string, { seasonType: number; week: number }>()
+    games.forEach((g) => {
+      const key = `${g.season_type}:${g.week}`
+      if (!map.has(key)) map.set(key, { seasonType: g.season_type, week: g.week })
+    })
+    return Array.from(map.entries())
+      .map(([key, v]) => ({ key, ...v }))
+      .sort((a, b) => a.seasonType - b.seasonType || a.week - b.week)
   }, [games])
 
-  const weekGames = games.filter((g) => g.week === week)
+  useEffect(() => {
+    if (weekKey === null && weeks.length > 0) setWeekKey(weeks[0].key)
+  }, [weeks, weekKey])
+
+  const weekGames = games.filter((g) => `${g.season_type}:${g.week}` === weekKey)
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
@@ -98,11 +108,22 @@ export default function GroupDashboard({ group: initialGroup, user, onBack }: { 
           <div className="flex gap-2 mb-4 flex-wrap">
             {weeks.map((w) => (
               <button
-                key={w}
-                onClick={() => setWeek(w)}
-                className={`font-mono-score text-xs px-3 py-1 rounded-full border ${week === w ? 'border-[var(--color-light-amber)] text-[var(--color-light-amber)]' : 'border-[var(--color-field-line)] text-[var(--color-text-muted)]'}`}
+                key={w.key}
+                onClick={() => setWeekKey(w.key)}
+                className={`font-mono-score text-xs px-3 py-1 rounded-full border flex items-center gap-1 ${weekKey === w.key ? 'border-[var(--color-light-amber)] text-[var(--color-light-amber)]' : 'border-[var(--color-field-line)] text-[var(--color-text-muted)]'}`}
               >
-                SEMANA {w}
+                {w.seasonType !== 2 && (
+                  <span
+                    className="text-[9px] px-1 rounded"
+                    style={{
+                      background: w.seasonType === 1 ? 'rgba(138,148,163,0.25)' : 'rgba(228,70,43,0.2)',
+                      color: w.seasonType === 1 ? 'var(--color-text-muted)' : 'var(--color-scoreboard-red)',
+                    }}
+                  >
+                    {w.seasonType === 1 ? 'PRETEMP' : 'PLAYOFFS'}
+                  </span>
+                )}
+                {weekLabel(w.seasonType, w.week)}
               </button>
             ))}
           </div>
@@ -120,10 +141,10 @@ export default function GroupDashboard({ group: initialGroup, user, onBack }: { 
         </>
       )}
 
-      {tab === 'tabla' && <Leaderboard groupId={group.id} />}
+      {tab === 'tabla' && <Leaderboard group={group} />}
 
       {tab === 'admin' && isAdmin && (
-        <Admin group={group} games={games} onChange={loadGames} onGroupUpdated={setGroup} />
+        <Admin group={group} games={games} onChange={loadGames} onGroupUpdated={setGroup} onBack={onBack} onLeftAdmin={() => setTab('picks')} />
       )}
     </div>
   )

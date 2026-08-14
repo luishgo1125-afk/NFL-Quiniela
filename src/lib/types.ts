@@ -24,6 +24,7 @@ export interface Game {
   id: string
   group_id: string
   week: number
+  season_type: 1 | 2 | 3
   home_team: string
   away_team: string
   kickoff: string
@@ -31,6 +32,13 @@ export interface Game {
   away_score: number | null
   status: 'scheduled' | 'live' | 'final'
   game_clock: string | null
+}
+
+// 1 = pretemporada, 2 = temporada regular, 3 = playoffs
+export function weekLabel(seasonType: number, week: number): string {
+  if (seasonType === 1) return `PRE ${week}`
+  if (seasonType === 3) return `PO ${week}`
+  return `SEMANA ${week}`
 }
 
 export interface Pick {

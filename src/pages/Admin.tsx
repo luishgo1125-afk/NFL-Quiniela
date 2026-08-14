@@ -29,6 +29,28 @@ export default function Admin({
   const [groupMsg, setGroupMsg] = useState<string | null>(null)
   const [groupErr, setGroupErr] = useState<string | null>(null)
 
+  const [pointsWinner, setPointsWinner] = useState(group.points_winner ?? 1)
+  const [pointsExact, setPointsExact] = useState(group.points_exact ?? 3)
+  const [savingRules, setSavingRules] = useState(false)
+  const [rulesMsg, setRulesMsg] = useState<string | null>(null)
+  const [rulesErr, setRulesErr] = useState<string | null>(null)
+
+  async function saveScoringRules(e: React.FormEvent) {
+    e.preventDefault()
+    setSavingRules(true)
+    setRulesMsg(null)
+    setRulesErr(null)
+    const { data, error: err } = await supabase.rpc('update_scoring_rules', {
+      p_group_id: groupId,
+      p_points_winner: pointsWinner,
+      p_points_exact: pointsExact,
+    })
+    setSavingRules(false)
+    if (err) { setRulesErr(err.message); return }
+    onGroupUpdated(data)
+    setRulesMsg('Guardado — se recalcularon los partidos ya finalizados.')
+  }
+
   const guess = guessCurrentWeek()
   const [syncYear, setSyncYear] = useState(guess.year)
   const [syncWeek, setSyncWeek] = useState(guess.week)
@@ -218,6 +240,41 @@ export default function Admin({
           className="w-full bg-[var(--color-light-amber)] text-[var(--color-field-night)] font-semibold rounded-md py-2 text-sm hover:brightness-110 disabled:opacity-50">
           {savingGroup ? 'Guardando...' : 'Guardar cambios de la liga'}
         </button>
+      </form>
+
+      <form onSubmit={saveScoringRules} className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-4 space-y-3">
+        <h2 className="text-sm font-semibold">Criterios de puntos</h2>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="text-xs text-[var(--color-text-muted)]">
+            Acertar al equipo ganador
+            <input
+              type="number"
+              min={0}
+              value={pointsWinner}
+              onChange={(e) => setPointsWinner(Number(e.target.value))}
+              className="w-full mt-1 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
+            />
+          </label>
+          <label className="text-xs text-[var(--color-text-muted)]">
+            Acertar el marcador exacto
+            <input
+              type="number"
+              min={0}
+              value={pointsExact}
+              onChange={(e) => setPointsExact(Number(e.target.value))}
+              className="w-full mt-1 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
+            />
+          </label>
+        </div>
+        {rulesErr && <p className="text-[var(--color-scoreboard-red)] text-xs">{rulesErr}</p>}
+        {rulesMsg && <p className="text-[var(--color-turf-green)] text-xs">{rulesMsg}</p>}
+        <button type="submit" disabled={savingRules}
+          className="w-full bg-[var(--color-light-amber)] text-[var(--color-field-night)] font-semibold rounded-md py-2 text-sm hover:brightness-110 disabled:opacity-50">
+          {savingRules ? 'Guardando...' : 'Guardar criterios'}
+        </button>
+        <p className="text-[10px] text-[var(--color-text-muted)]">
+          Al guardar, se recalculan automaticamente los puntos de todos los partidos ya finalizados con las nuevas reglas.
+        </p>
       </form>
 
       <form onSubmit={syncWeekFromEspn} className="bg-[var(--color-field-surface)] border border-[var(--color-light-amber)]/40 rounded-lg p-4 space-y-3">

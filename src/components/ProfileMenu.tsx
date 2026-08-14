@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { NFL_TEAMS } from '../lib/types'
+import { teamLogoUrl } from '../lib/teamLogos'
 import type { User } from '@supabase/supabase-js'
 
 function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
@@ -18,13 +20,15 @@ function ModalShell({ title, onClose, children }: { title: string; onClose: () =
 
 function ProfileModal({ user, onClose }: { user: User; onClose: () => void }) {
   const [name, setName] = useState('')
+  const [team, setTeam] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
   useEffect(() => {
-    supabase.from('profiles').select('display_name').eq('id', user.id).single().then(({ data }) => {
+    supabase.from('profiles').select('display_name, favorite_team').eq('id', user.id).single().then(({ data }) => {
       setName(data?.display_name ?? '')
+      setTeam(data?.favorite_team ?? '')
       setLoading(false)
     })
   }, [])
@@ -32,7 +36,10 @@ function ProfileModal({ user, onClose }: { user: User; onClose: () => void }) {
   async function save() {
     setSaving(true)
     setMsg(null)
-    const { error } = await supabase.from('profiles').update({ display_name: name }).eq('id', user.id)
+    const { error } = await supabase
+      .from('profiles')
+      .update({ display_name: name, favorite_team: team || null })
+      .eq('id', user.id)
     setSaving(false)
     setMsg(error ? error.message : 'Guardado.')
   }
@@ -54,6 +61,24 @@ function ProfileModal({ user, onClose }: { user: User; onClose: () => void }) {
               onChange={(e) => setName(e.target.value)}
               className="w-full mt-1 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
             />
+          )}
+        </div>
+        <div>
+          <label className="text-xs text-[var(--color-text-muted)]">Equipo favorito</label>
+          {loading ? (
+            <p className="text-sm text-[var(--color-text-muted)]">Cargando...</p>
+          ) : (
+            <div className="flex items-center gap-2 mt-1">
+              {team && <img src={teamLogoUrl(team)} alt={team} className="w-8 h-8 object-contain shrink-0" />}
+              <select
+                value={team}
+                onChange={(e) => setTeam(e.target.value)}
+                className="w-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
+              >
+                <option value="">Sin elegir</option>
+                {NFL_TEAMS.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
           )}
         </div>
         {msg && <p className="text-xs text-[var(--color-turf-green)]">{msg}</p>}

@@ -10,6 +10,8 @@ export interface Group {
   created_by: string
   created_at: string
   logo_url: string | null
+  points_winner: number
+  points_exact: number
 }
 
 export interface GroupMember {

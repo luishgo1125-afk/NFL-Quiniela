@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { NFL_TEAMS, type Game, type Group } from '../lib/types'
 import { fetchEspnWeek, guessCurrentWeek, type SeasonType } from '../lib/espn'
 import { teamLogoUrl } from '../lib/teamLogos'
+import MembersManager from '../components/MembersManager'
 
 export default function Admin({
   group,
@@ -276,6 +277,8 @@ export default function Admin({
           Al guardar, se recalculan automaticamente los puntos de todos los partidos ya finalizados con las nuevas reglas.
         </p>
       </form>
+
+      <MembersManager group={group} />
 
       <form onSubmit={syncWeekFromEspn} className="bg-[var(--color-field-surface)] border border-[var(--color-light-amber)]/40 rounded-lg p-4 space-y-3">
         <div>

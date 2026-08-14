@@ -11,7 +11,19 @@ export default function GroupDashboard({ group: initialGroup, user, onBack }: { 
   const [tab, setTab] = useState<'picks' | 'tabla' | 'admin'>('picks')
   const [games, setGames] = useState<Game[]>([])
   const [week, setWeek] = useState(1)
+  const [leaving, setLeaving] = useState(false)
+  const [leaveErr, setLeaveErr] = useState<string | null>(null)
   const isAdmin = group.created_by === user.id
+
+  async function leaveGroup() {
+    if (!confirm(`¿Seguro que quieres salir de "${group.name}"? Perderas acceso a esta liga.`)) return
+    setLeaving(true)
+    setLeaveErr(null)
+    const { error } = await supabase.rpc('leave_group', { p_group_id: group.id })
+    setLeaving(false)
+    if (error) { setLeaveErr(error.message); return }
+    onBack()
+  }
 
   async function loadGames() {
     const { data } = await supabase.from('games').select('*').eq('group_id', group.id).order('kickoff')
@@ -46,17 +58,28 @@ export default function GroupDashboard({ group: initialGroup, user, onBack }: { 
         ← Mis quinielas
       </button>
 
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-1">
         {group.logo_url ? (
           <img src={group.logo_url} alt={group.name} className="w-12 h-12 rounded-full object-cover border border-[var(--color-field-line)]" />
         ) : (
           <div className="w-12 h-12 rounded-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] flex items-center justify-center text-xl">🏈</div>
         )}
-        <div>
+        <div className="flex-1">
           <h1 className="font-display text-3xl font-800 leading-none">{group.name}</h1>
           <p className="text-xs text-[var(--color-text-muted)] font-mono-score mt-1">Codigo de invitacion: #{group.invite_code}</p>
         </div>
+        {!isAdmin && (
+          <button
+            onClick={leaveGroup}
+            disabled={leaving}
+            className="text-xs text-[var(--color-scoreboard-red)] hover:underline shrink-0 disabled:opacity-50"
+          >
+            {leaving ? 'Saliendo...' : 'Salir de la liga'}
+          </button>
+        )}
       </div>
+      {leaveErr && <p className="text-[var(--color-scoreboard-red)] text-xs mb-4">{leaveErr}</p>}
+      <div className="mb-5" />
 
       <div className="flex gap-1 mb-6 rounded-md overflow-hidden border border-[var(--color-field-line)] w-fit">
         {(['picks', 'tabla'] as const).concat(isAdmin ? ['admin'] : []).map((t) => (

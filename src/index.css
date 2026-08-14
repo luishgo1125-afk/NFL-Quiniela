@@ -1,0 +1,54 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Space+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap');
+
+@theme {
+  --font-display: 'Big Shoulders Display', sans-serif;
+  --font-body: 'Space Grotesk', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --color-field-night: #0A0E13;
+  --color-field-surface: #131A22;
+  --color-field-surface-raised: #1B2530;
+  --color-field-line: #2A3542;
+  --color-light-amber: #F2B705;
+  --color-light-amber-dim: #8A6B0F;
+  --color-scoreboard-red: #E4462B;
+  --color-turf-green: #3D8B5F;
+  --color-text-primary: #ECEFF3;
+  --color-text-muted: #8A94A3;
+}
+
+body {
+  background-color: var(--color-field-night);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(242, 183, 5, 0.08), transparent),
+    repeating-linear-gradient(180deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 3px);
+  color: var(--color-text-primary);
+  font-family: var(--font-body);
+  min-height: 100vh;
+}
+
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.01em;
+}
+
+.font-mono-score {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.scoreboard-glow {
+  box-shadow: 0 0 0 1px var(--color-light-amber-dim), 0 0 24px -8px rgba(242,183,5,0.35);
+}
+
+::selection {
+  background: var(--color-light-amber);
+  color: var(--color-field-night);
+}
+
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}

@@ -3,10 +3,6 @@ import { supabase } from '../lib/supabase'
 import type { Group } from '../lib/types'
 import type { User } from '@supabase/supabase-js'
 
-function randomCode() {
-  return Math.random().toString(36).slice(2, 8).toUpperCase()
-}
-
 export default function Groups({ user, onSelect }: { user: User; onSelect: (g: Group) => void }) {
   const [groups, setGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
@@ -30,14 +26,8 @@ export default function Groups({ user, onSelect }: { user: User; onSelect: (g: G
   async function createGroup(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
-    const code = randomCode()
-    const { data, error: err } = await supabase
-      .from('groups')
-      .insert({ name: newName, invite_code: code, created_by: user.id })
-      .select()
-      .single()
+    const { data, error: err } = await supabase.rpc('create_group', { p_name: newName })
     if (err) { setError(err.message); return }
-    await supabase.from('group_members').insert({ group_id: data.id, user_id: user.id })
     setNewName('')
     loadGroups()
   }
@@ -45,14 +35,8 @@ export default function Groups({ user, onSelect }: { user: User; onSelect: (g: G
   async function joinGroup(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
-    const { data, error: err } = await supabase
-      .from('groups')
-      .select('*')
-      .eq('invite_code', joinCode.trim().toUpperCase())
-      .single()
-    if (err || !data) { setError('Codigo de invitacion no encontrado'); return }
-    const { error: joinErr } = await supabase.from('group_members').insert({ group_id: data.id, user_id: user.id })
-    if (joinErr && !joinErr.message.includes('duplicate')) { setError(joinErr.message); return }
+    const { data, error: err } = await supabase.rpc('join_group', { p_invite_code: joinCode.trim().toUpperCase() })
+    if (err) { setError(err.message); return }
     setJoinCode('')
     loadGroups()
   }

@@ -3,7 +3,23 @@ import { supabase } from '../lib/supabase'
 import type { Game, Pick } from '../lib/types'
 import { teamLogoUrl } from '../lib/teamLogos'
 
-export default function GameCard({ game, userId }: { game: Game; userId: string }) {
+interface MemberInfo {
+  user_id: string
+  display_name: string
+  favorite_team: string | null
+}
+
+export default function GameCard({
+  game,
+  userId,
+  members,
+  pickedUserIds,
+}: {
+  game: Game
+  userId: string
+  members: MemberInfo[]
+  pickedUserIds: string[]
+}) {
   const [pick, setPick] = useState<Pick | null>(null)
   const [home, setHome] = useState('')
   const [away, setAway] = useState('')
@@ -130,6 +146,35 @@ export default function GameCard({ game, userId }: { game: Game; userId: string 
           {pick?.points != null && (
             <span className="ml-2 font-semibold text-[var(--color-light-amber)]">+{pick.points} pts</span>
           )}
+        </div>
+      )}
+
+      {members.length > 0 && (
+        <div className="flex items-center gap-1.5 mt-3 flex-wrap">
+          <span className="text-[10px] text-[var(--color-text-muted)] mr-1">
+            {pickedUserIds.length}/{members.length} ya predijeron
+          </span>
+          {members.map((m) => {
+            const done = pickedUserIds.includes(m.user_id)
+            return (
+              <div
+                key={m.user_id}
+                title={`${m.display_name}${done ? ' — ya prediji' : ' — falta'}`}
+                className="w-5 h-5 rounded-full flex items-center justify-center overflow-hidden text-[9px] font-display font-700 shrink-0"
+                style={{
+                  background: done ? 'rgba(61,139,95,0.2)' : 'var(--color-field-surface-raised)',
+                  border: `1px solid ${done ? '#3D8B5F' : 'var(--color-field-line)'}`,
+                  opacity: done ? 1 : 0.4,
+                }}
+              >
+                {m.favorite_team ? (
+                  <img src={teamLogoUrl(m.favorite_team)} alt={m.favorite_team} className="w-full h-full object-contain p-0.5" loading="lazy" />
+                ) : (
+                  m.display_name.charAt(0).toUpperCase()
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
 

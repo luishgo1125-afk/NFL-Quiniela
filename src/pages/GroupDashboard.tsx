@@ -14,6 +14,8 @@ export default function GroupDashboard({ group: initialGroup, user, onBack }: { 
   const [weekKey, setWeekKey] = useState<string | null>(null)
   const [leaving, setLeaving] = useState(false)
   const [leaveErr, setLeaveErr] = useState<string | null>(null)
+  const [members, setMembers] = useState<{ user_id: string; display_name: string; favorite_team: string | null }[]>([])
+  const [pickedBy, setPickedBy] = useState<Record<string, string[]>>({})
   const isAdmin = group.created_by === user.id
 
   async function leaveGroup() {
@@ -29,6 +31,28 @@ export default function GroupDashboard({ group: initialGroup, user, onBack }: { 
   async function loadGames() {
     const { data } = await supabase.from('games').select('*').eq('group_id', group.id).order('kickoff')
     setGames(data ?? [])
+  }
+
+  async function loadMembers() {
+    const { data } = await supabase
+      .from('group_members')
+      .select('user_id, profiles(display_name, favorite_team)')
+      .eq('group_id', group.id)
+    setMembers((data ?? []).map((row: any) => ({
+      user_id: row.user_id,
+      display_name: row.profiles?.display_name ?? 'Jugador',
+      favorite_team: row.profiles?.favorite_team ?? null,
+    })))
+  }
+
+  async function loadPickStatus() {
+    const { data } = await supabase.rpc('group_pick_status', { p_group_id: group.id })
+    const map: Record<string, string[]> = {}
+    ;(data ?? []).forEach((row: any) => {
+      map[row.game_id] = map[row.game_id] ?? []
+      map[row.game_id].push(row.user_id)
+    })
+    setPickedBy(map)
   }
 
   useEffect(() => {
@@ -49,7 +73,7 @@ export default function GroupDashboard({ group: initialGroup, user, onBack }: { 
     return () => { cancelled = true }
   }, [group.id, user.id])
 
-  useEffect(() => { loadGames() }, [group.id])
+  useEffect(() => { loadGames(); loadMembers(); loadPickStatus() }, [group.id])
 
   useEffect(() => {
     const channel = supabase
@@ -58,6 +82,11 @@ export default function GroupDashboard({ group: initialGroup, user, onBack }: { 
         'postgres_changes',
         { event: '*', schema: 'public', table: 'games', filter: `group_id=eq.${group.id}` },
         () => loadGames()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'picks' },
+        () => loadPickStatus()
       )
       .subscribe()
     return () => { supabase.removeChannel(channel) }
@@ -152,7 +181,7 @@ export default function GroupDashboard({ group: initialGroup, user, onBack }: { 
           ) : (
             <div className="space-y-3">
               {weekGames.map((g) => (
-                <GameCard key={g.id} game={g} userId={user.id} />
+                <GameCard key={g.id} game={g} userId={user.id} members={members} pickedUserIds={pickedBy[g.id] ?? []} />
               ))}
             </div>
           )}

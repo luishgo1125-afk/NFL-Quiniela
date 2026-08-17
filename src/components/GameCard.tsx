@@ -97,15 +97,23 @@ export default function GameCard({
   })
 
   const cardBorder = confirmed ? '#3D8B5F' : locked ? 'var(--color-field-line)' : 'var(--color-field-line)'
-  const cardBg = confirmed ? 'rgba(61,139,95,0.08)' : 'var(--color-field-surface)'
+  const cardBg = confirmed
+    ? 'linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.12)), rgba(61,139,95,0.08)'
+    : 'linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.15)), var(--color-field-surface)'
 
   return (
     <div
-      className={`rounded-lg border p-4 transition-colors ${!locked && !confirmed ? 'scoreboard-glow' : ''}`}
-      style={{ borderColor: cardBorder, background: cardBg }}
+      className={`rounded-xl border p-4 transition-all duration-150 hover:-translate-y-0.5 ${!locked && !confirmed ? 'scoreboard-glow' : ''}`}
+      style={{
+        borderColor: cardBorder,
+        background: cardBg,
+        boxShadow: confirmed
+          ? '0 6px 16px -4px rgba(61,139,95,0.25), 0 2px 6px rgba(0,0,0,0.3)'
+          : '0 6px 16px -4px rgba(0,0,0,0.45), 0 2px 6px rgba(0,0,0,0.3)',
+      }}
     >
       <div className="flex items-center justify-between mb-3">
-        <span className="text-xs text-[var(--color-text-muted)] font-mono-score">{kickoffLabel}</span>
+        <span className="text-xs text-[var(--color-text-muted)]">{kickoffLabel}</span>
         {game.status === 'final' ? (
           <span className="text-xs font-semibold text-[var(--color-turf-green)]">FINAL</span>
         ) : game.status === 'live' ? (
@@ -130,8 +138,8 @@ export default function GameCard({
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
           <div className="text-right">
             <div className="flex items-center justify-end gap-2 mb-1">
-              <span className="font-display text-2xl font-700">{game.away_team}</span>
               <img src={teamLogoUrl(game.away_team)} alt={game.away_team} className="w-8 h-8 object-contain" loading="lazy" />
+              <span className="font-display text-2xl font-700">{game.away_team}</span>
             </div>
             <div className="text-[10px] text-[var(--color-text-muted)]">VISITANTE</div>
           </div>

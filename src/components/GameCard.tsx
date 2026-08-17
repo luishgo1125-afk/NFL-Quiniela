@@ -122,51 +122,57 @@ export default function GameCard({
         )}
       </div>
 
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-        <div className="text-right">
-          <div className="flex items-center justify-end gap-2 mb-1">
-            <span className="font-display text-2xl font-700">{game.away_team}</span>
-            <img src={teamLogoUrl(game.away_team)} alt={game.away_team} className="w-8 h-8 object-contain" loading="lazy" />
+      {locked && !pick ? (
+        <div className="text-center py-3 text-sm text-[var(--color-text-muted)] italic">
+          No participaste en este partido
+        </div>
+      ) : (
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+          <div className="text-right">
+            <div className="flex items-center justify-end gap-2 mb-1">
+              <span className="font-display text-2xl font-700">{game.away_team}</span>
+              <img src={teamLogoUrl(game.away_team)} alt={game.away_team} className="w-8 h-8 object-contain" loading="lazy" />
+            </div>
+            <div className="text-[10px] text-[var(--color-text-muted)]">VISITANTE</div>
           </div>
-          <div className="text-[10px] text-[var(--color-text-muted)]">VISITANTE</div>
-        </div>
 
-        <div className="flex items-center gap-2">
-          <input
-            type="number"
-            min={0}
-            value={away}
-            disabled={locked}
-            onChange={(e) => setAway(e.target.value)}
-            className={`w-14 text-center font-mono-score text-xl rounded-md py-1 outline-none disabled:opacity-60 transition-colors ${
-              confirmed
-                ? 'bg-[rgba(61,139,95,0.15)] border border-[#3D8B5F] text-[#3D8B5F]'
-                : 'bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] focus:border-[var(--color-light-amber)]'
-            }`}
-          />
-          <span className="text-[var(--color-text-muted)]">–</span>
-          <input
-            type="number"
-            min={0}
-            value={home}
-            disabled={locked}
-            onChange={(e) => setHome(e.target.value)}
-            className={`w-14 text-center font-mono-score text-xl rounded-md py-1 outline-none disabled:opacity-60 transition-colors ${
-              confirmed
-                ? 'bg-[rgba(61,139,95,0.15)] border border-[#3D8B5F] text-[#3D8B5F]'
-                : 'bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] focus:border-[var(--color-light-amber)]'
-            }`}
-          />
-        </div>
-
-        <div className="text-left">
-          <div className="flex items-center justify-start gap-2 mb-1">
-            <span className="font-display text-2xl font-700">{game.home_team}</span>
-            <img src={teamLogoUrl(game.home_team)} alt={game.home_team} className="w-8 h-8 object-contain" loading="lazy" />
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={0}
+              value={away}
+              disabled={locked}
+              onChange={(e) => setAway(e.target.value)}
+              className={`w-14 text-center font-mono-score text-xl rounded-md py-1 outline-none disabled:opacity-60 transition-colors ${
+                confirmed
+                  ? 'bg-[rgba(61,139,95,0.15)] border border-[#3D8B5F] text-[#3D8B5F]'
+                  : 'bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] focus:border-[var(--color-light-amber)]'
+              }`}
+            />
+            <span className="text-[var(--color-text-muted)]">–</span>
+            <input
+              type="number"
+              min={0}
+              value={home}
+              disabled={locked}
+              onChange={(e) => setHome(e.target.value)}
+              className={`w-14 text-center font-mono-score text-xl rounded-md py-1 outline-none disabled:opacity-60 transition-colors ${
+                confirmed
+                  ? 'bg-[rgba(61,139,95,0.15)] border border-[#3D8B5F] text-[#3D8B5F]'
+                  : 'bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] focus:border-[var(--color-light-amber)]'
+              }`}
+            />
           </div>
-          <div className="text-[10px] text-[var(--color-text-muted)]">LOCAL</div>
+
+          <div className="text-left">
+            <div className="flex items-center justify-start gap-2 mb-1">
+              <span className="font-display text-2xl font-700">{game.home_team}</span>
+              <img src={teamLogoUrl(game.home_team)} alt={game.home_team} className="w-8 h-8 object-contain" loading="lazy" />
+            </div>
+            <div className="text-[10px] text-[var(--color-text-muted)]">LOCAL</div>
+          </div>
         </div>
-      </div>
+      )}
 
       {(game.status === 'final' || game.status === 'live') && (
         <div className="text-center mt-2 text-xs text-[var(--color-text-muted)]">

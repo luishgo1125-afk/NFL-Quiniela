@@ -63,7 +63,7 @@ export default function Login() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-3">
-            <span className="font-mono-score text-[var(--color-light-amber)] text-sm tracking-widest">WK 01</span>
+            <span className="font-mono-score text-[var(--color-light-amber)] text-sm tracking-widest"></span>
           </div>
           <img src="/logo.png" alt="Quiniela" className="h-14 w-auto mx-auto" />
           <p className="text-[var(--color-text-muted)] text-sm mt-3">Predicciones NFL entre amigos</p>

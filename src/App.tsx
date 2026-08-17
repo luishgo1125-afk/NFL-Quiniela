@@ -105,7 +105,7 @@ export default function App() {
     const { error } = await supabase.rpc('leave_group', { p_group_id: activeGroup.id })
     if (error) { alert(error.message); return }
     setActiveGroup(null)
-    setBottomTab('grupos')
+    setBottomTab('quinielas')
   }
 
   function selectGroup(g: Group) {
@@ -115,8 +115,8 @@ export default function App() {
 
   return (
     <div className="pb-16">
-      <header className="border-b border-[var(--color-field-line)] px-4 py-3 flex items-center" style={{ background: 'linear-gradient(180deg, rgba(242,183,5,0.05), transparent)' }}>
-        <img src="/logo.png" alt="Quiniela" className="h-6 w-auto" />
+      <header className="sticky top-0 z-40 border-b border-[var(--color-field-line)] px-4 py-2.5 flex items-center" style={{ background: 'linear-gradient(180deg, rgba(242,183,5,0.05), var(--color-field-night)), var(--color-field-night)' }}>
+        <img src="/logo.png" alt="Quiniela" className="h-10 w-auto" />
       </header>
 
       {bottomTab === 'grupos' && <MyGroups user={user} onEnter={selectGroup} />}
@@ -126,7 +126,7 @@ export default function App() {
           <GroupDashboard
             group={activeGroup}
             user={user}
-            onBack={() => { setActiveGroup(null); setBottomTab('grupos') }}
+            onBack={() => { setActiveGroup(null); setBottomTab('quinielas') }}
             onGroupChange={setActiveGroup}
           />
         ) : (

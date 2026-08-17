@@ -12,6 +12,7 @@ export interface Group {
   logo_url: string | null
   points_winner: number
   points_exact: number
+  special_picks_enabled: boolean
 }
 
 export interface GroupMember {
@@ -25,6 +26,7 @@ export interface Game {
   group_id: string
   week: number
   season_type: 1 | 2 | 3
+  year: number
   home_team: string
   away_team: string
   kickoff: string
@@ -47,6 +49,24 @@ export interface Pick {
   user_id: string
   pred_home_score: number
   pred_away_score: number
+  points: number | null
+}
+
+export interface SpecialCategory {
+  id: string
+  group_id: string
+  title: string
+  options: string[]
+  points: number
+  locked: boolean
+  correct_answer: string | null
+}
+
+export interface SpecialPick {
+  id: string
+  category_id: string
+  user_id: string
+  answer: string
   points: number | null
 }
 

@@ -3,18 +3,28 @@ import { supabase } from '../lib/supabase'
 import type { Game, Group } from '../lib/types'
 import { weekLabel } from '../lib/types'
 import GameCard from '../components/GameCard'
+import SpecialPicks from '../components/SpecialPicks'
 import Leaderboard from '../components/Leaderboard'
 import Admin from './Admin'
 import type { User } from '@supabase/supabase-js'
 
-export default function GroupDashboard({ group: initialGroup, user, onBack }: { group: Group; user: User; onBack: () => void }) {
-  const [group, setGroup] = useState(initialGroup)
-  const [tab, setTab] = useState<'picks' | 'tabla' | 'admin'>('picks')
+export default function GroupDashboard({
+  group: initialGroup,
+  user,
+  onBack,
+  onGroupChange,
+}: {
+  group: Group
+  user: User
+  onBack: () => void
+  onGroupChange?: (g: Group) => void
+}) {
+  const [group, setGroupState] = useState(initialGroup)
+  const setGroup = (g: Group) => { setGroupState(g); onGroupChange?.(g) }
+  const [tab, setTab] = useState<'picks' | 'especiales' | 'tabla' | 'admin'>('picks')
   const [games, setGames] = useState<Game[]>([])
   const [weekKey, setWeekKey] = useState<string | null>(null)
-  const [leaving, setLeaving] = useState(false)
   const [copiedCode, setCopiedCode] = useState(false)
-  const [leaveErr, setLeaveErr] = useState<string | null>(null)
   const [members, setMembers] = useState<{ user_id: string; display_name: string; favorite_team: string | null }[]>([])
   const [pickedBy, setPickedBy] = useState<Record<string, string[]>>({})
   const isAdmin = group.created_by === user.id
@@ -27,16 +37,6 @@ export default function GroupDashboard({ group: initialGroup, user, onBack }: { 
     } catch {
       // algunos navegadores/webviews bloquean el clipboard; sin drama, solo no pasa nada
     }
-  }
-
-  async function leaveGroup() {
-    if (!confirm(`¿Seguro que quieres salir de "${group.name}"? Perderas acceso a esta liga.`)) return
-    setLeaving(true)
-    setLeaveErr(null)
-    const { error } = await supabase.rpc('leave_group', { p_group_id: group.id })
-    setLeaving(false)
-    if (error) { setLeaveErr(error.message); return }
-    onBack()
   }
 
   async function loadGames() {
@@ -104,21 +104,23 @@ export default function GroupDashboard({ group: initialGroup, user, onBack }: { 
   }, [group.id])
 
   const weeks = useMemo(() => {
-    const map = new Map<string, { seasonType: number; week: number }>()
+    const map = new Map<string, { year: number; seasonType: number; week: number }>()
     games.forEach((g) => {
-      const key = `${g.season_type}:${g.week}`
-      if (!map.has(key)) map.set(key, { seasonType: g.season_type, week: g.week })
+      const key = `${g.year}:${g.season_type}:${g.week}`
+      if (!map.has(key)) map.set(key, { year: g.year, seasonType: g.season_type, week: g.week })
     })
     return Array.from(map.entries())
       .map(([key, v]) => ({ key, ...v }))
-      .sort((a, b) => a.seasonType - b.seasonType || a.week - b.week)
+      .sort((a, b) => a.year - b.year || a.seasonType - b.seasonType || a.week - b.week)
   }, [games])
+
+  const multiYear = useMemo(() => new Set(games.map((g) => g.year)).size > 1, [games])
 
   useEffect(() => {
     if (weekKey === null && weeks.length > 0) setWeekKey(weeks[0].key)
   }, [weeks, weekKey])
 
-  const weekGames = useMemo(() => games.filter((g) => `${g.season_type}:${g.week}` === weekKey), [games, weekKey])
+  const weekGames = useMemo(() => games.filter((g) => `${g.year}:${g.season_type}:${g.week}` === weekKey), [games, weekKey])
   const liveNow = useMemo(() => games.filter((g) => g.status === 'live'), [games])
 
   const [weeklyWinners, setWeeklyWinners] = useState<{ names: string[]; points: number } | null>(null)
@@ -155,6 +157,10 @@ export default function GroupDashboard({ group: initialGroup, user, onBack }: { 
     }
     computeWinner()
   }, [weekGames, members, group.points_exact])
+
+  useEffect(() => {
+    if (tab === 'especiales' && !group.special_picks_enabled) setTab('picks')
+  }, [tab, group.special_picks_enabled])
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
@@ -208,27 +214,21 @@ export default function GroupDashboard({ group: initialGroup, user, onBack }: { 
             <span className="text-[var(--color-text-muted)]">· {members.length} miembro{members.length !== 1 ? 's' : ''}</span>
           </p>
         </div>
-        {!isAdmin && (
-          <button
-            onClick={leaveGroup}
-            disabled={leaving}
-            className="text-xs text-[var(--color-scoreboard-red)] hover:underline shrink-0 disabled:opacity-50"
-          >
-            {leaving ? 'Saliendo...' : 'Salir de la liga'}
-          </button>
-        )}
       </div>
-      {leaveErr && <p className="text-[var(--color-scoreboard-red)] text-xs mb-4">{leaveErr}</p>}
       <div className="mb-5" />
 
       <div className="flex mb-6 rounded-md overflow-hidden border border-[var(--color-field-line)] w-full">
-        {(['picks', 'tabla'] as const).concat(isAdmin ? ['admin'] : []).map((t) => (
+        {(['picks'] as const)
+          .concat(group.special_picks_enabled ? ['especiales'] : [])
+          .concat(['tabla'])
+          .concat(isAdmin ? ['admin'] : [])
+          .map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={`flex-1 px-4 py-1.5 text-sm font-medium transition-colors ${tab === t ? 'bg-[var(--color-light-amber)] text-[var(--color-field-night)]' : 'text-[var(--color-text-muted)]'}`}
           >
-            {t === 'picks' ? 'Predicciones' : t === 'tabla' ? 'Tabla' : 'Administrar'}
+            {t === 'picks' ? 'Predicciones' : t === 'especiales' ? 'Especiales' : t === 'tabla' ? 'Tabla' : 'Administrar'}
           </button>
         ))}
       </div>
@@ -254,7 +254,7 @@ export default function GroupDashboard({ group: initialGroup, user, onBack }: { 
                     {w.seasonType === 1 ? 'PRETEMP' : 'PLAYOFFS'}
                   </span>
                 )}
-                {weekLabel(w.seasonType, w.week).replace(/^(PRE|PO) /, '')}
+                {weekLabel(w.seasonType, w.week).replace(/^(PRE|PO) /, '')}{multiYear ? ` · ${w.year}` : ''}
               </button>
             ))}
           </div>
@@ -281,6 +281,8 @@ export default function GroupDashboard({ group: initialGroup, user, onBack }: { 
           )}
         </>
       )}
+
+      {tab === 'especiales' && <SpecialPicks group={group} userId={user.id} />}
 
       {tab === 'tabla' && <Leaderboard group={group} />}
 

@@ -4,6 +4,7 @@ import { NFL_TEAMS, weekLabel, type Game, type Group } from '../lib/types'
 import { fetchEspnWeek, guessCurrentWeek, type SeasonType } from '../lib/espn'
 import { teamLogoUrl } from '../lib/teamLogos'
 import MembersManager from '../components/MembersManager'
+import AdminSpecialPicks from '../components/AdminSpecialPicks'
 import DangerZone from '../components/DangerZone'
 
 export default function Admin({
@@ -124,7 +125,7 @@ export default function Admin({
 
       for (const eg of espnGames) {
         const existing = games.find(
-          (g) => g.week === syncWeek && g.season_type === syncType && g.home_team === eg.homeTeam && g.away_team === eg.awayTeam
+          (g) => g.week === syncWeek && g.season_type === syncType && g.year === syncYear && g.home_team === eg.homeTeam && g.away_team === eg.awayTeam
         )
         const newStatus: 'scheduled' | 'live' | 'final' = eg.completed ? 'final' : eg.live ? 'live' : 'scheduled'
 
@@ -135,6 +136,7 @@ export default function Admin({
               group_id: groupId,
               week: syncWeek,
               season_type: syncType,
+              year: syncYear,
               home_team: eg.homeTeam,
               away_team: eg.awayTeam,
               kickoff: eg.kickoff,
@@ -195,6 +197,7 @@ export default function Admin({
       group_id: groupId,
       week,
       season_type: manualSeasonType,
+      year: new Date(kickoff).getFullYear(),
       home_team: homeTeam,
       away_team: awayTeam,
       kickoff: new Date(kickoff).toISOString(),
@@ -216,18 +219,18 @@ export default function Admin({
   }
 
   const gamesByWeek = useMemo(() => {
-    const map = new Map<string, { key: string; seasonType: number; week: number; games: Game[] }>()
+    const map = new Map<string, { key: string; year: number; seasonType: number; week: number; games: Game[] }>()
     games.forEach((g) => {
-      const key = `${g.season_type}:${g.week}`
-      if (!map.has(key)) map.set(key, { key, seasonType: g.season_type, week: g.week, games: [] })
+      const key = `${g.year}:${g.season_type}:${g.week}`
+      if (!map.has(key)) map.set(key, { key, year: g.year, seasonType: g.season_type, week: g.week, games: [] })
       map.get(key)!.games.push(g)
     })
-    return Array.from(map.values()).sort((a, b) => a.seasonType - b.seasonType || a.week - b.week)
+    return Array.from(map.values()).sort((a, b) => a.year - b.year || a.seasonType - b.seasonType || a.week - b.week)
   }, [games])
 
-  async function deleteWeek(seasonType: number, week: number) {
+  async function deleteWeek(seasonType: number, week: number, year: number) {
     if (!confirm(`¿Borrar toda la ${weekLabel(seasonType, week)}? Se eliminaran esos partidos y las predicciones de todos.`)) return
-    await supabase.from('games').delete().eq('group_id', groupId).eq('season_type', seasonType).eq('week', week)
+    await supabase.from('games').delete().eq('group_id', groupId).eq('season_type', seasonType).eq('week', week).eq('year', year)
     onChange()
   }
 
@@ -303,6 +306,8 @@ export default function Admin({
       </form>
 
       <MembersManager group={group} />
+
+      <AdminSpecialPicks group={group} onGroupUpdated={onGroupUpdated} />
 
       <form onSubmit={syncWeekFromEspn} className="bg-[var(--color-field-surface)] border border-[var(--color-light-amber)]/40 rounded-lg p-4 space-y-3">
         <div>
@@ -396,9 +401,9 @@ export default function Admin({
         {gamesByWeek.map((wk) => (
           <div key={wk.key} className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="font-mono-score text-xs text-[var(--color-light-amber)]">{weekLabel(wk.seasonType, wk.week)}</span>
+              <span className="font-mono-score text-xs text-[var(--color-light-amber)]">{weekLabel(wk.seasonType, wk.week)} · {wk.year}</span>
               <button
-                onClick={() => deleteWeek(wk.seasonType, wk.week)}
+                onClick={() => deleteWeek(wk.seasonType, wk.week, wk.year)}
                 className="text-xs text-[var(--color-scoreboard-red)] hover:underline"
               >
                 Borrar semana completa

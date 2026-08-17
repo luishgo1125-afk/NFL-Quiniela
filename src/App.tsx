@@ -89,15 +89,30 @@ export default function App() {
 
   if (!user) return <Login />
 
+  const activeGroupIsAdmin = activeGroup ? activeGroup.created_by === user.id : false
+
+  async function leaveActiveGroup() {
+    if (!activeGroup) return
+    if (!confirm(`¿Seguro que quieres salir de "${activeGroup.name}"? Perderas acceso a esta liga.`)) return
+    const { error } = await supabase.rpc('leave_group', { p_group_id: activeGroup.id })
+    if (error) { alert(error.message); return }
+    setActiveGroup(null)
+  }
+
   return (
     <div>
       <header className="border-b border-[var(--color-field-line)] px-4 py-3 flex items-center justify-between">
         <span className="font-display text-lg font-700">QUINIELA<span className="text-[var(--color-light-amber)]">.</span></span>
-        <ProfileMenu user={user} />
+        <ProfileMenu
+          user={user}
+          activeGroupName={activeGroup?.name ?? null}
+          showLeaveGroup={activeGroup != null && !activeGroupIsAdmin}
+          onLeaveGroup={leaveActiveGroup}
+        />
       </header>
 
       {activeGroup ? (
-        <GroupDashboard group={activeGroup} user={user} onBack={() => setActiveGroup(null)} />
+        <GroupDashboard group={activeGroup} user={user} onBack={() => setActiveGroup(null)} onGroupChange={setActiveGroup} />
       ) : (
         <Groups user={user} onSelect={setActiveGroup} />
       )}

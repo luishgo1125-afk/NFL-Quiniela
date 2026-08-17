@@ -147,7 +147,17 @@ function PasswordModal({ onClose }: { onClose: () => void }) {
   )
 }
 
-export default function ProfileMenu({ user }: { user: User }) {
+export default function ProfileMenu({
+  user,
+  activeGroupName,
+  showLeaveGroup,
+  onLeaveGroup,
+}: {
+  user: User
+  activeGroupName?: string | null
+  showLeaveGroup?: boolean
+  onLeaveGroup?: () => void
+}) {
   const [open, setOpen] = useState(false)
   const [modal, setModal] = useState<'password' | 'profile' | null>(null)
   const ref = useRef<HTMLDivElement>(null)
@@ -188,6 +198,14 @@ export default function ProfileMenu({ user }: { user: User }) {
           >
             Cambiar contrasena
           </button>
+          {showLeaveGroup && (
+            <button
+              onClick={() => { setOpen(false); onLeaveGroup?.() }}
+              className="w-full text-left px-4 py-2.5 text-sm text-[var(--color-scoreboard-red)] hover:bg-[var(--color-field-surface-raised)]"
+            >
+              Salir de {activeGroupName ? `"${activeGroupName}"` : 'esta liga'}
+            </button>
+          )}
           <button
             onClick={() => supabase.auth.signOut()}
             className="w-full text-left px-4 py-2.5 text-sm text-[var(--color-scoreboard-red)] hover:bg-[var(--color-field-surface-raised)]"

@@ -12,6 +12,7 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [forgotSent, setForgotSent] = useState(false)
+  const [signupSent, setSignupSent] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -34,6 +35,11 @@ export default function Login() {
             display_name: displayName || email.split('@')[0],
             favorite_team: favoriteTeam || null,
           })
+        }
+        // si no hay sesion todavia, es porque el proyecto pide confirmar el
+        // correo antes de dejar entrar (lo mas comun) — avisamos claramente
+        if (!data.session) {
+          setSignupSent(true)
         }
       } else {
         const { error: signErr } = await supabase.auth.signInWithPassword({ email, password })
@@ -70,7 +76,7 @@ export default function Login() {
         </div>
 
         <div className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-6">
-          {mode !== 'forgot' && (
+          {mode !== 'forgot' && !(mode === 'signup' && signupSent) && (
             <div className="flex mb-6 rounded-md overflow-hidden border border-[var(--color-field-line)]">
               <button
                 onClick={() => setMode('signin')}
@@ -119,6 +125,16 @@ export default function Login() {
                 </button>
               </form>
             )
+          ) : mode === 'signup' && signupSent ? (
+            <div className="text-center space-y-3">
+              <p className="text-sm">
+                Te mandamos un correo a <strong>{email}</strong>. Abre el enlace ahí para confirmar tu cuenta y poder entrar.
+              </p>
+              <p className="text-xs text-[var(--color-text-muted)]">Si no lo ves, revisa spam o promociones.</p>
+              <button onClick={() => { setMode('signin'); setSignupSent(false) }} className="text-xs text-[var(--color-light-amber)] hover:underline">
+                ← Volver a entrar
+              </button>
+            </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-3">
               {mode === 'signup' && (

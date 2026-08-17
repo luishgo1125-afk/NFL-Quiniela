@@ -113,6 +113,14 @@ export default function App() {
     setBottomTab('quinielas')
   }
 
+  function handleBottomTabChange(tab: BottomTab) {
+    if (tab === 'quinielas' && bottomTab === 'quinielas' && activeGroup) {
+      setActiveGroup(null)
+      return
+    }
+    setBottomTab(tab)
+  }
+
   return (
     <div className="pb-16">
       <header className="sticky top-0 z-40 border-b border-[var(--color-field-line)] px-4 py-2.5 flex items-center" style={{ background: 'linear-gradient(180deg, rgba(242,183,5,0.05), var(--color-field-night)), var(--color-field-night)' }}>
@@ -147,7 +155,7 @@ export default function App() {
 
       <BottomNav
         active={bottomTab}
-        onChange={setBottomTab}
+        onChange={handleBottomTabChange}
         onCreate={() => setShowCreateModal(true)}
         hasNotifications={false}
         canCreate={canCreate}

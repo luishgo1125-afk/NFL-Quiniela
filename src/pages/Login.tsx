@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { NFL_TEAMS } from '../lib/types'
+import { teamLogoUrl } from '../lib/teamLogos'
 
 export default function Login() {
   const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
+  const [favoriteTeam, setFavoriteTeam] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [forgotSent, setForgotSent] = useState(false)
@@ -23,7 +26,14 @@ export default function Login() {
         })
         if (signErr) throw signErr
         if (data.user) {
-          await supabase.from('profiles').insert({ id: data.user.id, display_name: displayName || email.split('@')[0] })
+          // upsert (no insert): el trigger de la base de datos ya crea la fila
+          // del perfil automaticamente al registrarse, asi que un insert normal
+          // chocaria con ella y tu nombre real nunca se guardaria
+          await supabase.from('profiles').upsert({
+            id: data.user.id,
+            display_name: displayName || email.split('@')[0],
+            favorite_team: favoriteTeam || null,
+          })
         }
       } else {
         const { error: signErr } = await supabase.auth.signInWithPassword({ email, password })
@@ -114,14 +124,30 @@ export default function Login() {
           ) : (
             <form onSubmit={handleSubmit} className="space-y-3">
               {mode === 'signup' && (
-                <input
-                  type="text"
-                  placeholder="Tu nombre"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  required
-                  className="w-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
-                />
+                <>
+                  <input
+                    type="text"
+                    placeholder="Tu nombre"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    required
+                    className="w-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
+                  />
+                  <div>
+                    <label className="text-xs text-[var(--color-text-muted)] block mb-1">Equipo favorito (opcional)</label>
+                    <div className="flex items-center gap-2">
+                      {favoriteTeam && <img src={teamLogoUrl(favoriteTeam)} alt={favoriteTeam} className="w-7 h-7 object-contain shrink-0" />}
+                      <select
+                        value={favoriteTeam}
+                        onChange={(e) => setFavoriteTeam(e.target.value)}
+                        className="w-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
+                      >
+                        <option value="">Sin elegir</option>
+                        {NFL_TEAMS.map((t) => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </>
               )}
               <input
                 type="email"

@@ -3,6 +3,34 @@ import { supabase } from '../lib/supabase'
 import type { Game, Pick } from '../lib/types'
 import { teamLogoUrl } from '../lib/teamLogos'
 
+// Cuenta hacia atras en pantalla, segundo a segundo, entre cada sincronizacion
+// real con ESPN, para dar sensacion de tiempo real aunque solo se consulte
+// ESPN cada cierto tiempo. Se reinicia cada vez que llega un dato fresco.
+function useTickingClock(rawClock: string | null, live: boolean): string | null {
+  const [display, setDisplay] = useState(rawClock)
+
+  useEffect(() => {
+    setDisplay(rawClock)
+    if (!live || !rawClock) return
+
+    const match = rawClock.match(/(\d+):(\d{2})/)
+    if (!match) return
+    let totalSeconds = parseInt(match[1], 10) * 60 + parseInt(match[2], 10)
+    const suffix = rawClock.replace(/\d+:\d{2}/, '').trim()
+
+    const interval = setInterval(() => {
+      totalSeconds = Math.max(0, totalSeconds - 1)
+      const m = Math.floor(totalSeconds / 60)
+      const s = totalSeconds % 60
+      setDisplay(`${m}:${String(s).padStart(2, '0')}${suffix ? ' ' + suffix : ''}`)
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [rawClock, live])
+
+  return display
+}
+
 interface MemberInfo {
   user_id: string
   display_name: string
@@ -28,6 +56,7 @@ export default function GameCard({
 
   const locked = new Date(game.kickoff).getTime() - 30 * 60 * 1000 <= Date.now()
   const confirmed = pick != null && home !== '' && away !== '' && String(pick.pred_home_score) === home && String(pick.pred_away_score) === away
+  const tickingClock = useTickingClock(game.game_clock, game.status === 'live')
 
   useEffect(() => {
     supabase
@@ -82,7 +111,7 @@ export default function GameCard({
         ) : game.status === 'live' ? (
           <span className="text-xs font-semibold text-[var(--color-scoreboard-red)] flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-scoreboard-red)] animate-pulse" />
-            EN VIVO{game.game_clock ? ` · ${game.game_clock}` : ''}
+            EN VIVO{tickingClock ? ` · ${tickingClock}` : ''}
           </span>
         ) : locked ? (
           <span className="text-xs font-semibold text-[var(--color-scoreboard-red)]">CERRADO</span>

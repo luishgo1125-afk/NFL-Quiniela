@@ -62,13 +62,11 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 mb-2">
+          <div className="inline-flex items-center gap-2 mb-3">
             <span className="font-mono-score text-[var(--color-light-amber)] text-sm tracking-widest">WK 01</span>
           </div>
-          <h1 className="font-display text-5xl font-800 leading-none tracking-tight">
-            QUINIELA<span className="text-[var(--color-light-amber)]">.</span>
-          </h1>
-          <p className="text-[var(--color-text-muted)] text-sm mt-2">Predicciones NFL entre amigos</p>
+          <img src="/logo.png" alt="Quiniela" className="h-14 w-auto mx-auto" />
+          <p className="text-[var(--color-text-muted)] text-sm mt-3">Predicciones NFL entre amigos</p>
         </div>
 
         <div className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-6">

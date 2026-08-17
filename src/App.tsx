@@ -2,9 +2,13 @@ import { useEffect, useState } from 'react'
 import { useAuth } from './lib/useAuth'
 import { supabase } from './lib/supabase'
 import Login from './pages/Login'
-import Groups from './pages/Groups'
+import QuinielasList from './pages/QuinielasList'
+import MyGroups from './pages/MyGroups'
 import GroupDashboard from './pages/GroupDashboard'
-import ProfileMenu from './components/ProfileMenu'
+import Notifications from './pages/Notifications'
+import Profile from './pages/Profile'
+import BottomNav, { type BottomTab } from './components/BottomNav'
+import NewGroupModal, { SUPER_ADMIN_ID } from './components/NewGroupModal'
 import type { Group } from './lib/types'
 
 function ResetPasswordScreen({ onDone }: { onDone: () => void }) {
@@ -62,6 +66,8 @@ export default function App() {
   const { user, loading } = useAuth()
   const [activeGroup, setActiveGroup] = useState<Group | null>(null)
   const [recovery, setRecovery] = useState(false)
+  const [bottomTab, setBottomTab] = useState<BottomTab>('quinielas')
+  const [showCreateModal, setShowCreateModal] = useState(false)
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
@@ -71,10 +77,11 @@ export default function App() {
   }, [])
 
   // si cambia el usuario logueado (cerrar sesion y entrar con otra cuenta sin
-  // recargar la pagina), regresa a la lista de quinielas en vez de dejar
-  // abierta la liga de la sesion anterior
+  // recargar la pagina), regresa al inicio en vez de dejar abierta la liga
+  // de la sesion anterior
   useEffect(() => {
     setActiveGroup(null)
+    setBottomTab('quinielas')
   }, [user?.id])
 
   if (loading) {
@@ -90,6 +97,7 @@ export default function App() {
   if (!user) return <Login />
 
   const activeGroupIsAdmin = activeGroup ? activeGroup.created_by === user.id : false
+  const canCreate = user.id === SUPER_ADMIN_ID
 
   async function leaveActiveGroup() {
     if (!activeGroup) return
@@ -97,24 +105,60 @@ export default function App() {
     const { error } = await supabase.rpc('leave_group', { p_group_id: activeGroup.id })
     if (error) { alert(error.message); return }
     setActiveGroup(null)
+    setBottomTab('grupos')
+  }
+
+  function selectGroup(g: Group) {
+    setActiveGroup(g)
+    setBottomTab('quinielas')
   }
 
   return (
-    <div>
-      <header className="border-b border-[var(--color-field-line)] px-4 py-3 flex items-center justify-between">
-        <span className="font-display text-lg font-700">QUINIELA<span className="text-[var(--color-light-amber)]">.</span></span>
-        <ProfileMenu
+    <div className="pb-16">
+      <header className="border-b border-[var(--color-field-line)] px-4 py-3 flex items-center" style={{ background: 'linear-gradient(180deg, rgba(242,183,5,0.05), transparent)' }}>
+        <img src="/logo.png" alt="Quiniela" className="h-6 w-auto" />
+      </header>
+
+      {bottomTab === 'grupos' && <MyGroups user={user} onEnter={selectGroup} />}
+
+      {bottomTab === 'quinielas' && (
+        activeGroup ? (
+          <GroupDashboard
+            group={activeGroup}
+            user={user}
+            onBack={() => { setActiveGroup(null); setBottomTab('grupos') }}
+            onGroupChange={setActiveGroup}
+          />
+        ) : (
+          <QuinielasList user={user} onSelect={selectGroup} />
+        )
+      )}
+
+      {bottomTab === 'notificaciones' && <Notifications user={user} />}
+
+      {bottomTab === 'perfil' && (
+        <Profile
           user={user}
           activeGroupName={activeGroup?.name ?? null}
           showLeaveGroup={activeGroup != null && !activeGroupIsAdmin}
           onLeaveGroup={leaveActiveGroup}
         />
-      </header>
+      )}
 
-      {activeGroup ? (
-        <GroupDashboard group={activeGroup} user={user} onBack={() => setActiveGroup(null)} onGroupChange={setActiveGroup} />
-      ) : (
-        <Groups user={user} onSelect={setActiveGroup} />
+      <BottomNav
+        active={bottomTab}
+        onChange={setBottomTab}
+        onCreate={() => setShowCreateModal(true)}
+        hasNotifications={false}
+        canCreate={canCreate}
+      />
+
+      {showCreateModal && (
+        <NewGroupModal
+          canCreate={canCreate}
+          onClose={() => setShowCreateModal(false)}
+          onDone={() => { setShowCreateModal(false); setBottomTab('grupos') }}
+        />
       )}
     </div>
   )

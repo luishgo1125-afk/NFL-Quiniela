@@ -1,13 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { supabase } from '../lib/supabase'
-import type { Group } from '../lib/types'
-import type { User } from '@supabase/supabase-js'
 
-// Mientras la app este en pruebas, solo esta cuenta puede crear ligas nuevas.
-// El resto puede unirse con un codigo de invitacion.
-const SUPER_ADMIN_ID = '74e0edbd-0c42-41fc-a001-238fbfd1a19f'
+export const SUPER_ADMIN_ID = '74e0edbd-0c42-41fc-a001-238fbfd1a19f'
 
-function NewGroupModal({ canCreate, onClose, onDone }: { canCreate: boolean; onClose: () => void; onDone: () => void }) {
+export default function NewGroupModal({ canCreate, onClose, onDone }: { canCreate: boolean; onClose: () => void; onDone: () => void }) {
   const [tab, setTab] = useState<'crear' | 'unirme'>(canCreate ? 'crear' : 'unirme')
   const [newName, setNewName] = useState('')
   const [joinCode, setJoinCode] = useState('')
@@ -97,78 +93,6 @@ function NewGroupModal({ canCreate, onClose, onDone }: { canCreate: boolean; onC
           </form>
         )}
       </div>
-    </div>
-  )
-}
-
-export default function Groups({ user, onSelect }: { user: User; onSelect: (g: Group) => void }) {
-  const [groups, setGroups] = useState<Group[]>([])
-  const [loading, setLoading] = useState(true)
-  const [showModal, setShowModal] = useState(false)
-  const canCreate = user.id === SUPER_ADMIN_ID
-
-  async function loadGroups() {
-    setLoading(true)
-    const { data } = await supabase
-      .from('group_members')
-      .select('groups(*)')
-      .eq('user_id', user.id)
-    const gs = (data ?? []).map((row: any) => row.groups).filter(Boolean)
-    setGroups(gs)
-    setLoading(false)
-  }
-
-  useEffect(() => { loadGroups() }, [])
-
-  return (
-    <div className="max-w-2xl mx-auto px-4 py-10">
-      <div className="flex items-center justify-between">
-        <h1 className="font-display text-4xl font-800">MIS QUINIELAS</h1>
-        <button
-          onClick={() => setShowModal(true)}
-          aria-label={canCreate ? 'Nueva quiniela' : 'Unirme a una quiniela'}
-          className="w-10 h-10 rounded-full bg-[var(--color-light-amber)] text-[var(--color-field-night)] text-2xl font-bold flex items-center justify-center hover:brightness-110 transition shrink-0 leading-none"
-        >
-          +
-        </button>
-      </div>
-      <p className="text-[var(--color-text-muted)] text-sm mb-8">Elige un grupo</p>
-
-      {loading ? (
-        <p className="text-[var(--color-text-muted)] text-sm">Cargando...</p>
-      ) : groups.length === 0 ? (
-        <p className="text-[var(--color-text-muted)] text-sm">
-          {canCreate
-            ? 'Todavia no perteneces a ningun grupo. Da clic en el + para crear uno o unirte con un codigo.'
-            : 'Todavia no perteneces a ningun grupo. Da clic en el + y unete con el codigo de invitacion que te compartieron.'}
-        </p>
-      ) : (
-        <div className="space-y-2">
-          {groups.map((g) => (
-            <button
-              key={g.id}
-              onClick={() => onSelect(g)}
-              className="w-full text-left bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg px-4 py-3 hover:border-[var(--color-light-amber)] transition flex items-center gap-3"
-            >
-              {g.logo_url ? (
-                <img src={g.logo_url} alt={g.name} className="w-9 h-9 rounded-full object-cover border border-[var(--color-field-line)] shrink-0" />
-              ) : (
-                <div className="w-9 h-9 rounded-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] flex items-center justify-center text-sm shrink-0">🏈</div>
-              )}
-              <span className="font-medium flex-1">{g.name}</span>
-              <span className="font-mono-score text-xs text-[var(--color-text-muted)]">#{g.invite_code}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {showModal && (
-        <NewGroupModal
-          canCreate={canCreate}
-          onClose={() => setShowModal(false)}
-          onDone={() => { setShowModal(false); loadGroups() }}
-        />
-      )}
     </div>
   )
 }

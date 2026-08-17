@@ -38,9 +38,22 @@ export interface Game {
 
 // 1 = pretemporada, 2 = temporada regular, 3 = playoffs
 export function weekLabel(seasonType: number, week: number): string {
-  if (seasonType === 1) return `PRE ${week}`
-  if (seasonType === 3) return `PO ${week}`
-  return `SEMANA ${week}`
+  if (seasonType === 1) return `PRE WEEK ${week}`
+  if (seasonType === 3) {
+    const rounds: Record<number, string> = { 1: 'WILD CARD', 2: 'DIVISIONAL', 3: 'CONFERENCE', 4: 'SUPER BOWL' }
+    return rounds[week] ?? `PLAYOFFS ${week}`
+  }
+  return `WEEK ${week}`
+}
+
+export const TEAM_NAMES: Record<string, string> = {
+  ARI: 'Cardinals', ATL: 'Falcons', BAL: 'Ravens', BUF: 'Bills', CAR: 'Panthers',
+  CHI: 'Bears', CIN: 'Bengals', CLE: 'Browns', DAL: 'Cowboys', DEN: 'Broncos',
+  DET: 'Lions', GB: 'Packers', HOU: 'Texans', IND: 'Colts', JAX: 'Jaguars',
+  KC: 'Chiefs', LV: 'Raiders', LAC: 'Chargers', LAR: 'Rams', MIA: 'Dolphins',
+  MIN: 'Vikings', NE: 'Patriots', NO: 'Saints', NYG: 'Giants', NYJ: 'Jets',
+  PHI: 'Eagles', PIT: 'Steelers', SF: '49ers', SEA: 'Seahawks', TB: 'Buccaneers',
+  TEN: 'Titans', WSH: 'Commanders',
 }
 
 export interface Pick {

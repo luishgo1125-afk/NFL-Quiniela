@@ -6,6 +6,7 @@ import GameCard from '../components/GameCard'
 import SpecialPicks from '../components/SpecialPicks'
 import Leaderboard from '../components/Leaderboard'
 import Admin from './Admin'
+import { IconClipboard, IconStar, IconBarChart, IconGear, IconCalendar, IconTrophy, IconCopy, IconWhatsapp } from '../components/icons'
 import type { User } from '@supabase/supabase-js'
 
 export default function GroupDashboard({
@@ -121,6 +122,7 @@ export default function GroupDashboard({
   }, [weeks, weekKey])
 
   const weekGames = useMemo(() => games.filter((g) => `${g.year}:${g.season_type}:${g.week}` === weekKey), [games, weekKey])
+  const selectedWeek = useMemo(() => weeks.find((w) => w.key === weekKey) ?? null, [weeks, weekKey])
   const liveNow = useMemo(() => games.filter((g) => g.status === 'live'), [games])
 
   const [weeklyWinners, setWeeklyWinners] = useState<{ names: string[]; points: number } | null>(null)
@@ -164,10 +166,6 @@ export default function GroupDashboard({
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
-      <button onClick={onBack} className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)] mb-4">
-        ← Mis quinielas
-      </button>
-
       <div className="flex items-center gap-3 mb-1">
         {group.logo_url ? (
           <img src={group.logo_url} alt={group.name} className="w-12 h-12 rounded-full object-cover border border-[var(--color-field-line)]" />
@@ -175,8 +173,13 @@ export default function GroupDashboard({
           <div className="w-12 h-12 rounded-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] flex items-center justify-center text-xl">🏈</div>
         )}
         <div className="flex-1">
-          <h1 className="font-display text-3xl font-800 leading-none flex items-center gap-2">
+          <h1 className="font-display text-3xl font-800 leading-none flex items-center gap-2 flex-wrap">
             {group.name}
+            {selectedWeek && (
+              <span className="text-[11px] font-mono-score font-semibold px-2 py-0.5 rounded-full border border-[var(--color-light-amber)] text-[var(--color-light-amber)] tracking-wide">
+                {weekLabel(selectedWeek.seasonType, selectedWeek.week)}
+              </span>
+            )}
             {liveNow.length > 0 && (
               <span className="text-[10px] font-semibold text-[var(--color-scoreboard-red)] flex items-center gap-1 font-mono-score">
                 <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-scoreboard-red)] animate-pulse" />
@@ -191,14 +194,7 @@ export default function GroupDashboard({
               aria-label="Copiar codigo de invitacion"
               className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--color-field-line)] hover:border-[var(--color-light-amber)] text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)] transition"
             >
-              {copiedCode ? (
-                <>✓ Copiado</>
-              ) : (
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="9" y="9" width="13" height="13" rx="2" />
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                </svg>
-              )}
+              {copiedCode ? <>✓ Copiado</> : <IconCopy />}
             </button>
             <a
               href={`https://wa.me/?text=${encodeURIComponent(`Unete a mi quiniela "${group.name}" en Quiniela NFL. Codigo: ${group.invite_code}`)}`}
@@ -207,31 +203,55 @@ export default function GroupDashboard({
               aria-label="Compartir por WhatsApp"
               className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--color-field-line)] hover:border-[#25D366] text-[var(--color-text-muted)] hover:text-[#25D366] transition"
             >
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91C21.95 6.45 17.5 2 12.04 2zm5.8 14.09c-.24.68-1.4 1.3-1.93 1.38-.5.08-1.12.11-1.8-.11-.42-.13-.95-.31-1.64-.6-2.88-1.24-4.76-4.14-4.9-4.33-.14-.19-1.17-1.56-1.17-2.97s.73-2.11 1-2.4c.26-.29.57-.36.76-.36h.55c.18 0 .42-.07.65.5.24.58.82 2 .89 2.14.07.14.11.31.02.5-.09.19-.14.31-.28.48-.14.17-.29.37-.42.5-.14.14-.28.29-.12.57.16.28.71 1.17 1.53 1.89 1.05.94 1.94 1.23 2.22 1.37.28.14.44.11.6-.07.16-.18.68-.79.87-1.06.19-.28.37-.23.63-.14.26.09 1.66.78 1.94.92.28.14.47.21.53.33.07.12.07.68-.17 1.36z" />
-              </svg>
+              <IconWhatsapp />
             </a>
             <span className="text-[var(--color-text-muted)]">· {members.length} miembro{members.length !== 1 ? 's' : ''}</span>
           </p>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          {group.special_picks_enabled && (
+            <button
+              onClick={() => setTab('especiales')}
+              aria-label="Predicciones especiales"
+              title="Predicciones especiales"
+              className={`p-2 rounded-md border transition ${tab === 'especiales' ? 'border-[var(--color-light-amber)] text-[var(--color-light-amber)] bg-[rgba(242,183,5,0.1)]' : 'border-[var(--color-field-line)] text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)] hover:border-[var(--color-light-amber)]'}`}
+            >
+              <IconStar size={16} />
+            </button>
+          )}
+          {isAdmin && (
+            <button
+              onClick={() => setTab('admin')}
+              aria-label="Administrar liga"
+              title="Administrar"
+              className={`p-2 rounded-md border transition ${tab === 'admin' ? 'border-[var(--color-light-amber)] text-[var(--color-light-amber)] bg-[rgba(242,183,5,0.1)]' : 'border-[var(--color-field-line)] text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)] hover:border-[var(--color-light-amber)]'}`}
+            >
+              <IconGear size={16} />
+            </button>
+          )}
         </div>
       </div>
       <div className="mb-5" />
 
       <div className="flex mb-6 rounded-md overflow-hidden border border-[var(--color-field-line)] w-full">
-        {(['picks'] as const)
-          .concat(group.special_picks_enabled ? ['especiales'] : [])
-          .concat(['tabla'])
-          .concat(isAdmin ? ['admin'] : [])
-          .map((t) => (
+        {(['picks', 'tabla'] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`flex-1 px-4 py-1.5 text-sm font-medium transition-colors ${tab === t ? 'bg-[var(--color-light-amber)] text-[var(--color-field-night)]' : 'text-[var(--color-text-muted)]'}`}
+            className={`flex-1 px-3 py-2 text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${tab === t ? 'bg-[var(--color-light-amber)] text-[var(--color-field-night)]' : 'text-[var(--color-text-muted)]'}`}
           >
-            {t === 'picks' ? 'Predicciones' : t === 'especiales' ? 'Especiales' : t === 'tabla' ? 'Tabla' : 'Administrar'}
+            {t === 'picks' ? <IconClipboard /> : <IconBarChart />}
+            {t === 'picks' ? 'Predicciones' : 'Tabla'}
           </button>
         ))}
       </div>
+
+      {(tab === 'especiales' || tab === 'admin') && (
+        <button onClick={() => setTab('picks')} className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)] mb-4 flex items-center gap-1">
+          ← Volver a predicciones
+        </button>
+      )}
+
 
       <div key={tab} className="animate-tab-fade">
         {tab === 'picks' && (
@@ -241,20 +261,19 @@ export default function GroupDashboard({
               <button
                 key={w.key}
                 onClick={() => setWeekKey(w.key)}
-                className={`font-mono-score text-xs px-3 py-1 rounded-full border flex items-center gap-1 ${weekKey === w.key ? 'border-[var(--color-light-amber)] text-[var(--color-light-amber)]' : 'border-[var(--color-field-line)] text-[var(--color-text-muted)]'}`}
+                className={`text-xs px-3 py-1.5 rounded-full border flex items-center gap-1.5 ${weekKey === w.key ? 'border-[var(--color-light-amber)] text-[var(--color-light-amber)]' : 'border-[var(--color-field-line)] text-[var(--color-text-muted)]'}`}
               >
-                {w.seasonType !== 2 && (
+                <IconCalendar size={11} />
+                <span className="font-medium">{weekLabel(w.seasonType, w.week).replace(/\s*\d+$/, '')}</span>
+                {w.seasonType !== 3 && (
                   <span
-                    className="text-[9px] px-1 rounded"
-                    style={{
-                      background: w.seasonType === 1 ? 'rgba(138,148,163,0.25)' : 'rgba(228,70,43,0.2)',
-                      color: w.seasonType === 1 ? 'var(--color-text-muted)' : 'var(--color-scoreboard-red)',
-                    }}
+                    className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold font-mono-score shrink-0"
+                    style={{ background: 'var(--color-light-amber)', color: 'var(--color-field-night)' }}
                   >
-                    {w.seasonType === 1 ? 'PRETEMP' : 'PLAYOFFS'}
+                    {w.week}
                   </span>
                 )}
-                {weekLabel(w.seasonType, w.week).replace(/^(PRE|PO) /, '')}{multiYear ? ` · ${w.year}` : ''}
+                {multiYear && <span className="text-[10px]">· {w.year}</span>}
               </button>
             ))}
           </div>
@@ -277,6 +296,22 @@ export default function GroupDashboard({
               {weekGames.map((g) => (
                 <GameCard key={g.id} game={g} userId={user.id} members={members} pickedUserIds={pickedBy[g.id] ?? []} />
               ))}
+
+              <div className="flex items-center gap-3 bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg px-4 py-3">
+                <div className="w-9 h-9 rounded-full bg-[rgba(242,183,5,0.15)] flex items-center justify-center shrink-0 text-[var(--color-light-amber)]">
+                  <IconTrophy size={18} />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold">¡Que empiecen los picks!</p>
+                  <p className="text-xs text-[var(--color-text-muted)]">Haz tus predicciones y compite con tu grupo.</p>
+                </div>
+                <button
+                  onClick={() => setTab('tabla')}
+                  className="shrink-0 flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-md border border-[var(--color-light-amber)] text-[var(--color-light-amber)] hover:bg-[var(--color-light-amber)] hover:text-[var(--color-field-night)] transition"
+                >
+                  <IconBarChart size={12} /> Ver tabla
+                </button>
+              </div>
             </div>
           )}
         </>

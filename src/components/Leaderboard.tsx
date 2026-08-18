@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { teamLogoUrl } from '../lib/teamLogos'
-import type { Group } from '../lib/types'
+import { weekLabel, type Group } from '../lib/types'
 
 interface Row {
   user_id: string
@@ -20,20 +20,57 @@ const RANK_STYLES = [
   { bg: 'rgba(180,120,60,0.10)', border: '#B47A3C', badge: '#C98A4B', text: '#0A0E13' },
 ]
 
-// Dibuja la tabla como imagen (sin logos de equipo, para evitar problemas de
-// CORS con el CDN de ESPN al exportar el canvas) y la comparte o descarga.
-async function shareLeaderboardImage(groupName: string, rows: Row[]) {
+// Carga una imagen permitiendo exportarla despues en el canvas (CORS).
+// Si falla (por ejemplo el CDN no lo permite), regresa null y el dibujo
+// cae de vuelta a un circulo con inicial en vez de tronar todo el share.
+function loadImage(url: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => resolve(img)
+    img.onerror = () => resolve(null)
+    img.src = url
+  })
+}
+
+function drawCircleImage(ctx: CanvasRenderingContext2D, img: HTMLImageElement, cx: number, cy: number, r: number, pad = 0) {
+  ctx.save()
+  ctx.beginPath()
+  ctx.arc(cx, cy, r, 0, Math.PI * 2)
+  ctx.closePath()
+  ctx.clip()
+  ctx.fillStyle = '#1B2530'
+  ctx.fill()
+  const size = (r - pad) * 2
+  ctx.drawImage(img, cx - size / 2, cy - size / 2, size, size)
+  ctx.restore()
+}
+
+async function shareLeaderboardImage(group: Group, weekLabelText: string | null, rows: Row[]) {
   const rowHeight = 64
-  const headerHeight = 110
-  const footerHeight = 50
+  const headerHeight = 132
+  const footerHeight = 56
   const width = 720
   const height = headerHeight + rows.length * rowHeight + footerHeight
 
+  // precargar imagenes (logo de la liga, logo de la app, y un logo por equipo distinto)
+  const uniqueTeams = Array.from(new Set(rows.map((r) => r.favorite_team).filter(Boolean))) as string[]
+  const [groupLogoImg, appLogoImg, teamLogoImgs] = await Promise.all([
+    group.logo_url ? loadImage(group.logo_url) : Promise.resolve(null),
+    loadImage('/logo.png'),
+    Promise.all(uniqueTeams.map(async (t) => [t, await loadImage(teamLogoUrl(t))] as const)),
+  ])
+  const teamLogoMap = new Map(teamLogoImgs)
+
   const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
+  const SCALE = 3 // dibuja a 3x y luego escala el contexto, para que la imagen exportada quede nitida
+  canvas.width = width * SCALE
+  canvas.height = height * SCALE
   const ctx = canvas.getContext('2d')
   if (!ctx) return
+  ctx.scale(SCALE, SCALE)
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
 
   // fondo
   ctx.fillStyle = '#0A0E13'
@@ -44,13 +81,32 @@ async function shareLeaderboardImage(groupName: string, rows: Row[]) {
   ctx.fillStyle = glow
   ctx.fillRect(0, 0, width, headerHeight + 40)
 
-  // encabezado
+  // logo de la liga (o balon de placeholder)
+  const logoCx = 56, logoCy = 60, logoR = 30
+  if (groupLogoImg) {
+    drawCircleImage(ctx, groupLogoImg, logoCx, logoCy, logoR)
+  } else {
+    ctx.beginPath()
+    ctx.arc(logoCx, logoCy, logoR, 0, Math.PI * 2)
+    ctx.fillStyle = '#1B2530'
+    ctx.fill()
+    ctx.strokeStyle = '#2A3542'
+    ctx.stroke()
+    ctx.font = '28px Arial'
+    ctx.textAlign = 'center'
+    ctx.fillText('🏈', logoCx, logoCy + 10)
+    ctx.textAlign = 'left'
+  }
+
+  // titulo + semana
   ctx.fillStyle = '#ECEFF3'
-  ctx.font = '700 30px Arial'
-  ctx.fillText(groupName.toUpperCase(), 28, 46)
+  ctx.font = '700 28px Arial'
+  ctx.fillText(group.name.toUpperCase(), 104, 52)
   ctx.fillStyle = '#8A94A3'
-  ctx.font = '400 15px Arial'
-  ctx.fillText('Tabla de posiciones · Quiniela NFL', 28, 72)
+  ctx.font = '400 14px Arial'
+  const subtitle = weekLabelText ? `Tabla de posiciones · ${weekLabelText}` : 'Tabla de posiciones'
+  ctx.fillText(subtitle, 104, 76)
+
   ctx.strokeStyle = '#2A3542'
   ctx.lineWidth = 1
   ctx.beginPath()
@@ -72,19 +128,28 @@ async function shareLeaderboardImage(groupName: string, rows: Row[]) {
     ctx.font = '700 20px Arial'
     ctx.fillText(String(i + 1), 28, y + rowHeight / 2 + 7)
 
-    // avatar (inicial)
+    // avatar (logo del equipo favorito, o inicial si no eligio uno / no cargo)
     const cx = 76, cy = y + rowHeight / 2
-    ctx.beginPath()
-    ctx.arc(cx, cy, 18, 0, Math.PI * 2)
-    ctx.fillStyle = '#1B2530'
-    ctx.fill()
-    ctx.strokeStyle = '#2A3542'
-    ctx.stroke()
-    ctx.fillStyle = '#ECEFF3'
-    ctx.font = '700 16px Arial'
-    ctx.textAlign = 'center'
-    ctx.fillText(r.display_name.charAt(0).toUpperCase(), cx, cy + 6)
-    ctx.textAlign = 'left'
+    const teamImg = r.favorite_team ? teamLogoMap.get(r.favorite_team) : null
+    if (teamImg) {
+      ctx.beginPath()
+      ctx.arc(cx, cy, 18, 0, Math.PI * 2)
+      ctx.strokeStyle = '#2A3542'
+      ctx.stroke()
+      drawCircleImage(ctx, teamImg, cx, cy, 18, 4)
+    } else {
+      ctx.beginPath()
+      ctx.arc(cx, cy, 18, 0, Math.PI * 2)
+      ctx.fillStyle = '#1B2530'
+      ctx.fill()
+      ctx.strokeStyle = '#2A3542'
+      ctx.stroke()
+      ctx.fillStyle = '#ECEFF3'
+      ctx.font = '700 16px Arial'
+      ctx.textAlign = 'center'
+      ctx.fillText(r.display_name.charAt(0).toUpperCase(), cx, cy + 6)
+      ctx.textAlign = 'left'
+    }
 
     // nombre
     ctx.fillStyle = '#ECEFF3'
@@ -105,19 +170,26 @@ async function shareLeaderboardImage(groupName: string, rows: Row[]) {
     ctx.textAlign = 'left'
   })
 
-  ctx.fillStyle = '#8A94A3'
-  ctx.font = '400 12px Arial'
-  ctx.textAlign = 'center'
-  ctx.fillText('🏈 Quiniela NFL', width / 2, height - 20)
-  ctx.textAlign = 'left'
+  // pie de pagina: nuestro logo en vez de texto
+  if (appLogoImg) {
+    const logoH = 22
+    const logoW = (appLogoImg.width / appLogoImg.height) * logoH
+    ctx.drawImage(appLogoImg, width / 2 - logoW / 2, height - footerHeight / 2 - logoH / 2, logoW, logoH)
+  } else {
+    ctx.fillStyle = '#8A94A3'
+    ctx.font = '400 12px Arial'
+    ctx.textAlign = 'center'
+    ctx.fillText('🏈 Quiniela NFL', width / 2, height - 20)
+    ctx.textAlign = 'left'
+  }
 
   canvas.toBlob(async (blob) => {
     if (!blob) return
-    const file = new File([blob], `tabla-${groupName.toLowerCase().replace(/\s+/g, '-')}.png`, { type: 'image/png' })
+    const file = new File([blob], `tabla-${group.name.toLowerCase().replace(/\s+/g, '-')}.png`, { type: 'image/png' })
 
     if (navigator.share && navigator.canShare?.({ files: [file] })) {
       try {
-        await navigator.share({ files: [file], title: `Tabla de ${groupName}` })
+        await navigator.share({ files: [file], title: `Tabla de ${group.name}` })
         return
       } catch {
         // si cancela el share nativo, cae al fallback de descarga
@@ -135,7 +207,9 @@ async function shareLeaderboardImage(groupName: string, rows: Row[]) {
 
 export default function Leaderboard({ group }: { group: Group }) {
   const [rows, setRows] = useState<Row[]>([])
+  const [currentWeekLabel, setCurrentWeekLabel] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [sharing, setSharing] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -145,17 +219,24 @@ export default function Leaderboard({ group }: { group: Group }) {
         .select('user_id, profiles(display_name, favorite_team)')
         .eq('group_id', group.id)
 
-      const { data: games } = await supabase
+      const { data: allGames } = await supabase
         .from('games')
-        .select('id, kickoff')
+        .select('id, kickoff, status, year, season_type, week')
         .eq('group_id', group.id)
-        .eq('status', 'final')
         .is('deleted_at', null)
         .order('kickoff', { ascending: false })
 
-      const finalGameIds = (games ?? []).map((g) => g.id)
+      const gameList = allGames ?? []
+
+      // semana actual: la mas proxima sin terminar; si no hay, la ultima jugada
+      const nonFinal = gameList.filter((g) => g.status !== 'final').sort((a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime())
+      const currentRef = nonFinal[0] ?? gameList[0] ?? null
+      setCurrentWeekLabel(currentRef ? weekLabel(currentRef.season_type, currentRef.week) : null)
+
+      const finalGames = gameList.filter((g) => g.status === 'final')
+      const finalGameIds = finalGames.map((g) => g.id)
       const kickoffByGame: Record<string, string> = {}
-      ;(games ?? []).forEach((g) => { kickoffByGame[g.id] = g.kickoff })
+      finalGames.forEach((g) => { kickoffByGame[g.id] = g.kickoff })
 
       let picks: any[] = []
       if (finalGameIds.length) {
@@ -209,6 +290,15 @@ export default function Leaderboard({ group }: { group: Group }) {
 
   const maxExact = Math.max(0, ...rows.map((r) => r.exactHits))
 
+  async function handleShare() {
+    setSharing(true)
+    try {
+      await shareLeaderboardImage(group, currentWeekLabel, rows)
+    } finally {
+      setSharing(false)
+    }
+  }
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between mb-1">
@@ -216,15 +306,16 @@ export default function Leaderboard({ group }: { group: Group }) {
           Desempate: 1) mas marcadores exactos, 2) mas aciertos totales.
         </p>
         <button
-          onClick={() => shareLeaderboardImage(group.name, rows)}
-          className="text-xs font-semibold text-[var(--color-light-amber)] hover:underline shrink-0 flex items-center gap-1"
+          onClick={handleShare}
+          disabled={sharing}
+          className="text-xs font-semibold text-[var(--color-light-amber)] hover:underline shrink-0 flex items-center gap-1 disabled:opacity-50"
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
             <polyline points="16 6 12 2 8 6" />
             <line x1="12" y1="2" x2="12" y2="15" />
           </svg>
-          Compartir
+          {sharing ? 'Generando...' : 'Compartir'}
         </button>
       </div>
       {rows.map((r, i) => {

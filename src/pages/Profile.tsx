@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { NFL_TEAMS } from '../lib/types'
 import { teamLogoUrl } from '../lib/teamLogos'
-import { IconUser } from '../components/icons'
+import { IconUser, IconBell } from '../components/icons'
+import { pushSupported, isPushEnabled, enablePush, disablePush } from '../lib/push'
 import type { User } from '@supabase/supabase-js'
 
 export default function Profile({
@@ -27,6 +28,32 @@ export default function Profile({
   const [savingPw, setSavingPw] = useState(false)
   const [pwErr, setPwErr] = useState<string | null>(null)
   const [pwOk, setPwOk] = useState(false)
+
+  const [pushEnabled, setPushEnabled] = useState(false)
+  const [pushBusy, setPushBusy] = useState(false)
+  const [pushErr, setPushErr] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (pushSupported()) isPushEnabled().then(setPushEnabled)
+  }, [])
+
+  async function togglePush() {
+    setPushBusy(true)
+    setPushErr(null)
+    try {
+      if (pushEnabled) {
+        await disablePush()
+        setPushEnabled(false)
+      } else {
+        await enablePush(user.id)
+        setPushEnabled(true)
+      }
+    } catch (err) {
+      setPushErr(err instanceof Error ? err.message : 'No se pudo cambiar las notificaciones')
+    } finally {
+      setPushBusy(false)
+    }
+  }
 
   useEffect(() => {
     supabase.from('profiles').select('display_name, favorite_team').eq('id', user.id).single().then(({ data }) => {
@@ -112,6 +139,35 @@ export default function Profile({
               </button>
             </>
           )}
+        </div>
+
+        <div className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <IconBell size={16} className="text-[var(--color-text-muted)]" />
+              <h2 className="text-sm font-semibold">Notificaciones</h2>
+            </div>
+            <button
+              onClick={togglePush}
+              disabled={pushBusy || !pushSupported()}
+              aria-label="Activar o desactivar notificaciones"
+              className="w-11 h-6 rounded-full relative transition disabled:opacity-50"
+              style={{ background: pushEnabled ? '#3D8B5F' : 'var(--color-field-line)' }}
+            >
+              <span
+                className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all"
+                style={{ left: pushEnabled ? '22px' : '2px' }}
+              />
+            </button>
+          </div>
+          <p className="text-[10px] text-[var(--color-text-muted)]">
+            {!pushSupported()
+              ? 'Tu navegador no soporta notificaciones push.'
+              : pushEnabled
+                ? 'Activadas — te avisamos cuando termine un partido, si alguien se une a tu liga, cuando empiece un juego en vivo, y antes de que cierren tus predicciones.'
+                : 'Desactivadas — actívalas para recibir avisos aunque no tengas la app abierta.'}
+          </p>
+          {pushErr && <p className="text-xs text-[var(--color-scoreboard-red)]">{pushErr}</p>}
         </div>
 
         <div className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-4 space-y-3">

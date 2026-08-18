@@ -1,7 +1,16 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { teamLogoUrl } from '../lib/teamLogos'
+import { IconGlobe, IconMedal, IconClipboardX } from './icons'
 import { weekLabel, type Group } from '../lib/types'
+
+interface RecentPick {
+  gameLabel: string
+  resultLabel: string
+  predLabel: string
+  points: number
+  weekLabelText: string
+}
 
 interface Row {
   user_id: string
@@ -12,6 +21,9 @@ interface Row {
   played: number
   exactHits: number
   streak: number
+  bestStreak: number
+  recentPicks: RecentPick[]
+  globalRank: number | null
 }
 
 const RANK_STYLES = [
@@ -53,7 +65,6 @@ async function shareLeaderboardImage(group: Group, weekLabelText: string | null,
   const width = 720
   const height = headerHeight + rows.length * rowHeight + footerHeight
 
-  // precargar imagenes (logo de la liga, logo de la app, y un logo por equipo distinto)
   const uniqueTeams = Array.from(new Set(rows.map((r) => r.favorite_team).filter(Boolean))) as string[]
   const [groupLogoImg, appLogoImg, teamLogoImgs] = await Promise.all([
     group.logo_url ? loadImage(group.logo_url) : Promise.resolve(null),
@@ -63,7 +74,7 @@ async function shareLeaderboardImage(group: Group, weekLabelText: string | null,
   const teamLogoMap = new Map(teamLogoImgs)
 
   const canvas = document.createElement('canvas')
-  const SCALE = 3 // dibuja a 3x y luego escala el contexto, para que la imagen exportada quede nitida
+  const SCALE = 3
   canvas.width = width * SCALE
   canvas.height = height * SCALE
   const ctx = canvas.getContext('2d')
@@ -72,7 +83,6 @@ async function shareLeaderboardImage(group: Group, weekLabelText: string | null,
   ctx.imageSmoothingEnabled = true
   ctx.imageSmoothingQuality = 'high'
 
-  // fondo
   ctx.fillStyle = '#0A0E13'
   ctx.fillRect(0, 0, width, height)
   const glow = ctx.createRadialGradient(width / 2, 0, 0, width / 2, 0, width * 0.7)
@@ -81,7 +91,6 @@ async function shareLeaderboardImage(group: Group, weekLabelText: string | null,
   ctx.fillStyle = glow
   ctx.fillRect(0, 0, width, headerHeight + 40)
 
-  // logo de la liga (o balon de placeholder)
   const logoCx = 56, logoCy = 60, logoR = 30
   if (groupLogoImg) {
     drawCircleImage(ctx, groupLogoImg, logoCx, logoCy, logoR)
@@ -98,7 +107,6 @@ async function shareLeaderboardImage(group: Group, weekLabelText: string | null,
     ctx.textAlign = 'left'
   }
 
-  // titulo + semana
   ctx.fillStyle = '#ECEFF3'
   ctx.font = '700 28px Arial'
   ctx.fillText(group.name.toUpperCase(), 104, 52)
@@ -123,12 +131,10 @@ async function shareLeaderboardImage(group: Group, weekLabelText: string | null,
       ctx.fillRect(0, y, width, rowHeight)
     }
 
-    // numero de posicion
     ctx.fillStyle = i < 3 ? rankColors[i] : '#8A94A3'
     ctx.font = '700 20px Arial'
     ctx.fillText(String(i + 1), 28, y + rowHeight / 2 + 7)
 
-    // avatar (logo del equipo favorito, o inicial si no eligio uno / no cargo)
     const cx = 76, cy = y + rowHeight / 2
     const teamImg = r.favorite_team ? teamLogoMap.get(r.favorite_team) : null
     if (teamImg) {
@@ -151,7 +157,6 @@ async function shareLeaderboardImage(group: Group, weekLabelText: string | null,
       ctx.textAlign = 'left'
     }
 
-    // nombre
     ctx.fillStyle = '#ECEFF3'
     ctx.font = '600 18px Arial'
     ctx.fillText(r.display_name, 108, y + rowHeight / 2)
@@ -159,7 +164,6 @@ async function shareLeaderboardImage(group: Group, weekLabelText: string | null,
     ctx.font = '400 13px Arial'
     ctx.fillText(`${r.hits}/${r.played} aciertos`, 108, y + rowHeight / 2 + 20)
 
-    // puntos
     ctx.fillStyle = '#ECEFF3'
     ctx.font = '700 26px Arial'
     ctx.textAlign = 'right'
@@ -170,7 +174,6 @@ async function shareLeaderboardImage(group: Group, weekLabelText: string | null,
     ctx.textAlign = 'left'
   })
 
-  // pie de pagina: nuestro logo en vez de texto
   if (appLogoImg) {
     const logoH = 22
     const logoW = (appLogoImg.width / appLogoImg.height) * logoH
@@ -205,15 +208,155 @@ async function shareLeaderboardImage(group: Group, weekLabelText: string | null,
   }, 'image/png')
 }
 
+interface GlobalSummary {
+  points: number
+  hits: number
+  played: number
+  exactHits: number
+  streak: number
+  bestStreak: number
+  maxPossible: number
+}
+
+function PlayerStatsModal({ row, onClose }: { row: Row; onClose: () => void }) {
+  const [global, setGlobal] = useState<GlobalSummary | null>(null)
+  const [loadingGlobal, setLoadingGlobal] = useState(true)
+
+  useEffect(() => {
+    async function loadGlobal() {
+      setLoadingGlobal(true)
+      const { data } = await supabase.rpc('global_user_picks_summary', { p_user_id: row.user_id })
+      const picks = (data ?? []) as { points: number; kickoff: string; points_exact: number }[]
+
+      let points = 0, hits = 0, exactHits = 0, maxPossible = 0
+      picks.forEach((p) => {
+        points += p.points ?? 0
+        if ((p.points ?? 0) > 0) hits++
+        if (p.points === p.points_exact) exactHits++
+        maxPossible += p.points_exact ?? 0
+      })
+      let streak = 0
+      for (const p of picks) {
+        if ((p.points ?? 0) > 0) streak++
+        else break
+      }
+      let bestStreak = 0, running = 0
+      picks.forEach((p) => {
+        if ((p.points ?? 0) > 0) { running++; bestStreak = Math.max(bestStreak, running) } else { running = 0 }
+      })
+
+      setGlobal({ points, hits, played: picks.length, exactHits, streak, bestStreak, maxPossible })
+      setLoadingGlobal(false)
+    }
+    loadGlobal()
+  }, [row.user_id])
+
+  const winRate = global && global.played > 0 ? Math.round((global.hits / global.played) * 100) : 0
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-xl p-6 max-h-[85vh] overflow-y-auto relative">
+        <button onClick={onClose} className="absolute top-4 right-4 text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)] text-lg leading-none">✕</button>
+
+        <div className="flex flex-col items-center text-center mb-5">
+          <div
+            className="w-16 h-16 rounded-full flex items-center justify-center font-display text-xl font-700 shrink-0 overflow-hidden mb-3"
+            style={{ background: 'var(--color-field-surface-raised)', border: '2px solid var(--color-field-line)' }}
+          >
+            {row.favorite_team ? (
+              <img src={teamLogoUrl(row.favorite_team)} alt={row.favorite_team} className="w-full h-full object-contain p-2" />
+            ) : (
+              row.display_name.charAt(0).toUpperCase()
+            )}
+          </div>
+          <h3 className="font-display text-2xl font-700 leading-tight">{row.display_name}</h3>
+          {row.globalRank && (
+            <span
+              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full mt-2"
+              style={{ background: 'rgba(242,183,5,0.15)', color: 'var(--color-light-amber)', border: '1px solid rgba(242,183,5,0.4)' }}
+            >
+              <IconMedal size={13} /> #{row.globalRank} en el ranking global
+            </span>
+          )}
+        </div>
+
+        <p className="text-xs text-[var(--color-text-muted)] text-center mb-4">Estadisticas de todas sus ligas juntas</p>
+
+        {loadingGlobal || !global ? (
+          <p className="text-xs text-[var(--color-text-muted)] text-center mb-5">Cargando...</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 mb-5">
+            <div className="bg-[var(--color-field-surface-raised)] rounded-lg p-4 text-center flex flex-col justify-center items-center h-full">
+              <div className="text-[10px] font-semibold text-[var(--color-text-muted)] tracking-wide mb-1">PUNTOS TOTALES</div>
+              <div className="font-mono-score text-3xl font-extrabold">{global.points}</div>
+            </div>
+            <div className="bg-[var(--color-field-surface-raised)] rounded-lg p-4 text-center flex flex-col justify-center items-center h-full">
+              <div className="text-[10px] font-semibold text-[var(--color-text-muted)] tracking-wide mb-1">ACIERTOS</div>
+              <div className="font-mono-score text-3xl font-extrabold">{winRate}%</div>
+              <div className="h-1 rounded-full bg-[var(--color-field-line)] mt-2 mb-1.5 overflow-hidden">
+                <div className="h-full rounded-full" style={{ width: `${winRate}%`, background: '#3D8B5F' }} />
+              </div>
+              <div className="text-[10px] text-[var(--color-text-muted)]">{global.hits}/{global.played} pronosticos</div>
+            </div>
+            <div className="bg-[var(--color-field-surface-raised)] rounded-lg p-4 text-center flex flex-col justify-center items-center h-full">
+              <div className="text-[10px] font-semibold text-[var(--color-text-muted)] tracking-wide mb-1">MARCADORES EXACTOS</div>
+              <div className="font-mono-score text-3xl font-extrabold">{global.exactHits}</div>
+              <div className="text-[10px] text-[var(--color-text-muted)] mt-1">de {global.played} registrados</div>
+            </div>
+            <div className="bg-[var(--color-field-surface-raised)] rounded-lg p-4 text-center flex flex-col justify-center items-center h-full">
+              <div className="text-[10px] font-semibold text-[var(--color-text-muted)] tracking-wide mb-1">MEJOR RACHA</div>
+              <div className="text-2xl font-700 flex items-center justify-center gap-1">🔥 <span className="font-extrabold">{global.bestStreak}</span></div>
+              <div className="text-[10px] text-[var(--color-text-muted)] mt-1">(actual: {global.streak})</div>
+            </div>
+          </div>
+        )}
+
+        <h4 className="text-xs font-semibold text-[var(--color-text-muted)] mb-2">Ultimas predicciones en esta liga</h4>
+        {row.recentPicks.length === 0 ? (
+          <div className="flex flex-col items-center text-center py-6 text-[var(--color-text-muted)]">
+            <IconClipboardX size={32} className="mb-2 opacity-50" />
+            <p className="text-xs">Aun no hay predicciones recientes aqui.</p>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            {row.recentPicks.map((p, i) => (
+              <div key={i} className="flex items-center justify-between text-xs bg-[var(--color-field-surface-raised)] rounded-md px-3 py-2">
+                <div>
+                  <div className="font-medium">{p.gameLabel}</div>
+                  <div className="text-[10px] text-[var(--color-text-muted)] font-mono-score">
+                    {p.weekLabelText} · Final {p.resultLabel} · Predijo {p.predLabel}
+                  </div>
+                </div>
+                <span
+                  className="font-mono-score font-700 shrink-0 ml-2"
+                  style={{ color: p.points > 0 ? '#3D8B5F' : 'var(--color-text-muted)' }}
+                >
+                  {p.points > 0 ? `+${p.points}` : '0'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function Leaderboard({ group }: { group: Group }) {
   const [rows, setRows] = useState<Row[]>([])
   const [currentWeekLabel, setCurrentWeekLabel] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [sharing, setSharing] = useState(false)
+  const [selectedPlayer, setSelectedPlayer] = useState<Row | null>(null)
 
   useEffect(() => {
     async function load() {
       setLoading(true)
+
+      const { data: globalRanks } = await supabase.rpc('global_rankings')
+      const rankByUser: Record<string, number> = {}
+      ;(globalRanks ?? []).forEach((r: any, i: number) => { rankByUser[r.user_id] = i + 1 })
+
       const { data: members } = await supabase
         .from('group_members')
         .select('user_id, profiles(display_name, favorite_team)')
@@ -221,26 +364,28 @@ export default function Leaderboard({ group }: { group: Group }) {
 
       const { data: allGames } = await supabase
         .from('games')
-        .select('id, kickoff, status, year, season_type, week')
+        .select('id, kickoff, status, year, season_type, week, home_team, away_team, home_score, away_score')
         .eq('group_id', group.id)
         .is('deleted_at', null)
         .order('kickoff', { ascending: false })
 
       const gameList = allGames ?? []
 
-      // semana actual: la mas proxima sin terminar; si no hay, la ultima jugada
       const nonFinal = gameList.filter((g) => g.status !== 'final').sort((a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime())
       const currentRef = nonFinal[0] ?? gameList[0] ?? null
       setCurrentWeekLabel(currentRef ? weekLabel(currentRef.season_type, currentRef.week) : null)
 
       const finalGames = gameList.filter((g) => g.status === 'final')
       const finalGameIds = finalGames.map((g) => g.id)
-      const kickoffByGame: Record<string, string> = {}
-      finalGames.forEach((g) => { kickoffByGame[g.id] = g.kickoff })
+      const gameById: Record<string, (typeof finalGames)[number]> = {}
+      finalGames.forEach((g) => { gameById[g.id] = g })
 
       let picks: any[] = []
       if (finalGameIds.length) {
-        const { data } = await supabase.from('picks').select('user_id, game_id, points').in('game_id', finalGameIds)
+        const { data } = await supabase
+          .from('picks')
+          .select('user_id, game_id, points, pred_home_score, pred_away_score')
+          .in('game_id', finalGameIds)
         picks = data ?? []
       }
 
@@ -252,7 +397,7 @@ export default function Leaderboard({ group }: { group: Group }) {
 
       const result: Row[] = (members ?? []).map((m: any) => {
         const userPicks = (byUser[m.user_id] ?? []).slice().sort(
-          (a, b) => new Date(kickoffByGame[b.game_id]).getTime() - new Date(kickoffByGame[a.game_id]).getTime()
+          (a, b) => new Date(gameById[b.game_id]?.kickoff ?? 0).getTime() - new Date(gameById[a.game_id]?.kickoff ?? 0).getTime()
         )
         let points = 0
         let hits = 0
@@ -262,11 +407,30 @@ export default function Leaderboard({ group }: { group: Group }) {
           if ((p.points ?? 0) > 0) hits++
           if (p.points === group.points_exact) exactHits++
         })
+
         let streak = 0
         for (const p of userPicks) {
           if ((p.points ?? 0) > 0) streak++
           else break
         }
+
+        let bestStreak = 0
+        let running = 0
+        userPicks.forEach((p) => {
+          if ((p.points ?? 0) > 0) { running++; bestStreak = Math.max(bestStreak, running) } else { running = 0 }
+        })
+
+        const recentPicks: RecentPick[] = userPicks.slice(0, 8).map((p) => {
+          const g = gameById[p.game_id]
+          return {
+            gameLabel: g ? `${g.away_team} @ ${g.home_team}` : 'Partido',
+            resultLabel: g ? `${g.away_score}-${g.home_score}` : '',
+            predLabel: `${p.pred_away_score}-${p.pred_home_score}`,
+            points: p.points ?? 0,
+            weekLabelText: g ? weekLabel(g.season_type, g.week) : '',
+          }
+        })
+
         return {
           user_id: m.user_id,
           display_name: m.profiles?.display_name ?? 'Jugador',
@@ -276,6 +440,9 @@ export default function Leaderboard({ group }: { group: Group }) {
           played: userPicks.length,
           exactHits,
           streak,
+          bestStreak,
+          recentPicks,
+          globalRank: rankByUser[m.user_id] ?? null,
         }
       })
       result.sort((a, b) => b.points - a.points || b.exactHits - a.exactHits || b.hits - a.hits)
@@ -301,10 +468,7 @@ export default function Leaderboard({ group }: { group: Group }) {
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between mb-1">
-        <p className="text-[10px] text-[var(--color-text-muted)]">
-          Desempate: 1) mas marcadores exactos, 2) mas aciertos totales.
-        </p>
+      <div className="flex items-center justify-end mb-1">
         <button
           onClick={handleShare}
           disabled={sharing}
@@ -321,9 +485,10 @@ export default function Leaderboard({ group }: { group: Group }) {
       {rows.map((r, i) => {
         const style = RANK_STYLES[i]
         return (
-          <div
+          <button
             key={r.user_id}
-            className="flex items-center gap-3 px-4 py-3 rounded-lg border"
+            onClick={() => setSelectedPlayer(r)}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border text-left hover:brightness-110 transition"
             style={{
               background: style?.bg ?? 'var(--color-field-surface)',
               borderColor: style?.border ?? 'var(--color-field-line)',
@@ -360,6 +525,15 @@ export default function Leaderboard({ group }: { group: Group }) {
                 {maxExact > 0 && r.exactHits === maxExact && (
                   <span className="text-[10px]" title="Mas marcadores exactos del grupo">🎯</span>
                 )}
+                {r.globalRank && (
+                  <span
+                    className="inline-flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full shrink-0"
+                    style={{ background: 'rgba(242,183,5,0.12)', color: 'var(--color-light-amber)' }}
+                    title="Posicion en el ranking global"
+                  >
+                    <IconGlobe size={9} /> #{r.globalRank}
+                  </span>
+                )}
               </div>
               <div className="text-[11px] text-[var(--color-text-muted)] font-mono-score">
                 {r.hits}/{r.played} aciertos
@@ -370,9 +544,15 @@ export default function Leaderboard({ group }: { group: Group }) {
               <div className="font-mono-score text-xl font-700 leading-none">{r.points}</div>
               <div className="text-[10px] text-[var(--color-text-muted)]">pts</div>
             </div>
-          </div>
+          </button>
         )
       })}
+
+      <p className="text-[10px] text-[var(--color-text-muted)] text-center pt-1">
+        Desempate: 1) mas marcadores exactos, 2) mas aciertos totales. Toca a alguien para ver sus stats.
+      </p>
+
+      {selectedPlayer && <PlayerStatsModal row={selectedPlayer} onClose={() => setSelectedPlayer(null)} />}
     </div>
   )
 }

@@ -19,7 +19,7 @@ async function loadStats(group: Group, userId: string): Promise<GroupStats> {
   const { data: memberRows } = await supabase.from('group_members').select('user_id').eq('group_id', group.id)
   const memberIds = (memberRows ?? []).map((m: any) => m.user_id)
 
-  const { data: games } = await supabase.from('games').select('*').eq('group_id', group.id).order('kickoff')
+  const { data: games } = await supabase.from('games').select('*').eq('group_id', group.id).is('deleted_at', null).order('kickoff')
   const gameList = (games ?? []) as Game[]
 
   const nonFinal = gameList.filter((g) => g.status !== 'final').sort((a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime())

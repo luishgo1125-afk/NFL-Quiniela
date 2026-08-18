@@ -31,6 +31,7 @@ export default function Notifications({ user }: { user: User }) {
       .select('id, group_id, home_team, away_team, home_score, away_score, status, kickoff, groups(name)')
       .in('group_id', groupIds)
       .in('status', ['live', 'final'])
+      .is('deleted_at', null)
       .gte('kickoff', since)
       .order('kickoff', { ascending: false })
       .limit(30)

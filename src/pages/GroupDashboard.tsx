@@ -106,7 +106,7 @@ export default function GroupDashboard({
 
   const weeks = useMemo(() => {
     const map = new Map<string, { year: number; seasonType: number; week: number }>()
-    games.forEach((g) => {
+    games.filter((g) => !g.deleted_at).forEach((g) => {
       const key = `${g.year}:${g.season_type}:${g.week}`
       if (!map.has(key)) map.set(key, { year: g.year, seasonType: g.season_type, week: g.week })
     })
@@ -121,9 +121,9 @@ export default function GroupDashboard({
     if (weekKey === null && weeks.length > 0) setWeekKey(weeks[0].key)
   }, [weeks, weekKey])
 
-  const weekGames = useMemo(() => games.filter((g) => `${g.year}:${g.season_type}:${g.week}` === weekKey), [games, weekKey])
+  const weekGames = useMemo(() => games.filter((g) => !g.deleted_at && `${g.year}:${g.season_type}:${g.week}` === weekKey), [games, weekKey])
   const selectedWeek = useMemo(() => weeks.find((w) => w.key === weekKey) ?? null, [weeks, weekKey])
-  const liveNow = useMemo(() => games.filter((g) => g.status === 'live'), [games])
+  const liveNow = useMemo(() => games.filter((g) => !g.deleted_at && g.status === 'live'), [games])
 
   const [weeklyWinners, setWeeklyWinners] = useState<{ names: string[]; points: number } | null>(null)
 

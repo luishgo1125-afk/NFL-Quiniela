@@ -34,6 +34,7 @@ export interface Game {
   away_score: number | null
   status: 'scheduled' | 'live' | 'final'
   game_clock: string | null
+  deleted_at: string | null
 }
 
 // 1 = pretemporada, 2 = temporada regular, 3 = playoffs

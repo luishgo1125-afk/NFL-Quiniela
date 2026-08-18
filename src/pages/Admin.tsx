@@ -66,6 +66,11 @@ export default function Admin({
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState<string | null>(null)
   const [autoSync, setAutoSync] = useState(false)
+  const [expandedWeeks, setExpandedWeeks] = useState<Record<string, boolean>>({})
+
+  function toggleWeek(key: string) {
+    setExpandedWeeks((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
 
   function onPickLogo(file: File | null) {
     setLogoFile(file)
@@ -122,6 +127,7 @@ export default function Admin({
 
       let created = 0
       let updated = 0
+      let failed = 0
 
       for (const eg of espnGames) {
         const existing = games.find(
@@ -130,7 +136,7 @@ export default function Admin({
         const newStatus: 'scheduled' | 'live' | 'final' = eg.completed ? 'final' : eg.live ? 'live' : 'scheduled'
 
         if (!existing) {
-          const { data: inserted } = await supabase
+          const { data: inserted, error: insertErr } = await supabase
             .from('games')
             .insert({
               group_id: groupId,
@@ -147,6 +153,12 @@ export default function Admin({
             })
             .select()
             .single()
+
+          if (insertErr) {
+            failed++
+            console.error('Error insertando partido:', insertErr.message)
+            continue
+          }
           created++
           if (eg.completed && inserted) {
             await supabase.rpc('calculate_points_for_game', { p_game_id: inserted.id })
@@ -173,7 +185,8 @@ export default function Admin({
         }
       }
 
-      setSyncMsg(`Listo: ${created} agregado(s), ${updated} actualizado(s) — ${new Date().toLocaleTimeString('es-MX')}`)
+      const failedNote = failed > 0 ? ` — ⚠️ ${failed} fallaron (revisa la consola del navegador)` : ''
+      setSyncMsg(`Listo: ${created} agregado(s), ${updated} actualizado(s)${failedNote} — ${new Date().toLocaleTimeString('es-MX')}`)
       onChange()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo sincronizar con ESPN')
@@ -214,13 +227,19 @@ export default function Admin({
   }
 
   async function deleteGame(id: string) {
-    await supabase.from('games').delete().eq('id', id)
+    if (!confirm('¿Borrar este partido? Podras recuperarlo despues desde la Papelera.')) return
+    await supabase.from('games').update({ deleted_at: new Date().toISOString() }).eq('id', id)
+    onChange()
+  }
+
+  async function restoreGame(id: string) {
+    await supabase.from('games').update({ deleted_at: null }).eq('id', id)
     onChange()
   }
 
   const gamesByWeek = useMemo(() => {
     const map = new Map<string, { key: string; year: number; seasonType: number; week: number; games: Game[] }>()
-    games.forEach((g) => {
+    games.filter((g) => !g.deleted_at).forEach((g) => {
       const key = `${g.year}:${g.season_type}:${g.week}`
       if (!map.has(key)) map.set(key, { key, year: g.year, seasonType: g.season_type, week: g.week, games: [] })
       map.get(key)!.games.push(g)
@@ -228,9 +247,28 @@ export default function Admin({
     return Array.from(map.values()).sort((a, b) => a.year - b.year || a.seasonType - b.seasonType || a.week - b.week)
   }, [games])
 
+  const deletedGames = useMemo(() => games.filter((g) => g.deleted_at), [games])
+
   async function deleteWeek(seasonType: number, week: number, year: number) {
-    if (!confirm(`¿Borrar toda la ${weekLabel(seasonType, week)}? Se eliminaran esos partidos y las predicciones de todos.`)) return
-    await supabase.from('games').delete().eq('group_id', groupId).eq('season_type', seasonType).eq('week', week).eq('year', year)
+    if (!confirm(`¿Borrar toda la ${weekLabel(seasonType, week)}? Podras recuperarla despues desde la Papelera.`)) return
+    await supabase
+      .from('games')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('group_id', groupId)
+      .eq('season_type', seasonType)
+      .eq('week', week)
+      .eq('year', year)
+    onChange()
+  }
+
+  async function restoreWeek(seasonType: number, week: number, year: number) {
+    await supabase
+      .from('games')
+      .update({ deleted_at: null })
+      .eq('group_id', groupId)
+      .eq('season_type', seasonType)
+      .eq('week', week)
+      .eq('year', year)
     onChange()
   }
 
@@ -395,26 +433,88 @@ export default function Admin({
         </button>
       </form>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         <h2 className="text-sm font-semibold">Partidos capturados</h2>
         {games.length === 0 && <p className="text-xs text-[var(--color-text-muted)]">Ninguno todavia.</p>}
-        {gamesByWeek.map((wk) => (
-          <div key={wk.key} className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="font-mono-score text-xs text-[var(--color-light-amber)]">{weekLabel(wk.seasonType, wk.week)} · {wk.year}</span>
+        {gamesByWeek.map((wk) => {
+          const open = !!expandedWeeks[wk.key]
+          return (
+            <div key={wk.key} className="border border-[var(--color-field-line)] rounded-lg overflow-hidden">
               <button
-                onClick={() => deleteWeek(wk.seasonType, wk.week, wk.year)}
-                className="text-xs text-[var(--color-scoreboard-red)] hover:underline"
+                onClick={() => toggleWeek(wk.key)}
+                className="w-full flex items-center justify-between px-3 py-2.5 bg-[var(--color-field-surface)] hover:bg-[var(--color-field-surface-raised)] transition"
               >
-                Borrar semana completa
+                <span className="flex items-center gap-2">
+                  <span className={`text-[var(--color-text-muted)] text-xs transition-transform ${open ? 'rotate-90' : ''}`}>▶</span>
+                  <span className="font-mono-score text-xs text-[var(--color-light-amber)]">{weekLabel(wk.seasonType, wk.week)} · {wk.year}</span>
+                  <span className="text-[10px] text-[var(--color-text-muted)]">({wk.games.length} partido{wk.games.length !== 1 ? 's' : ''})</span>
+                </span>
+                <span
+                  onClick={(e) => { e.stopPropagation(); deleteWeek(wk.seasonType, wk.week, wk.year) }}
+                  className="text-xs text-[var(--color-scoreboard-red)] hover:underline"
+                >
+                  Borrar semana completa
+                </span>
               </button>
+              {open && (
+                <div className="p-3 space-y-2 bg-[var(--color-field-night)]/40">
+                  {wk.games.map((g) => (
+                    <AdminGameRow key={g.id} game={g} onFinal={setFinalScore} onDelete={deleteGame} />
+                  ))}
+                </div>
+              )}
             </div>
-            {wk.games.map((g) => (
-              <AdminGameRow key={g.id} game={g} onFinal={setFinalScore} onDelete={deleteGame} />
-            ))}
-          </div>
-        ))}
+          )
+        })}
       </div>
+
+      {deletedGames.length > 0 && (
+        <div className="border border-[var(--color-field-line)] rounded-lg overflow-hidden">
+          <div className="px-3 py-2.5 bg-[var(--color-field-surface)]">
+            <h2 className="text-sm font-semibold flex items-center gap-2">
+              🗑️ Papelera
+              <span className="text-[10px] text-[var(--color-text-muted)] font-normal">
+                ({deletedGames.length} partido{deletedGames.length !== 1 ? 's' : ''} borrado{deletedGames.length !== 1 ? 's' : ''})
+              </span>
+            </h2>
+          </div>
+          <div className="p-3 space-y-2 bg-[var(--color-field-night)]/40">
+            {(() => {
+              const map = new Map<string, { key: string; year: number; seasonType: number; week: number; games: Game[] }>()
+              deletedGames.forEach((g) => {
+                const key = `${g.year}:${g.season_type}:${g.week}`
+                if (!map.has(key)) map.set(key, { key, year: g.year, seasonType: g.season_type, week: g.week, games: [] })
+                map.get(key)!.games.push(g)
+              })
+              return Array.from(map.values()).map((wk) => (
+                <div key={wk.key} className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-md p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-mono-score text-xs text-[var(--color-text-muted)]">
+                      {weekLabel(wk.seasonType, wk.week)} · {wk.year} ({wk.games.length})
+                    </span>
+                    <button
+                      onClick={() => restoreWeek(wk.seasonType, wk.week, wk.year)}
+                      className="text-xs font-semibold text-[var(--color-turf-green)] hover:underline"
+                    >
+                      Restaurar semana completa
+                    </button>
+                  </div>
+                  <div className="space-y-1">
+                    {wk.games.map((g) => (
+                      <div key={g.id} className="flex items-center justify-between text-xs text-[var(--color-text-muted)] px-2 py-1">
+                        <span>{g.away_team} @ {g.home_team}</span>
+                        <button onClick={() => restoreGame(g.id)} className="text-[var(--color-turf-green)] hover:underline">
+                          Restaurar
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            })()}
+          </div>
+        </div>
+      )}
 
       <DangerZone group={group} onGroupUpdated={onGroupUpdated} onLeftAdmin={onLeftAdmin} onDeleted={onBack} />
     </div>

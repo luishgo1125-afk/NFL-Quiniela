@@ -150,6 +150,7 @@ export default function Leaderboard({ group }: { group: Group }) {
         .select('id, kickoff')
         .eq('group_id', group.id)
         .eq('status', 'final')
+        .is('deleted_at', null)
         .order('kickoff', { ascending: false })
 
       const finalGameIds = (games ?? []).map((g) => g.id)

@@ -68,6 +68,25 @@ export default function App() {
   const [recovery, setRecovery] = useState(false)
   const [bottomTab, setBottomTab] = useState<BottomTab>('quinielas')
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [hasUnread, setHasUnread] = useState(false)
+
+  useEffect(() => {
+    if (!user) return
+    async function checkUnread() {
+      const { count } = await supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user!.id)
+        .is('read_at', null)
+      setHasUnread((count ?? 0) > 0)
+    }
+    checkUnread()
+    const channel = supabase
+      .channel(`unread-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, () => checkUnread())
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [user?.id])
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
@@ -157,7 +176,7 @@ export default function App() {
         active={bottomTab}
         onChange={handleBottomTabChange}
         onCreate={() => setShowCreateModal(true)}
-        hasNotifications={false}
+        hasNotifications={hasUnread}
         canCreate={canCreate}
       />
 

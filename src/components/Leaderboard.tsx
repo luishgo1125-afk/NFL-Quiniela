@@ -9,6 +9,7 @@ interface RecentPick {
   resultLabel: string
   predLabel: string
   points: number
+  diff: number
   weekLabelText: string
 }
 
@@ -20,6 +21,7 @@ interface Row {
   hits: number
   played: number
   exactHits: number
+  pointDiff: number
   streak: number
   bestStreak: number
   recentPicks: RecentPick[]
@@ -322,10 +324,8 @@ function PlayerStatsModal({ row, onClose }: { row: Row; onClose: () => void }) {
             {row.recentPicks.map((p, i) => (
               <div key={i} className="flex items-center justify-between text-xs bg-[var(--color-field-surface-raised)] rounded-md px-3 py-2">
                 <div>
-                  <div className="font-medium">{p.gameLabel}</div>
-                  <div className="text-[10px] text-[var(--color-text-muted)] font-mono-score">
-                    {p.weekLabelText} · Final {p.resultLabel} · Predijo {p.predLabel}
-                  </div>
+                  <div className="font-medium">{p.weekLabelText} · {p.gameLabel}</div>
+                  <div className="text-[10px] text-[var(--color-text-muted)] font-mono-score">Final {p.resultLabel} · Predijo {p.predLabel} · Dif +{p.diff}</div>
                 </div>
                 <span
                   className="font-mono-score font-700 shrink-0 ml-2"
@@ -402,10 +402,15 @@ export default function Leaderboard({ group }: { group: Group }) {
         let points = 0
         let hits = 0
         let exactHits = 0
+        let pointDiff = 0
         userPicks.forEach((p) => {
           points += p.points ?? 0
           if ((p.points ?? 0) > 0) hits++
           if (p.points === group.points_exact) exactHits++
+          const g = gameById[p.game_id]
+          if (g) {
+            pointDiff += Math.abs((g.home_score ?? 0) - (p.pred_home_score ?? 0)) + Math.abs((g.away_score ?? 0) - (p.pred_away_score ?? 0))
+          }
         })
 
         let streak = 0
@@ -422,11 +427,13 @@ export default function Leaderboard({ group }: { group: Group }) {
 
         const recentPicks: RecentPick[] = userPicks.slice(0, 8).map((p) => {
           const g = gameById[p.game_id]
+          const diff = g ? Math.abs((g.home_score ?? 0) - (p.pred_home_score ?? 0)) + Math.abs((g.away_score ?? 0) - (p.pred_away_score ?? 0)) : 0
           return {
             gameLabel: g ? `${g.away_team} @ ${g.home_team}` : 'Partido',
             resultLabel: g ? `${g.away_score}-${g.home_score}` : '',
             predLabel: `${p.pred_away_score}-${p.pred_home_score}`,
             points: p.points ?? 0,
+            diff,
             weekLabelText: g ? weekLabel(g.season_type, g.week) : '',
           }
         })
@@ -439,13 +446,14 @@ export default function Leaderboard({ group }: { group: Group }) {
           hits,
           played: userPicks.length,
           exactHits,
+          pointDiff,
           streak,
           bestStreak,
           recentPicks,
           globalRank: rankByUser[m.user_id] ?? null,
         }
       })
-      result.sort((a, b) => b.points - a.points || b.exactHits - a.exactHits || b.hits - a.hits)
+      result.sort((a, b) => b.points - a.points || b.exactHits - a.exactHits || a.pointDiff - b.pointDiff)
       setRows(result)
       setLoading(false)
     }
@@ -536,7 +544,7 @@ export default function Leaderboard({ group }: { group: Group }) {
                 )}
               </div>
               <div className="text-[11px] text-[var(--color-text-muted)] font-mono-score">
-                {r.hits}/{r.played} aciertos
+                {r.hits}/{r.played} Aciertos · Dif +{r.pointDiff}
               </div>
             </div>
 
@@ -549,7 +557,7 @@ export default function Leaderboard({ group }: { group: Group }) {
       })}
 
       <p className="text-[10px] text-[var(--color-text-muted)] text-center pt-1">
-        Desempate: 1) mas marcadores exactos, 2) mas aciertos totales. Toca a alguien para ver sus stats.
+        Desempate: 1) mas marcadores exactos, 2) menor diferencia de puntos (real vs. predicho, ambos equipos). Toca a alguien para ver sus stats.
       </p>
 
       {selectedPlayer && <PlayerStatsModal row={selectedPlayer} onClose={() => setSelectedPlayer(null)} />}

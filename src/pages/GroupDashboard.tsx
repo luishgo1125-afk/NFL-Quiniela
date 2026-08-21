@@ -149,30 +149,40 @@ export default function GroupDashboard({
 
   useEffect(() => {
     async function computeWinner() {
-      const finalIds = weekGames.filter((g) => g.status === 'final').map((g) => g.id)
-      if (finalIds.length === 0) { setWeeklyWinners(null); return }
-      const { data } = await supabase.from('picks').select('user_id, points').in('game_id', finalIds)
+      if (weekGames.length === 0) { setWeeklyWinners(null); return }
+      // solo mostramos ganador/empate de la jornada cuando TODOS los juegos
+      // de la semana ya terminaron; si aun hay pendientes, no hay resultado final
+      const allFinal = weekGames.every((g) => g.status === 'final')
+      if (!allFinal) { setWeeklyWinners(null); return }
 
-      const stats: Record<string, { points: number; exact: number; hits: number }> = {}
+      const finalIds = weekGames.map((g) => g.id)
+      const gameById: Record<string, typeof weekGames[number]> = {}
+      weekGames.forEach((g) => { gameById[g.id] = g })
+      const { data } = await supabase.from('picks').select('user_id, game_id, points, pred_home_score, pred_away_score').in('game_id', finalIds)
+
+      const stats: Record<string, { points: number; exact: number; diff: number }> = {}
       ;(data ?? []).forEach((p: any) => {
-        const cur = stats[p.user_id] ?? { points: 0, exact: 0, hits: 0 }
+        const cur = stats[p.user_id] ?? { points: 0, exact: 0, diff: 0 }
         cur.points += p.points ?? 0
-        if ((p.points ?? 0) > 0) cur.hits++
         if (p.points === group.points_exact) cur.exact++
+        const g = gameById[p.game_id]
+        if (g) {
+          cur.diff += Math.abs((g.home_score ?? 0) - (p.pred_home_score ?? 0)) + Math.abs((g.away_score ?? 0) - (p.pred_away_score ?? 0))
+        }
         stats[p.user_id] = cur
       })
 
       const entries = Object.entries(stats)
       if (entries.length === 0) { setWeeklyWinners(null); return }
 
-      // desempate: 1) puntos, 2) marcadores exactos, 3) aciertos totales
-      entries.sort((a, b) => b[1].points - a[1].points || b[1].exact - a[1].exact || b[1].hits - a[1].hits)
+      // desempate: 1) puntos totales, 2) marcadores exactos acertados, 3) menor diferencia de puntos (real vs. predicho, ambos equipos)
+      entries.sort((a, b) => b[1].points - a[1].points || b[1].exact - a[1].exact || a[1].diff - b[1].diff)
       const [topId, topStats] = entries[0]
       if (topStats.points <= 0) { setWeeklyWinners(null); return }
 
       // si sigue habiendo empate total incluso despues del desempate, son co-ganadores reales
       const tied = entries.filter(
-        ([, s]) => s.points === topStats.points && s.exact === topStats.exact && s.hits === topStats.hits
+        ([, s]) => s.points === topStats.points && s.exact === topStats.exact && s.diff === topStats.diff
       )
       const names = tied.map(([uid]) => members.find((m) => m.user_id === uid)?.display_name ?? 'Jugador')
       setWeeklyWinners({ names, points: topStats.points })

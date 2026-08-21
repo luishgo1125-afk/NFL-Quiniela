@@ -310,7 +310,7 @@ export default function Profile({
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
       {/* Encabezado + ranking */}
-      <div className="grid grid-cols-2 gap-4 w-full">
+      <div className="grid grid-cols-[1.25fr_1fr] gap-3 w-full items-stretch">
         <div className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-4">
           <div className="flex items-center gap-3">
             <div className="relative shrink-0">
@@ -335,22 +335,22 @@ export default function Profile({
           </div>
           {globalStats?.rank && (
             <span
-              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full mt-3"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full mt-3 whitespace-nowrap"
               style={{ background: 'rgba(242,183,5,0.15)', color: 'var(--color-light-amber)', border: '1px solid rgba(242,183,5,0.4)' }}
             >
-              <IconMedal size={13} /> #{globalStats.rank} en el ranking global
+              <IconMedal size={13} className="shrink-0" /> #{globalStats.rank} en el ranking
             </span>
           )}
         </div>
 
         {globalStats?.rank && (
-          <div className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-4 sm:w-48">
-            <p className="text-[10px] font-semibold text-[var(--color-light-amber)] tracking-wide mb-1">RANKING GLOBAL</p>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="font-display text-3xl font-800">#{globalStats.rank}</span>
-              <IconMedal size={20} className="text-[var(--color-light-amber)]" />
+          <div className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-3 h-full flex flex-col justify-center">
+            <p className="text-[9px] font-semibold text-[var(--color-light-amber)] tracking-wide mb-1 whitespace-nowrap">RANKING GLOBAL</p>
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="font-display text-2xl font-800">#{globalStats.rank}</span>
+              <IconMedal size={16} className="text-[var(--color-light-amber)]" />
             </div>
-            <p className="text-[10px] text-[var(--color-text-muted)] mb-2">
+            <p className="text-[9px] text-[var(--color-text-muted)] mb-2 leading-tight">
               {globalStats.rank === 1 ? '¡Vas primero!' : `Estas a ${pointsToFirst} pts del #1`}
             </p>
             <div className="h-1.5 rounded-full bg-[var(--color-field-line)] overflow-hidden mb-1">
@@ -445,15 +445,6 @@ export default function Profile({
 
       {/* Lista de configuracion */}
       <div className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg divide-y divide-[var(--color-field-line)] overflow-hidden">
-        <button onClick={() => setShowEdit(true)} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-[var(--color-field-surface-raised)] transition text-left">
-          <IconUser size={18} className="text-[var(--color-light-amber)] shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold">Perfil</p>
-            <p className="text-[10px] text-[var(--color-text-muted)]">Edita tu informacion personal y preferencias</p>
-          </div>
-          <IconChevronRight size={16} className="text-[var(--color-text-muted)] shrink-0" />
-        </button>
-
         <div className="flex items-center gap-3 px-4 py-3.5">
           <IconBell size={18} className="text-[var(--color-light-amber)] shrink-0" />
           <div className="flex-1 min-w-0">

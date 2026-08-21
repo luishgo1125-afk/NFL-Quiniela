@@ -87,6 +87,26 @@ export default function GroupDashboard({
 
   useEffect(() => { loadGames(); loadMembers(); loadPickStatus() }, [group.id])
 
+  // el celular corta la conexion en tiempo real cuando se bloquea la pantalla
+  // o la app pasa a segundo plano; al volver a abrirla, refresca todo de una
+  // vez en lugar de esperar a que llegue algo por el socket (que puede seguir
+  // caido un rato)
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === 'visible') {
+        loadGames()
+        loadMembers()
+        loadPickStatus()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
+    }
+  }, [group.id])
+
   useEffect(() => {
     const channel = supabase
       .channel(`games-${group.id}`)

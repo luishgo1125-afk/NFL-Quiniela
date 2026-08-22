@@ -113,14 +113,19 @@ export default function GroupDashboard({
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'games', filter: `group_id=eq.${group.id}` },
-        () => loadGames()
+        (payload) => {
+          console.log('[realtime] cambio en games recibido:', payload)
+          loadGames()
+        }
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'picks' },
         () => loadPickStatus()
       )
-      .subscribe()
+      .subscribe((status, err) => {
+        console.log('[realtime] estado del canal games:', status, err ?? '')
+      })
     return () => { supabase.removeChannel(channel) }
   }, [group.id])
 

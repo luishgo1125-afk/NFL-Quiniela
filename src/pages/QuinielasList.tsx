@@ -2,8 +2,13 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Game, Group } from '../lib/types'
 import { weekLabel } from '../lib/types'
-import { IconClipboard, IconCalendar } from '../components/icons'
+import { IconClipboard, IconCalendar, IconUsers, IconCopy, IconWhatsapp, IconGear } from '../components/icons'
 import type { User } from '@supabase/supabase-js'
+
+interface Member {
+  user_id: string
+  display_name: string
+}
 
 interface GroupStats {
   weekLabelText: string | null
@@ -67,7 +72,9 @@ async function loadStats(group: Group, userId: string): Promise<GroupStats> {
 export default function QuinielasList({ user, onSelect }: { user: User; onSelect: (g: Group) => void }) {
   const [groups, setGroups] = useState<Group[]>([])
   const [stats, setStats] = useState<Record<string, GroupStats>>({})
+  const [membersByGroup, setMembersByGroup] = useState<Record<string, Member[]>>({})
   const [loading, setLoading] = useState(true)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -79,9 +86,31 @@ export default function QuinielasList({ user, onSelect }: { user: User; onSelect
 
       const entries = await Promise.all(gs.map(async (g) => [g.id, await loadStats(g, user.id)] as const))
       setStats(Object.fromEntries(entries))
+
+      const memberEntries = await Promise.all(
+        gs.map(async (g) => {
+          const { data: rows } = await supabase
+            .from('group_members')
+            .select('user_id, profiles(display_name)')
+            .eq('group_id', g.id)
+          const members = (rows ?? []).map((r: any) => ({ user_id: r.user_id, display_name: r.profiles?.display_name ?? 'Jugador' }))
+          return [g.id, members] as const
+        })
+      )
+      setMembersByGroup(Object.fromEntries(memberEntries))
     }
     load()
   }, [user.id])
+
+  async function copyCode(g: Group) {
+    try {
+      await navigator.clipboard.writeText(g.invite_code)
+      setCopiedId(g.id)
+      setTimeout(() => setCopiedId(null), 1500)
+    } catch {
+      // algunos navegadores bloquean el clipboard, sin drama
+    }
+  }
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-10">
@@ -98,58 +127,89 @@ export default function QuinielasList({ user, onSelect }: { user: User; onSelect
         <div className="space-y-2">
           {groups.map((g) => {
             const s = stats[g.id]
+            const members = membersByGroup[g.id] ?? []
+            const isAdmin = g.created_by === user.id
             const closesLabel = s?.closesAt
               ? new Date(s.closesAt).toLocaleString('es-MX', { weekday: 'long', hour: 'numeric', minute: '2-digit' })
               : null
             return (
-              <button
+              <div
                 key={g.id}
-                onClick={() => onSelect(g)}
-                className="w-full text-left bg-[var(--color-field-surface)] border rounded-lg px-4 py-3 hover:border-[var(--color-light-amber)] transition"
+                className="bg-[var(--color-field-surface)] border rounded-lg px-4 py-3"
                 style={{ borderColor: (s?.liveCount ?? 0) > 0 ? '#E4462B' : 'var(--color-field-line)' }}
               >
-                <div className="flex items-center gap-3">
-                  {g.logo_url ? (
-                    <img src={g.logo_url} alt={g.name} className="w-10 h-10 rounded-full object-cover border border-[var(--color-field-line)] shrink-0" />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] flex items-center justify-center text-lg shrink-0">🏈</div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold truncate">{g.name}</span>
-                      {s?.weekLabelText && (
-                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border border-[var(--color-light-amber)] text-[var(--color-light-amber)] shrink-0">
-                          {s.weekLabelText}
+                <button onClick={() => onSelect(g)} className="w-full text-left">
+                  <div className="flex items-center gap-3">
+                    {g.logo_url ? (
+                      <img src={g.logo_url} alt={g.name} className="w-10 h-10 rounded-full object-cover border border-[var(--color-field-line)] shrink-0" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] flex items-center justify-center text-lg shrink-0">🏈</div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold truncate">{g.name}</span>
+                        {s?.weekLabelText && (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border border-[var(--color-light-amber)] text-[var(--color-light-amber)] shrink-0">
+                            {s.weekLabelText}
+                          </span>
+                        )}
+                        {(s?.liveCount ?? 0) > 0 && (
+                          <span className="text-[10px] font-semibold text-[var(--color-scoreboard-red)] flex items-center gap-1 shrink-0">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-scoreboard-red)] animate-pulse" /> EN VIVO
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-[var(--color-text-muted)] mt-0.5 flex items-center gap-1">
+                        <IconUsers size={11} /> {members.length > 0 ? members.map((m) => m.display_name).join(' · ') : `${s?.membersCount ?? 0} miembros`}
+                      </p>
+                    </div>
+                  </div>
+
+                  {s && (s.picksTotal > 0 || closesLabel || s.myRank) && (
+                    <div className="mt-2.5 pt-2.5 border-t border-[var(--color-field-line)] flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--color-text-muted)]">
+                      {s.picksTotal > 0 && (
+                        <span className="flex items-center gap-1">
+                          <IconClipboard size={12} /> {s.picksDone}/{s.picksTotal} picks realizados
                         </span>
                       )}
-                      {(s?.liveCount ?? 0) > 0 && (
-                        <span className="text-[10px] font-semibold text-[var(--color-scoreboard-red)] flex items-center gap-1 shrink-0">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-scoreboard-red)] animate-pulse" /> EN VIVO
+                      {closesLabel && (
+                        <span className="flex items-center gap-1">
+                          <IconCalendar size={12} /> Cierra: {closesLabel}
                         </span>
+                      )}
+                      {s.myRank && (
+                        <span className="text-[var(--color-light-amber)] font-semibold">Tu posicion: #{s.myRank}</span>
                       )}
                     </div>
-                    <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{s?.membersCount ?? 0} miembros</p>
-                  </div>
-                </div>
+                  )}
+                </button>
 
-                {s && (s.picksTotal > 0 || closesLabel || s.myRank) && (
-                  <div className="mt-2.5 pt-2.5 border-t border-[var(--color-field-line)] flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--color-text-muted)]">
-                    {s.picksTotal > 0 && (
-                      <span className="flex items-center gap-1">
-                        <IconClipboard size={12} /> {s.picksDone}/{s.picksTotal} picks realizados
-                      </span>
-                    )}
-                    {closesLabel && (
-                      <span className="flex items-center gap-1">
-                        <IconCalendar size={12} /> Cierra: {closesLabel}
-                      </span>
-                    )}
-                    {s.myRank && (
-                      <span className="text-[var(--color-light-amber)] font-semibold">Tu posicion: #{s.myRank}</span>
-                    )}
-                  </div>
-                )}
-              </button>
+                <div className="mt-2.5 pt-2.5 border-t border-[var(--color-field-line)] flex flex-wrap gap-2">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); copyCode(g) }}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-md border border-[var(--color-field-line)] text-[var(--color-text-muted)] hover:border-[var(--color-light-amber)] hover:text-[var(--color-light-amber)] transition flex items-center gap-1"
+                  >
+                    <IconCopy size={11} /> {copiedId === g.id ? 'Copiado ✓' : 'Invitar'}
+                  </button>
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(`Unete a mi quiniela "${g.name}" en Quiniela NFL. Codigo: ${g.invite_code}`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-md border border-[var(--color-field-line)] text-[var(--color-text-muted)] hover:border-[#25D366] hover:text-[#25D366] transition flex items-center gap-1"
+                  >
+                    <IconWhatsapp size={11} /> WhatsApp
+                  </a>
+                  {isAdmin && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onSelect(g) }}
+                      className="text-xs font-semibold px-3 py-1.5 rounded-md border border-[var(--color-field-line)] text-[var(--color-text-muted)] hover:border-[var(--color-light-amber)] hover:text-[var(--color-light-amber)] transition flex items-center gap-1"
+                    >
+                      <IconGear size={11} /> Administrar
+                    </button>
+                  )}
+                </div>
+              </div>
             )
           })}
         </div>

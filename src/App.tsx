@@ -3,7 +3,7 @@ import { useAuth } from './lib/useAuth'
 import { supabase } from './lib/supabase'
 import Login from './pages/Login'
 import QuinielasList from './pages/QuinielasList'
-import MyGroups from './pages/MyGroups'
+import GlobalRanking from './pages/GlobalRanking'
 import GroupDashboard from './pages/GroupDashboard'
 import Notifications from './pages/Notifications'
 import Profile from './pages/Profile'
@@ -146,7 +146,7 @@ export default function App() {
         <img src="/logo.png" alt="Quiniela" className="h-10 w-auto" />
       </header>
 
-      {bottomTab === 'grupos' && <MyGroups user={user} onEnter={selectGroup} />}
+      {bottomTab === 'ranking' && <GlobalRanking user={user} />}
 
       {bottomTab === 'quinielas' && (
         activeGroup ? (
@@ -184,7 +184,7 @@ export default function App() {
         <NewGroupModal
           canCreate={canCreate}
           onClose={() => setShowCreateModal(false)}
-          onDone={() => { setShowCreateModal(false); setBottomTab('grupos') }}
+          onDone={() => { setShowCreateModal(false); setBottomTab('quinielas') }}
         />
       )}
     </div>

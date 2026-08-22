@@ -1,6 +1,6 @@
-import { IconHome, IconUsers, IconPlusCircle, IconBell, IconUser } from './icons'
+import { IconHome, IconGlobe, IconPlusCircle, IconBell, IconUser } from './icons'
 
-export type BottomTab = 'quinielas' | 'grupos' | 'notificaciones' | 'perfil'
+export type BottomTab = 'quinielas' | 'ranking' | 'notificaciones' | 'perfil'
 
 export default function BottomNav({
   active,
@@ -17,7 +17,7 @@ export default function BottomNav({
 }) {
   const items: { key: BottomTab | 'crear'; label: string; icon: (active: boolean) => React.ReactNode }[] = [
     { key: 'quinielas', label: 'Quinielas', icon: (a) => <IconHome size={20} className={a ? 'text-[var(--color-light-amber)]' : ''} /> },
-    { key: 'grupos', label: 'Mis grupos', icon: (a) => <IconUsers size={20} className={a ? 'text-[var(--color-light-amber)]' : ''} /> },
+    { key: 'ranking', label: 'Ranking global', icon: (a) => <IconGlobe size={20} className={a ? 'text-[var(--color-light-amber)]' : ''} /> },
     { key: 'crear', label: canCreate ? 'Crear quiniela' : 'Unirse a quiniela', icon: () => <IconPlusCircle size={22} /> },
     { key: 'notificaciones', label: 'Notificaciones', icon: (a) => <IconBell size={20} className={a ? 'text-[var(--color-light-amber)]' : ''} /> },
     { key: 'perfil', label: 'Perfil', icon: (a) => <IconUser size={20} className={a ? 'text-[var(--color-light-amber)]' : ''} /> },

@@ -453,7 +453,18 @@ export default function Leaderboard({ group }: { group: Group }) {
           globalRank: rankByUser[m.user_id] ?? null,
         }
       })
-      result.sort((a, b) => b.points - a.points || b.exactHits - a.exactHits || a.pointDiff - b.pointDiff)
+      // desempate: 1) puntos, 2) marcadores exactos, 3) menor diferencia de puntos —
+      // pero quien no registro ninguna prediccion (played=0) nunca debe ganarle
+      // el desempate a alguien que si jugo, aunque le haya ido mal (diff=0 por defecto
+      // no es lo mismo que una diferencia real de 0)
+      result.sort((a, b) => {
+        if (b.points !== a.points) return b.points - a.points
+        if (b.exactHits !== a.exactHits) return b.exactHits - a.exactHits
+        if (a.played === 0 && b.played === 0) return 0
+        if (a.played === 0) return 1
+        if (b.played === 0) return -1
+        return a.pointDiff - b.pointDiff
+      })
       setRows(result)
       setLoading(false)
     }

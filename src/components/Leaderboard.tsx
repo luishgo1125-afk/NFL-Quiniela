@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { teamLogoUrl } from '../lib/teamLogos'
-import { IconGlobe, IconMedal, IconClipboardX } from './icons'
+import { IconGlobe, IconMedal, IconClipboardX, IconCalendar } from './icons'
 import { weekLabel, type Group } from '../lib/types'
 
 interface RecentPick {
@@ -344,7 +344,9 @@ function PlayerStatsModal({ row, onClose }: { row: Row; onClose: () => void }) {
 
 export default function Leaderboard({ group }: { group: Group }) {
   const [rows, setRows] = useState<Row[]>([])
-  const [currentWeekLabel, setCurrentWeekLabel] = useState<string | null>(null)
+  const [weeks, setWeeks] = useState<{ key: string; year: number; seasonType: number; week: number }[]>([])
+  const [selectedWeekKey, setSelectedWeekKey] = useState<string | null>(null)
+  const [weekLabelText, setWeekLabelText] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [sharing, setSharing] = useState(false)
   const [selectedPlayer, setSelectedPlayer] = useState<Row | null>(null)
@@ -371,15 +373,42 @@ export default function Leaderboard({ group }: { group: Group }) {
 
       const gameList = allGames ?? []
 
+      // lista de semanas disponibles (para el selector; solo se muestra en modo semanal)
+      const weekMap = new Map<string, { year: number; seasonType: number; week: number }>()
+      gameList.forEach((g) => {
+        const key = `${g.year}:${g.season_type}:${g.week}`
+        if (!weekMap.has(key)) weekMap.set(key, { year: g.year, seasonType: g.season_type, week: g.week })
+      })
+      const weeksList = Array.from(weekMap.entries())
+        .map(([key, v]) => ({ key, ...v }))
+        .sort((a, b) => a.year - b.year || a.seasonType - b.seasonType || a.week - b.week)
+      setWeeks(weeksList)
+
       const nonFinal = gameList.filter((g) => g.status !== 'final').sort((a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime())
       const currentRef = nonFinal[0] ?? gameList[0] ?? null
-      setCurrentWeekLabel(currentRef ? weekLabel(currentRef.season_type, currentRef.week) : null)
+      const currentKey = currentRef ? `${currentRef.year}:${currentRef.season_type}:${currentRef.week}` : null
+
+      const effectiveWeekKey = group.scoring_mode === 'weekly' ? (selectedWeekKey ?? currentKey) : null
+      if (group.scoring_mode === 'weekly' && selectedWeekKey === null && currentKey) {
+        setSelectedWeekKey(currentKey)
+      }
+      const activeWeekEntry = weeksList.find((w) => w.key === effectiveWeekKey) ?? null
+
+      setWeekLabelText(
+        group.scoring_mode === 'weekly'
+          ? activeWeekEntry
+            ? weekLabel(activeWeekEntry.seasonType, activeWeekEntry.week)
+            : null
+          : currentRef
+          ? weekLabel(currentRef.season_type, currentRef.week)
+          : null
+      )
 
       const finalGames = gameList.filter(
         (g) =>
           g.status === 'final' &&
           (group.scoring_mode !== 'weekly' ||
-            (currentRef && g.season_type === currentRef.season_type && g.week === currentRef.week && g.year === currentRef.year))
+            (activeWeekEntry && g.season_type === activeWeekEntry.seasonType && g.week === activeWeekEntry.week && g.year === activeWeekEntry.year))
       )
       const finalGameIds = finalGames.map((g) => g.id)
       const gameById: Record<string, (typeof finalGames)[number]> = {}
@@ -474,7 +503,7 @@ export default function Leaderboard({ group }: { group: Group }) {
       setLoading(false)
     }
     load()
-  }, [group.id, group.points_exact])
+  }, [group.id, group.points_exact, group.scoring_mode, selectedWeekKey])
 
   if (loading) return <p className="text-[var(--color-text-muted)] text-sm">Cargando tabla...</p>
   if (rows.length === 0) return <p className="text-[var(--color-text-muted)] text-sm">Todavia no hay nadie en este grupo.</p>
@@ -484,7 +513,7 @@ export default function Leaderboard({ group }: { group: Group }) {
   async function handleShare() {
     setSharing(true)
     try {
-      await shareLeaderboardImage(group, currentWeekLabel, rows)
+      await shareLeaderboardImage(group, weekLabelText, rows)
     } finally {
       setSharing(false)
     }
@@ -492,11 +521,33 @@ export default function Leaderboard({ group }: { group: Group }) {
 
   return (
     <div className="space-y-2">
-      {group.scoring_mode === 'weekly' && (
-        <p className="text-xs text-[var(--color-text-muted)]">
-          Tabla de {currentWeekLabel ?? 'esta semana'} — los puntos se reinician cada semana, hay ganador semanal.
-        </p>
+      {group.scoring_mode === 'weekly' && weeks.length > 0 && (
+        <div className="flex gap-2 mb-1 flex-wrap">
+          {weeks.map((w) => (
+            <button
+              key={w.key}
+              onClick={() => setSelectedWeekKey(w.key)}
+              className={`text-xs px-3 py-1.5 rounded-full border flex items-center gap-1.5 transition ${
+                selectedWeekKey === w.key
+                  ? 'border-[var(--color-light-amber)] text-[var(--color-light-amber)]'
+                  : 'border-[var(--color-field-line)] text-[var(--color-text-muted)] hover:border-[var(--color-light-amber)]'
+              }`}
+            >
+              <IconCalendar size={11} />
+              <span className="font-medium">{weekLabel(w.seasonType, w.week).replace(/\s*\d+$/, '')}</span>
+              {w.seasonType !== 3 && (
+                <span
+                  className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold font-mono-score shrink-0"
+                  style={{ background: selectedWeekKey === w.key ? 'var(--color-light-amber)' : 'var(--color-field-line)', color: selectedWeekKey === w.key ? 'var(--color-field-night)' : 'var(--color-text-muted)' }}
+                >
+                  {w.week}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
       )}
+      
       <div className="flex items-center justify-end mb-1">
         <button
           onClick={handleShare}

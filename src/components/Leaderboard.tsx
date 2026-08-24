@@ -375,7 +375,12 @@ export default function Leaderboard({ group }: { group: Group }) {
       const currentRef = nonFinal[0] ?? gameList[0] ?? null
       setCurrentWeekLabel(currentRef ? weekLabel(currentRef.season_type, currentRef.week) : null)
 
-      const finalGames = gameList.filter((g) => g.status === 'final')
+      const finalGames = gameList.filter(
+        (g) =>
+          g.status === 'final' &&
+          (group.scoring_mode !== 'weekly' ||
+            (currentRef && g.season_type === currentRef.season_type && g.week === currentRef.week && g.year === currentRef.year))
+      )
       const finalGameIds = finalGames.map((g) => g.id)
       const gameById: Record<string, (typeof finalGames)[number]> = {}
       finalGames.forEach((g) => { gameById[g.id] = g })
@@ -487,6 +492,11 @@ export default function Leaderboard({ group }: { group: Group }) {
 
   return (
     <div className="space-y-2">
+      {group.scoring_mode === 'weekly' && (
+        <p className="text-xs text-[var(--color-text-muted)]">
+          Tabla de {currentWeekLabel ?? 'esta semana'} — los puntos se reinician cada semana, hay ganador semanal.
+        </p>
+      )}
       <div className="flex items-center justify-end mb-1">
         <button
           onClick={handleShare}

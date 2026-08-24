@@ -13,6 +13,7 @@ export interface Group {
   points_winner: number
   points_exact: number
   special_picks_enabled: boolean
+  scoring_mode: 'season' | 'weekly'
 }
 
 export interface GroupMember {

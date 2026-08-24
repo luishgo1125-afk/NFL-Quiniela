@@ -43,6 +43,22 @@ export default function Admin({
   const [rulesMsg, setRulesMsg] = useState<string | null>(null)
   const [rulesErr, setRulesErr] = useState<string | null>(null)
 
+  const [savingMode, setSavingMode] = useState(false)
+  const [modeErr, setModeErr] = useState<string | null>(null)
+
+  async function changeScoringMode(mode: 'season' | 'weekly') {
+    if (mode === group.scoring_mode || savingMode) return
+    setSavingMode(true)
+    setModeErr(null)
+    const { data, error: err } = await supabase.rpc('set_scoring_mode', {
+      p_group_id: groupId,
+      p_scoring_mode: mode,
+    })
+    setSavingMode(false)
+    if (err) { setModeErr(err.message); return }
+    onGroupUpdated(data)
+  }
+
   async function saveScoringRules(e: React.FormEvent) {
     e.preventDefault()
     setSavingRules(true)
@@ -342,6 +358,39 @@ export default function Admin({
           Al guardar, se recalculan automaticamente los puntos de todos los partidos ya finalizados con las nuevas reglas.
         </p>
       </form>
+
+      <div className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-4 space-y-3">
+        <h2 className="text-sm font-semibold">Modo de puntuacion</h2>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => changeScoringMode('season')}
+            disabled={savingMode}
+            className={`text-left rounded-md border px-3 py-2.5 transition disabled:opacity-50 ${
+              group.scoring_mode === 'season'
+                ? 'border-[var(--color-light-amber)] bg-[rgba(242,183,5,0.08)]'
+                : 'border-[var(--color-field-line)] hover:border-[var(--color-light-amber)]'
+            }`}
+          >
+            <p className="text-xs font-semibold">Temporada completa</p>
+            <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">Los puntos se acumulan durante toda la temporada</p>
+          </button>
+          <button
+            type="button"
+            onClick={() => changeScoringMode('weekly')}
+            disabled={savingMode}
+            className={`text-left rounded-md border px-3 py-2.5 transition disabled:opacity-50 ${
+              group.scoring_mode === 'weekly'
+                ? 'border-[var(--color-light-amber)] bg-[rgba(242,183,5,0.08)]'
+                : 'border-[var(--color-field-line)] hover:border-[var(--color-light-amber)]'
+            }`}
+          >
+            <p className="text-xs font-semibold">Semana a semana</p>
+            <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">La tabla se reinicia en 0 cada semana; hay un ganador por semana</p>
+          </button>
+        </div>
+        {modeErr && <p className="text-[var(--color-scoreboard-red)] text-xs">{modeErr}</p>}
+      </div>
 
       <MembersManager group={group} />
 

@@ -143,8 +143,16 @@ export default function GroupDashboard({
   const multiYear = useMemo(() => new Set(games.map((g) => g.year)).size > 1, [games])
 
   useEffect(() => {
-    if (weekKey === null && weeks.length > 0) setWeekKey(weeks[0].key)
-  }, [weeks, weekKey])
+    if (weekKey !== null || weeks.length === 0) return
+    // la semana "actual" es la del partido mas proximo que aun no termino;
+    // si toda la temporada ya se jugo, usamos la mas reciente (no la primera)
+    const nonFinal = games
+      .filter((g) => !g.deleted_at && g.status !== 'final')
+      .sort((a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime())
+    const currentRef = nonFinal[0] ?? null
+    const currentKey = currentRef ? `${currentRef.year}:${currentRef.season_type}:${currentRef.week}` : weeks[weeks.length - 1].key
+    setWeekKey(currentKey)
+  }, [weeks, weekKey, games])
 
   const weekGames = useMemo(() => games.filter((g) => !g.deleted_at && `${g.year}:${g.season_type}:${g.week}` === weekKey), [games, weekKey])
   const selectedWeek = useMemo(() => weeks.find((w) => w.key === weekKey) ?? null, [weeks, weekKey])

@@ -59,10 +59,15 @@ export default function GameCard({
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [showPickers, setShowPickers] = useState(false)
+  const [othersPicks, setOthersPicks] = useState<Record<string, { pred_home_score: number; pred_away_score: number; points: number | null }>>({})
 
   const kickoffTime = new Date(game.kickoff).getTime()
   const lockTime = kickoffTime - LOCK_MINUTES * 60 * 1000
   const locked = lockTime <= Date.now()
+  // la base de datos deja ver los pronosticos de los demas justo al kickoff
+  // (no desde que se cierra la prediccion, que es un poco antes) -- usamos
+  // este momento para saber cuando ya se pueden mostrar
+  const othersVisible = kickoffTime <= Date.now()
   const closingSoon = !locked && lockTime - WARNING_MINUTES * 60 * 1000 <= Date.now()
   const confirmed = pick != null && home !== '' && away !== '' && String(pick.pred_home_score) === home && String(pick.pred_away_score) === away
   const tickingClock = useTickingClock(game.game_clock, game.status === 'live')
@@ -86,6 +91,23 @@ export default function GameCard({
         }
       })
   }, [game.id])
+
+  // una vez que ya arranco el partido, RLS deja ver los pronosticos de todo
+  // el grupo (antes de eso, solo regresa el propio, sin necesidad de filtrar
+  // nada aqui -- la base de datos ya se encarga)
+  useEffect(() => {
+    if (!othersVisible) return
+    supabase
+      .from('picks')
+      .select('user_id, pred_home_score, pred_away_score, points')
+      .eq('game_id', game.id)
+      .then(({ data }) => {
+        const map: typeof othersPicks = {}
+        ;(data ?? []).forEach((p: any) => { map[p.user_id] = p })
+        setOthersPicks(map)
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game.id, othersVisible])
 
   async function save() {
     if (home === '' || away === '') return
@@ -277,9 +299,15 @@ export default function GameCard({
               <h3 className="text-sm font-semibold">{game.away_team} @ {game.home_team}</h3>
               <button onClick={() => setShowPickers(false)} className="text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)] text-lg leading-none">✕</button>
             </div>
+            {locked && !othersVisible && (
+              <p className="text-[10px] text-[var(--color-text-muted)] mb-2">
+                Los pronosticos de los demas se muestran en cuanto arranca el partido.
+              </p>
+            )}
             <div className="space-y-1.5">
               {members.map((m) => {
                 const done = pickedUserIds.includes(m.user_id)
+                const theirs = othersPicks[m.user_id]
                 return (
                   <div key={m.user_id} className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-[var(--color-field-surface-raised)]">
                     <div
@@ -296,7 +324,16 @@ export default function GameCard({
                       )}
                     </div>
                     <span className="text-sm flex-1 truncate">{m.display_name}</span>
-                    {done ? (
+                    {othersVisible && theirs ? (
+                      <span className="text-xs font-mono-score font-semibold flex items-center gap-1.5">
+                        {theirs.pred_away_score}-{theirs.pred_home_score}
+                        {theirs.points != null && theirs.points > 0 && (
+                          <span className="text-[var(--color-light-amber)]">+{theirs.points}</span>
+                        )}
+                      </span>
+                    ) : othersVisible && !done ? (
+                      <span className="text-[10px] text-[var(--color-text-muted)] italic">No participo</span>
+                    ) : done ? (
                       <span className="text-[10px] font-semibold text-[#3D8B5F] flex items-center gap-1"><IconCheck size={11} /> Ya eligio</span>
                     ) : (
                       <span className="text-[10px] text-[var(--color-text-muted)]">Falta</span>

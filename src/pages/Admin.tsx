@@ -645,10 +645,10 @@ function AdminGameRow({ game, onFinal, onDelete }: { game: Game; onFinal: (g: Ga
         {game.status === 'live' && <span className="ml-2 text-[var(--color-scoreboard-red)] text-xs font-semibold">EN VIVO</span>}
       </div>
       <div className="flex items-center gap-2">
-        <input type="number" min={0} value={away} onChange={(e) => setAway(e.target.value)}
+        <input type="number" inputMode="numeric" pattern="[0-9]*" min={0} value={away} onChange={(e) => setAway(e.target.value)}
           className="w-12 text-center font-mono-score text-sm bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md py-1 outline-none focus:border-[var(--color-light-amber)]" />
         <span className="text-[var(--color-text-muted)]">–</span>
-        <input type="number" min={0} value={home} onChange={(e) => setHome(e.target.value)}
+        <input type="number" inputMode="numeric" pattern="[0-9]*" min={0} value={home} onChange={(e) => setHome(e.target.value)}
           className="w-12 text-center font-mono-score text-sm bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md py-1 outline-none focus:border-[var(--color-light-amber)]" />
         <button
           onClick={() => home !== '' && away !== '' && onFinal(game, Number(home), Number(away))}

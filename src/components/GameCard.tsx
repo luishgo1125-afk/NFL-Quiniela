@@ -181,6 +181,8 @@ export default function GameCard({
           <div className="flex items-center gap-2">
             <input
               type="number"
+              inputMode="numeric"
+              pattern="[0-9]*"
               min={0}
               value={away}
               disabled={locked}
@@ -195,6 +197,8 @@ export default function GameCard({
             <span className="text-[var(--color-text-muted)]">–</span>
             <input
               type="number"
+              inputMode="numeric"
+              pattern="[0-9]*"
               min={0}
               value={home}
               disabled={locked}

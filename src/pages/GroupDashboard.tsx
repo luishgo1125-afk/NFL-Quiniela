@@ -1,13 +1,17 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, lazy, Suspense } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Game, Group } from '../lib/types'
 import { weekLabel } from '../lib/types'
 import GameCard from '../components/GameCard'
 import SpecialPicks from '../components/SpecialPicks'
 import Leaderboard from '../components/Leaderboard'
-import Admin from './Admin'
 import { IconClipboard, IconStar, IconBarChart, IconGear, IconCalendar, IconTrophy, IconCopy, IconWhatsapp } from '../components/icons'
 import type { User } from '@supabase/supabase-js'
+
+// Admin es la pantalla mas pesada (formularios, importador de ESPN, gestor de
+// partidos); casi nadie la abre en cada visita, asi que se descarga aparte,
+// solo cuando de verdad se toca el engrane de ajustes.
+const Admin = lazy(() => import('./Admin'))
 
 export default function GroupDashboard({
   group: initialGroup,
@@ -365,7 +369,9 @@ export default function GroupDashboard({
       {tab === 'tabla' && <Leaderboard group={group} />}
 
       {tab === 'admin' && isAdmin && (
-        <Admin group={group} games={games} onChange={loadGames} onGroupUpdated={setGroup} onBack={onBack} onLeftAdmin={() => setTab('picks')} />
+        <Suspense fallback={<p className="text-[var(--color-text-muted)] text-sm py-8 text-center">Cargando...</p>}>
+          <Admin group={group} games={games} onChange={loadGames} onGroupUpdated={setGroup} onBack={onBack} onLeftAdmin={() => setTab('picks')} />
+        </Suspense>
       )}
       </div>
     </div>

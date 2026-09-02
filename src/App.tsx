@@ -1,15 +1,26 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, lazy, Suspense } from 'react'
 import { useAuth } from './lib/useAuth'
 import { supabase } from './lib/supabase'
 import Login from './pages/Login'
-import QuinielasList from './pages/QuinielasList'
-import GlobalRanking from './pages/GlobalRanking'
-import GroupDashboard from './pages/GroupDashboard'
-import Notifications from './pages/Notifications'
-import Profile from './pages/Profile'
 import BottomNav, { type BottomTab } from './components/BottomNav'
 import NewGroupModal, { SUPER_ADMIN_ID } from './components/NewGroupModal'
 import type { Group } from './lib/types'
+
+// cada pantalla se descarga solo cuando el usuario de verdad entra a ella,
+// en vez de que el primer carga tenga que traer el codigo de toda la app junta
+const QuinielasList = lazy(() => import('./pages/QuinielasList'))
+const GlobalRanking = lazy(() => import('./pages/GlobalRanking'))
+const GroupDashboard = lazy(() => import('./pages/GroupDashboard'))
+const Notifications = lazy(() => import('./pages/Notifications'))
+const Profile = lazy(() => import('./pages/Profile'))
+
+function ScreenLoading() {
+  return (
+    <div className="flex items-center justify-center py-20">
+      <span className="font-mono-score text-[var(--color-light-amber)] text-sm animate-pulse">CARGANDO...</span>
+    </div>
+  )
+}
 
 function ResetPasswordScreen({ onDone }: { onDone: () => void }) {
   const [pw, setPw] = useState('')
@@ -146,31 +157,33 @@ export default function App() {
         <img src="/logo.png" alt="Quiniela" className="h-10 w-auto" />
       </header>
 
-      {bottomTab === 'ranking' && <GlobalRanking user={user} />}
+      <Suspense fallback={<ScreenLoading />}>
+        {bottomTab === 'ranking' && <GlobalRanking user={user} />}
 
-      {bottomTab === 'quinielas' && (
-        activeGroup ? (
-          <GroupDashboard
-            group={activeGroup}
+        {bottomTab === 'quinielas' && (
+          activeGroup ? (
+            <GroupDashboard
+              group={activeGroup}
+              user={user}
+              onBack={() => { setActiveGroup(null); setBottomTab('quinielas') }}
+              onGroupChange={setActiveGroup}
+            />
+          ) : (
+            <QuinielasList user={user} onSelect={selectGroup} />
+          )
+        )}
+
+        {bottomTab === 'notificaciones' && <Notifications user={user} />}
+
+        {bottomTab === 'perfil' && (
+          <Profile
             user={user}
-            onBack={() => { setActiveGroup(null); setBottomTab('quinielas') }}
-            onGroupChange={setActiveGroup}
+            activeGroupName={activeGroup?.name ?? null}
+            showLeaveGroup={activeGroup != null && !activeGroupIsAdmin}
+            onLeaveGroup={leaveActiveGroup}
           />
-        ) : (
-          <QuinielasList user={user} onSelect={selectGroup} />
-        )
-      )}
-
-      {bottomTab === 'notificaciones' && <Notifications user={user} />}
-
-      {bottomTab === 'perfil' && (
-        <Profile
-          user={user}
-          activeGroupName={activeGroup?.name ?? null}
-          showLeaveGroup={activeGroup != null && !activeGroupIsAdmin}
-          onLeaveGroup={leaveActiveGroup}
-        />
-      )}
+        )}
+      </Suspense>
 
       <BottomNav
         active={bottomTab}

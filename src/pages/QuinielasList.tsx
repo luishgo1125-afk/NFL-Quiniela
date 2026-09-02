@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import type { Game, Group } from '../lib/types'
+import type { Group } from '../lib/types'
 import { weekLabel } from '../lib/types'
 import { IconClipboard, IconCalendar, IconUsers, IconCopy, IconWhatsapp, IconGear } from '../components/icons'
 import type { User } from '@supabase/supabase-js'
@@ -20,15 +20,24 @@ interface GroupStats {
   liveCount: number
 }
 
+interface GameStatsRow {
+  id: string
+  year: number
+  season_type: number
+  week: number
+  kickoff: string
+  status: string
+}
+
 async function loadStats(group: Group, userId: string): Promise<GroupStats> {
   const { data: memberRows } = await supabase.from('group_members').select('user_id').eq('group_id', group.id)
   const memberIds = (memberRows ?? []).map((m: any) => m.user_id)
 
-  const { data: games } = await supabase.from('games').select('*').eq('group_id', group.id).is('deleted_at', null).order('kickoff')
-  const gameList = (games ?? []) as Game[]
+  const { data: games } = await supabase.from('games').select('id, year, season_type, week, kickoff, status').eq('group_id', group.id).is('deleted_at', null).order('kickoff')
+  const gameList = (games ?? []) as GameStatsRow[]
 
   const nonFinal = gameList.filter((g) => g.status !== 'final').sort((a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime())
-  let weekGames: Game[] = []
+  let weekGames: GameStatsRow[] = []
   if (nonFinal.length > 0) {
     const cur = nonFinal[0]
     weekGames = gameList.filter((g) => g.year === cur.year && g.season_type === cur.season_type && g.week === cur.week)

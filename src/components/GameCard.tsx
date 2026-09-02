@@ -42,8 +42,6 @@ interface MemberInfo {
 
 const LOCK_MINUTES = 30
 const WARNING_MINUTES = 150 // "cierra pronto" empieza 2.5h antes del cierre real (2h antes de kickoff)
-const PENDING_DAYS = 8 // las predicciones "abren" 7 dias antes del kickoff
-
 export default function GameCard({
   game,
   userId,
@@ -64,10 +62,8 @@ export default function GameCard({
 
   const kickoffTime = new Date(game.kickoff).getTime()
   const lockTime = kickoffTime - LOCK_MINUTES * 60 * 1000
-  const opensAt = kickoffTime - PENDING_DAYS * 24 * 60 * 60 * 1000
   const locked = lockTime <= Date.now()
-  const pending = !locked && opensAt > Date.now()
-  const closingSoon = !locked && !pending && lockTime - WARNING_MINUTES * 60 * 1000 <= Date.now()
+  const closingSoon = !locked && lockTime - WARNING_MINUTES * 60 * 1000 <= Date.now()
   const confirmed = pick != null && home !== '' && away !== '' && String(pick.pred_home_score) === home && String(pick.pred_away_score) === away
   const tickingClock = useTickingClock(game.game_clock, game.status === 'live')
 
@@ -78,7 +74,7 @@ export default function GameCard({
   useEffect(() => {
     supabase
       .from('picks')
-      .select('*')
+      .select('pred_home_score, pred_away_score, points')
       .eq('game_id', game.id)
       .eq('user_id', userId)
       .maybeSingle()
@@ -112,7 +108,7 @@ export default function GameCard({
   // toca el nombre/logo de un equipo para elegirlo como ganador directo,
   // sin tener que escribir el marcador exacto (lo puedes afinar despues)
   function selectWinner(side: 'away' | 'home') {
-    if (locked || pending) return
+    if (locked) return
     if (away === '' || home === '') {
       if (side === 'away') { setAway('7'); setHome('0') } else { setHome('7'); setAway('0') }
       return
@@ -126,9 +122,6 @@ export default function GameCard({
   const kickoffLabel = new Date(game.kickoff).toLocaleString('es-MX', {
     weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
   })
-  const opensAtLabel = new Date(opensAt).toLocaleString('es-MX', {
-    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-  })
 
   const cardBorder = confirmed ? '#3D8B5F' : locked ? 'var(--color-field-line)' : 'var(--color-field-line)'
   const cardBg = confirmed
@@ -137,7 +130,7 @@ export default function GameCard({
 
   return (
     <div
-      className={`rounded-xl border p-5 transition-all duration-150 hover:-translate-y-0.5 ${!locked && !confirmed && !pending ? 'scoreboard-glow' : ''}`}
+      className={`rounded-xl border p-5 transition-all duration-150 hover:-translate-y-0.5 ${!locked && !confirmed ? 'scoreboard-glow' : ''}`}
       style={{
         borderColor: cardBorder,
         background: cardBg,
@@ -157,8 +150,6 @@ export default function GameCard({
           <StatusPill label={`EN VIVO${tickingClock ? ` · ${tickingClock}` : ''}`} variant="red" pulse />
         ) : locked ? (
           <StatusPill label="CERRADO" variant="muted" icon={<IconLock size={10} />} />
-        ) : pending ? (
-          <StatusPill label="PENDIENTE" variant="muted" icon={<IconHourglass size={10} />} />
         ) : closingSoon ? (
           <StatusPill label="CIERRA PRONTO" variant="amber" icon={<IconClock size={10} />} />
         ) : (
@@ -169,11 +160,6 @@ export default function GameCard({
       {locked && !pick ? (
         <div className="text-center py-3 text-sm text-[var(--color-text-muted)] italic">
           No participaste en este partido
-        </div>
-      ) : pending ? (
-        <div className="text-center py-3 text-sm text-[var(--color-text-muted)] flex flex-col items-center gap-1">
-          <IconHourglass size={18} />
-          Las predicciones abren el {opensAtLabel}
         </div>
       ) : (
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
@@ -249,7 +235,7 @@ export default function GameCard({
         </div>
       )}
 
-      {members.length > 0 && !pending && (
+      {members.length > 0 && (
         <button
           onClick={() => setShowPickers(true)}
           className="flex items-center gap-1.5 mt-4 flex-wrap w-full text-left hover:opacity-80 transition"
@@ -319,7 +305,7 @@ export default function GameCard({
         </div>
       )}
 
-      {!locked && !pending && (
+      {!locked && (
         <button
           onClick={save}
           disabled={saving || home === '' || away === '' || confirmed}

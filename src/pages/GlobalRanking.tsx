@@ -194,16 +194,17 @@ export default function GlobalRanking({ user }: { user: User }) {
   const [rows, setRows] = useState<RankRow[]>([])
   const [loading, setLoading] = useState(true)
   const [sharing, setSharing] = useState(false)
+  const [preseason, setPreseason] = useState(false)
 
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const { data } = await supabase.rpc('global_rankings')
+      const { data } = await supabase.rpc('global_rankings', { p_preseason_only: preseason })
       setRows((data ?? []) as RankRow[])
       setLoading(false)
     }
     load()
-  }, [])
+  }, [preseason])
 
   async function handleShare() {
     if (rows.length === 0 || sharing) return
@@ -231,12 +232,37 @@ export default function GlobalRanking({ user }: { user: User }) {
           </button>
         )}
       </div>
-      <p className="text-[var(--color-text-muted)] text-sm mb-8">Puntos, marcadores exactos y % de aciertos en todas tus quinielas</p>
+      <p className="text-[var(--color-text-muted)] text-sm mb-4">Puntos, marcadores exactos y % de aciertos en todas tus quinielas</p>
+
+      <div className="grid grid-cols-2 gap-2 mb-6">
+        <button
+          onClick={() => setPreseason(false)}
+          className={`text-xs font-semibold py-2 rounded-md border transition ${
+            !preseason
+              ? 'border-[var(--color-light-amber)] bg-[rgba(242,183,5,0.12)] text-[var(--color-light-amber)]'
+              : 'border-[var(--color-field-line)] text-[var(--color-text-muted)] hover:border-[var(--color-light-amber)]'
+          }`}
+        >
+          Temporada
+        </button>
+        <button
+          onClick={() => setPreseason(true)}
+          className={`text-xs font-semibold py-2 rounded-md border transition ${
+            preseason
+              ? 'border-[var(--color-light-amber)] bg-[rgba(242,183,5,0.12)] text-[var(--color-light-amber)]'
+              : 'border-[var(--color-field-line)] text-[var(--color-text-muted)] hover:border-[var(--color-light-amber)]'
+          }`}
+        >
+          Pretemporada
+        </button>
+      </div>
 
       {loading ? (
         <p className="text-[var(--color-text-muted)] text-sm">Cargando...</p>
       ) : rows.length === 0 ? (
-        <p className="text-[var(--color-text-muted)] text-sm">Todavia no hay resultados registrados.</p>
+        <p className="text-[var(--color-text-muted)] text-sm">
+          {preseason ? 'No hay resultados de pretemporada registrados.' : 'Todavia no hay resultados registrados.'}
+        </p>
       ) : (
         <>
           <div className="grid grid-cols-[2rem_1fr_3.2rem_3.2rem_4rem] items-center gap-2 px-4 py-3 mb-2 rounded-lg bg-[var(--color-field-surface)] border border-[var(--color-field-line)] text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wide">

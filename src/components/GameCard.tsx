@@ -42,7 +42,7 @@ interface MemberInfo {
 
 const LOCK_MINUTES = 30
 const WARNING_MINUTES = 150 // "cierra pronto" empieza 2.5h antes del cierre real (2h antes de kickoff)
-const PENDING_DAYS = 7 // las predicciones "abren" 7 dias antes del kickoff
+const PENDING_DAYS = 8 // las predicciones "abren" 7 dias antes del kickoff
 
 export default function GameCard({
   game,

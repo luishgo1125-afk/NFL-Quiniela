@@ -80,6 +80,18 @@ export default function App() {
   const [bottomTab, setBottomTab] = useState<BottomTab>('quinielas')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [hasUnread, setHasUnread] = useState(false)
+  const [focusGameId, setFocusGameId] = useState<string | null>(null)
+
+  // al tocar una notificacion de un partido, brinca a la liga correcta y le
+  // pasa el id del partido a GroupDashboard para que se posicione ahi
+  async function openGameFromNotification(gameId: string) {
+    const { data } = await supabase.from('games').select('*, groups(*)').eq('id', gameId).maybeSingle()
+    if (!data || !data.groups) return
+    const { groups: groupData, ...gameData } = data as any
+    setActiveGroup(groupData)
+    setFocusGameId(gameData.id)
+    setBottomTab('quinielas')
+  }
 
   useEffect(() => {
     if (!user) return
@@ -167,13 +179,15 @@ export default function App() {
               user={user}
               onBack={() => { setActiveGroup(null); setBottomTab('quinielas') }}
               onGroupChange={setActiveGroup}
+              focusGameId={focusGameId}
+              onFocusConsumed={() => setFocusGameId(null)}
             />
           ) : (
             <QuinielasList user={user} onSelect={selectGroup} />
           )
         )}
 
-        {bottomTab === 'notificaciones' && <Notifications user={user} />}
+        {bottomTab === 'notificaciones' && <Notifications user={user} onOpenGame={openGameFromNotification} />}
 
         {bottomTab === 'perfil' && (
           <Profile

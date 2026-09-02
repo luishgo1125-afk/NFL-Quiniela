@@ -18,11 +18,15 @@ export default function GroupDashboard({
   user,
   onBack,
   onGroupChange,
+  focusGameId,
+  onFocusConsumed,
 }: {
   group: Group
   user: User
   onBack: () => void
   onGroupChange?: (g: Group) => void
+  focusGameId?: string | null
+  onFocusConsumed?: () => void
 }) {
   const [group, setGroupState] = useState(initialGroup)
   const setGroup = (g: Group) => { setGroupState(g); onGroupChange?.(g) }
@@ -157,6 +161,25 @@ export default function GroupDashboard({
     const currentKey = currentRef ? `${currentRef.year}:${currentRef.season_type}:${currentRef.week}` : weeks[weeks.length - 1].key
     setWeekKey(currentKey)
   }, [weeks, weekKey, games])
+
+  // si venimos de tocar una notificacion de un partido especifico, salta
+  // directo a la semana de ESE partido (aunque no sea la semana "actual")
+  const [highlightedGameId, setHighlightedGameId] = useState<string | null>(null)
+  useEffect(() => {
+    if (!focusGameId || games.length === 0) return
+    const target = games.find((g) => g.id === focusGameId)
+    if (target) {
+      setWeekKey(`${target.year}:${target.season_type}:${target.week}`)
+      setTab('picks')
+      setHighlightedGameId(focusGameId)
+      setTimeout(() => {
+        document.getElementById(`game-${focusGameId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 150)
+      setTimeout(() => setHighlightedGameId(null), 3000)
+    }
+    onFocusConsumed?.()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusGameId, games])
 
   const weekGames = useMemo(() => games.filter((g) => !g.deleted_at && `${g.year}:${g.season_type}:${g.week}` === weekKey), [games, weekKey])
   const selectedWeek = useMemo(() => weeks.find((w) => w.key === weekKey) ?? null, [weeks, weekKey])
@@ -341,7 +364,13 @@ export default function GroupDashboard({
           ) : (
             <div className="space-y-3">
               {weekGames.map((g) => (
-                <GameCard key={g.id} game={g} userId={user.id} members={members} pickedUserIds={pickedBy[g.id] ?? []} />
+                <div
+                  key={g.id}
+                  id={`game-${g.id}`}
+                  className={g.id === highlightedGameId ? 'rounded-xl ring-2 ring-[var(--color-light-amber)] transition-all' : ''}
+                >
+                  <GameCard game={g} userId={user.id} members={members} pickedUserIds={pickedBy[g.id] ?? []} />
+                </div>
               ))}
 
               <div className="flex items-center gap-3 bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg px-4 py-3">

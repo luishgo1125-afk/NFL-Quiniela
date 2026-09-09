@@ -173,7 +173,7 @@ export default function QuinielasList({ user, onSelect }: { user: User; onSelect
                         )}
                       </div>
                       <p className="text-xs text-[var(--color-text-muted)] mt-0.5 flex items-center gap-1">
-                        <IconUsers size={11} /> {members.length > 0 ? members.map((m) => m.display_name).join(' · ') : `${s?.membersCount ?? 0} miembros`}
+                        <IconUsers size={11} /> {members.length > 0 ? `${members.length} jugador${members.length !== 1 ? 'es' : ''}` : `${s?.membersCount ?? 0} miembros`}
                       </p>
                     </div>
                   </div>

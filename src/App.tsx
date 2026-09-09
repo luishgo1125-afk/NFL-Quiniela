@@ -84,7 +84,7 @@ export default function App() {
 
   // si la URL trae ?join=CODIGO (link directo de invitacion de un admin),
   // lo guardamos para procesarlo en cuanto sepamos si hay sesion o no
-  const [pendingInviteCode] = useState<string | null>(() => new URLSearchParams(window.location.search).get('join'))
+  const [pendingInviteCode, setPendingInviteCode] = useState<string | null>(() => new URLSearchParams(window.location.search).get('join'))
   const [joining, setJoining] = useState(!!pendingInviteCode)
   const [joinError, setJoinError] = useState<string | null>(null)
 
@@ -123,6 +123,7 @@ export default function App() {
         .maybeSingle()
 
       window.history.replaceState({}, '', window.location.pathname)
+      setPendingInviteCode(null) // se usa una sola vez -- si luego alguien mas inicia sesion en esta misma pestana, ya no lo vuelve a unir
 
       if (membership?.groups) {
         setActiveGroup(membership.groups as any)

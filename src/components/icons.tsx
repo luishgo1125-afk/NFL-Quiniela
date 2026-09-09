@@ -339,3 +339,12 @@ export function IconAlertTriangle({ size = 16, className = '' }: IconProps) {
     </svg>
   )
 }
+
+export function IconCoin({ size = 16, className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v10M9.5 9.5c0-1.1 1.12-2 2.5-2s2.5.9 2.5 2-1.12 1.5-2.5 1.5-2.5.4-2.5 1.5 1.12 2 2.5 2 2.5-.9 2.5-2" />
+    </svg>
+  )
+}

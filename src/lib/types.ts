@@ -14,6 +14,10 @@ export interface Group {
   points_exact: number
   special_picks_enabled: boolean
   scoring_mode: 'season' | 'weekly'
+  bet_amount: number
+  prize_split_1: number
+  prize_split_2: number
+  prize_split_3: number
 }
 
 export interface GroupMember {

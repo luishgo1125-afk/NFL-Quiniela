@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { teamLogoUrl } from '../lib/teamLogos'
-import { IconGlobe, IconMedal, IconClipboardX, IconCalendar } from './icons'
+import { IconGlobe, IconMedal, IconClipboardX, IconCalendar, IconCoin } from './icons'
 import { weekLabel, type Group } from '../lib/types'
 
 interface RecentPick {
@@ -407,8 +407,9 @@ export default function Leaderboard({ group }: { group: Group }) {
       const finalGames = gameList.filter(
         (g) =>
           g.status === 'final' &&
-          (group.scoring_mode !== 'weekly' ||
-            (activeWeekEntry && g.season_type === activeWeekEntry.seasonType && g.week === activeWeekEntry.week && g.year === activeWeekEntry.year))
+          (group.scoring_mode === 'weekly'
+            ? activeWeekEntry && g.season_type === activeWeekEntry.seasonType && g.week === activeWeekEntry.week && g.year === activeWeekEntry.year
+            : g.season_type !== 1) // en modo "temporada completa" la pretemporada no cuenta
       )
       const finalGameIds = finalGames.map((g) => g.id)
       const gameById: Record<string, (typeof finalGames)[number]> = {}
@@ -509,6 +510,7 @@ export default function Leaderboard({ group }: { group: Group }) {
   if (rows.length === 0) return <p className="text-[var(--color-text-muted)] text-sm">Todavia no hay nadie en este grupo.</p>
 
   const maxExact = Math.max(0, ...rows.map((r) => r.exactHits))
+  const totalPrize = group.bet_amount > 0 ? group.bet_amount * rows.length : 0
 
   async function handleShare() {
     setSharing(true)
@@ -547,7 +549,13 @@ export default function Leaderboard({ group }: { group: Group }) {
           ))}
         </div>
       )}
-      
+      {totalPrize > 0 && (
+        <div className="flex items-center justify-between bg-[rgba(61,139,95,0.08)] border border-[#3D8B5F]/40 rounded-lg px-4 py-2.5 mb-1">
+          <span className="text-sm font-semibold flex items-center gap-1.5">
+            <IconCoin size={15} className="text-[var(--color-turf-green)]" /> Premio total: <span className="font-mono-score text-[var(--color-turf-green)]">${totalPrize.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+          </span>
+        </div>
+      )}
       <div className="flex items-center justify-end mb-1">
         <button
           onClick={handleShare}
@@ -564,6 +572,7 @@ export default function Leaderboard({ group }: { group: Group }) {
       </div>
       {rows.map((r, i) => {
         const style = RANK_STYLES[i]
+        const prize = group.bet_amount > 0 && i < 3 ? totalPrize * [group.prize_split_1, group.prize_split_2, group.prize_split_3][i] / 100 : null
         return (
           <button
             key={r.user_id}
@@ -623,6 +632,11 @@ export default function Leaderboard({ group }: { group: Group }) {
             <div className="text-right shrink-0">
               <div className="font-mono-score text-xl font-700 leading-none">{r.points}</div>
               <div className="text-[10px] text-[var(--color-text-muted)]">pts</div>
+              {prize != null && (
+                <div className="text-[10px] font-semibold text-[var(--color-turf-green)] mt-0.5">
+                  ${prize.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                </div>
+              )}
             </div>
           </button>
         )

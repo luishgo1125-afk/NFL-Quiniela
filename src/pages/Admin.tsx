@@ -38,6 +38,15 @@ export default function Admin({
   onLeftAdmin: () => void
 }) {
   const groupId = group.id
+  const [memberCount, setMemberCount] = useState<number | null>(null)
+
+  useEffect(() => {
+    supabase
+      .from('group_members')
+      .select('user_id', { count: 'exact', head: true })
+      .eq('group_id', groupId)
+      .then(({ count }) => setMemberCount(count ?? null))
+  }, [groupId])
   const [week, setWeek] = useState(1)
   const [manualSeasonType, setManualSeasonType] = useState<SeasonType>(2)
   const [homeTeam, setHomeTeam] = useState(NFL_TEAMS[0])
@@ -88,6 +97,37 @@ export default function Admin({
     if (err) { setRulesErr(err.message); return }
     onGroupUpdated(data)
     setRulesMsg('Guardado — se recalcularon los partidos ya finalizados.')
+  }
+
+  const [betAmount, setBetAmount] = useState(group.bet_amount ?? 0)
+  const [split1, setSplit1] = useState(group.prize_split_1 ?? 65)
+  const [split2, setSplit2] = useState(group.prize_split_2 ?? 25)
+  const [split3, setSplit3] = useState(group.prize_split_3 ?? 10)
+  const [savingPrize, setSavingPrize] = useState(false)
+  const [prizeMsg, setPrizeMsg] = useState<string | null>(null)
+  const [prizeErr, setPrizeErr] = useState<string | null>(null)
+  const splitTotal = Number(split1) + Number(split2) + Number(split3)
+
+  async function savePrizeSettings(e: React.FormEvent) {
+    e.preventDefault()
+    setPrizeMsg(null)
+    setPrizeErr(null)
+    if (Math.round(splitTotal * 100) / 100 !== 100) {
+      setPrizeErr(`Los porcentajes deben sumar 100 (ahorita suman ${splitTotal}).`)
+      return
+    }
+    setSavingPrize(true)
+    const { data, error: err } = await supabase.rpc('set_prize_settings', {
+      p_group_id: groupId,
+      p_bet_amount: Number(betAmount),
+      p_split_1: Number(split1),
+      p_split_2: Number(split2),
+      p_split_3: Number(split3),
+    })
+    setSavingPrize(false)
+    if (err) { setPrizeErr(err.message); return }
+    onGroupUpdated(data)
+    setPrizeMsg('Guardado.')
   }
 
   const guess = guessCurrentWeek()
@@ -430,6 +470,82 @@ export default function Admin({
 
           <AdminSpecialPicks group={group} onGroupUpdated={onGroupUpdated} />
         </div>
+        )}
+      </section>
+
+      <section className="space-y-3">
+        <SectionHeader title="Premio" open={!!openSections.premio} onToggle={() => toggleSection('premio')} />
+        {openSections.premio && (
+        <form onSubmit={savePrizeSettings} className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-4 space-y-4">
+          <div>
+            <h2 className="text-sm font-semibold">Monto por participante</h2>
+            <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">
+              El premio total se calcula solo: este monto x cuantos participantes haya en la liga.
+            </p>
+          </div>
+          <label className="text-xs text-[var(--color-text-muted)] block">
+            Monto (por persona)
+            <input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step="0.01"
+              value={betAmount}
+              onChange={(e) => setBetAmount(Number(e.target.value))}
+              className="w-full mt-1 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
+            />
+          </label>
+
+          {memberCount != null && Number(betAmount) > 0 && (
+            <p className="text-xs text-[var(--color-turf-green)] font-semibold">
+              Premio total ahorita: ${(Number(betAmount) * memberCount).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              <span className="text-[var(--color-text-muted)] font-normal"> ({memberCount} × ${Number(betAmount).toLocaleString('es-MX')})</span>
+            </p>
+          )}
+
+          <div className="h-px bg-[var(--color-field-line)]" />
+
+          <div>
+            <h2 className="text-sm font-semibold">Como se reparte entre los primeros 3</h2>
+            <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">Los porcentajes deben sumar 100.</p>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <label className="text-xs text-[var(--color-text-muted)]">
+              🥇 1er lugar
+              <input
+                type="number" inputMode="decimal" min={0} max={100} step="0.1"
+                value={split1} onChange={(e) => setSplit1(Number(e.target.value))}
+                className="w-full mt-1 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
+              />
+            </label>
+            <label className="text-xs text-[var(--color-text-muted)]">
+              🥈 2do lugar
+              <input
+                type="number" inputMode="decimal" min={0} max={100} step="0.1"
+                value={split2} onChange={(e) => setSplit2(Number(e.target.value))}
+                className="w-full mt-1 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
+              />
+            </label>
+            <label className="text-xs text-[var(--color-text-muted)]">
+              🥉 3er lugar
+              <input
+                type="number" inputMode="decimal" min={0} max={100} step="0.1"
+                value={split3} onChange={(e) => setSplit3(Number(e.target.value))}
+                className="w-full mt-1 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
+              />
+            </label>
+          </div>
+          <p className={`text-xs ${splitTotal === 100 ? 'text-[var(--color-text-muted)]' : 'text-[var(--color-scoreboard-red)] font-semibold'}`}>
+            Suman {splitTotal}{splitTotal !== 100 ? ' — deben ser 100' : ''}
+          </p>
+
+          {prizeErr && <p className="text-[var(--color-scoreboard-red)] text-xs">{prizeErr}</p>}
+          {prizeMsg && <p className="text-[var(--color-turf-green)] text-xs">{prizeMsg}</p>}
+          <button type="submit" disabled={savingPrize}
+            className="w-full bg-[var(--color-light-amber)] text-[var(--color-field-night)] font-semibold rounded-md py-2 text-sm hover:brightness-110 disabled:opacity-50">
+            {savingPrize ? 'Guardando...' : 'Guardar premio'}
+          </button>
+        </form>
         )}
       </section>
 

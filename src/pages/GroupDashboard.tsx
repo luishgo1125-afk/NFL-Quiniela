@@ -291,6 +291,7 @@ export default function GroupDashboard({
               </span>
             )}
           </h1>
+          {tab !== 'tabla' && (
           <p className="text-xs text-[var(--color-text-muted)] font-mono-score mt-1 flex items-center gap-1.5 flex-wrap">
             Codigo: #{group.invite_code}
             <button
@@ -311,6 +312,7 @@ export default function GroupDashboard({
             </a>
             <span className="text-[var(--color-text-muted)]">· {members.length} miembro{members.length !== 1 ? 's' : ''}</span>
           </p>
+          )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
           {group.special_picks_enabled && (

@@ -6,7 +6,7 @@ import GameCard from '../components/GameCard'
 import SpecialPicks from '../components/SpecialPicks'
 import Leaderboard from '../components/Leaderboard'
 import CopyPicksModal from '../components/CopyPicksModal'
-import { IconClipboard, IconStar, IconBarChart, IconGear, IconCalendar, IconTrophy, IconCopy, IconWhatsapp } from '../components/icons'
+import { IconClipboard, IconStar, IconBarChart, IconGear, IconCalendar, IconTrophy, IconCopy, IconWhatsapp, IconAlertTriangle } from '../components/icons'
 import type { User } from '@supabase/supabase-js'
 
 // Admin es la pantalla mas pesada (formularios, importador de ESPN, gestor de
@@ -188,6 +188,37 @@ export default function GroupDashboard({
   const selectedWeek = useMemo(() => weeks.find((w) => w.key === weekKey) ?? null, [weeks, weekKey])
   const liveNow = useMemo(() => games.filter((g) => !g.deleted_at && g.status === 'live'), [games])
 
+  // se refresca cada 30s para que la cuenta regresiva de "cierra en" se sienta viva
+  const [nowTick, setNowTick] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(Date.now()), 30_000)
+    return () => clearInterval(id)
+  }, [])
+
+  const PROGRESS_LOCK_MINUTES = 30 // mismo margen que GameCard.tsx
+  const weekPicksTotal = weekGames.length
+  const weekPicksDone = weekGames.filter((g) => (pickedBy[g.id] ?? []).includes(user.id)).length
+  const weekPicksMissing = weekPicksTotal - weekPicksDone
+  const weekPicksPct = weekPicksTotal > 0 ? Math.round((weekPicksDone / weekPicksTotal) * 100) : 0
+
+  const nextLock = useMemo(() => {
+    const upcoming = weekGames
+      .map((g) => new Date(g.kickoff).getTime() - PROGRESS_LOCK_MINUTES * 60 * 1000)
+      .filter((lockTime) => lockTime > nowTick)
+      .sort((a, b) => a - b)
+    return upcoming[0] ?? null
+  }, [weekGames, nowTick])
+
+  function formatCountdown(ms: number) {
+    const totalMin = Math.max(0, Math.floor(ms / 60000))
+    const days = Math.floor(totalMin / (60 * 24))
+    const hours = Math.floor((totalMin % (60 * 24)) / 60)
+    const mins = totalMin % 60
+    if (days > 0) return `${days}d ${hours}h`
+    if (hours > 0) return `${hours}h ${mins}m`
+    return `${mins}m`
+  }
+
   const [weeklyWinners, setWeeklyWinners] = useState<{ names: string[]; points: number } | null>(null)
 
   useEffect(() => {
@@ -361,6 +392,54 @@ export default function GroupDashboard({
               </button>
             )}
           </div>
+
+          {weekPicksTotal > 0 && (() => {
+            const closingSoonBanner = nextLock != null && nextLock - nowTick < 3 * 60 * 60 * 1000
+            const urgent = weekPicksMissing > 0 || closingSoonBanner
+            return urgent ? (
+              <div className="bg-[var(--color-field-surface)] border border-[var(--color-light-amber)]/40 rounded-lg px-4 py-3 mb-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold flex items-center gap-1.5">
+                    <IconClipboard size={14} className="text-[var(--color-text-muted)]" />
+                    {weekPicksDone}/{weekPicksTotal} predicciones
+                  </span>
+                  <span className="text-sm font-bold font-mono-score text-[var(--color-turf-green)]">{weekPicksPct}%</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-[var(--color-field-line)] overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{ width: `${weekPicksPct}%`, background: weekPicksPct === 100 ? 'var(--color-turf-green)' : 'linear-gradient(90deg, #3D8B5F, #4FAE76)' }}
+                  />
+                </div>
+                <div className="flex items-center justify-between pt-1">
+                  {weekPicksMissing > 0 ? (
+                    <p className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-light-amber)]">
+                      <IconAlertTriangle size={13} /> Te faltan {weekPicksMissing}
+                    </p>
+                  ) : (
+                    <span />
+                  )}
+                  {nextLock && (
+                    <span className="text-xs flex items-center gap-1">
+                      Cierra en <span className="font-bold text-[var(--color-light-amber)] font-mono-score">{formatCountdown(nextLock - nowTick)}</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between text-xs text-[var(--color-text-muted)] px-1 mb-4">
+                <span className="flex items-center gap-1.5">
+                  <IconClipboard size={12} className="text-[var(--color-turf-green)]" /> Todo predicho
+                </span>
+                {nextLock ? (
+                  <span>Cierra en {formatCountdown(nextLock - nowTick)}</span>
+                ) : (
+                  <span>No hay predicciones abiertas esta semana</span>
+                )}
+              </div>
+            )
+          })()}
+
           {weeklyWinners && (
             <div className="flex items-center gap-2 text-sm bg-[rgba(242,183,5,0.08)] border border-[var(--color-light-amber)]/40 rounded-lg px-3 py-2 mb-4">
               <span className="text-lg">🏆</span>

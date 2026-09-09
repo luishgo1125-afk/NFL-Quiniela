@@ -5,6 +5,7 @@ import { weekLabel } from '../lib/types'
 import GameCard from '../components/GameCard'
 import SpecialPicks from '../components/SpecialPicks'
 import Leaderboard from '../components/Leaderboard'
+import CopyPicksModal from '../components/CopyPicksModal'
 import { IconClipboard, IconStar, IconBarChart, IconGear, IconCalendar, IconTrophy, IconCopy, IconWhatsapp } from '../components/icons'
 import type { User } from '@supabase/supabase-js'
 
@@ -31,6 +32,8 @@ export default function GroupDashboard({
   const [group, setGroupState] = useState(initialGroup)
   const setGroup = (g: Group) => { setGroupState(g); onGroupChange?.(g) }
   const [tab, setTab] = useState<'picks' | 'especiales' | 'tabla' | 'admin'>('picks')
+  const [showCopyModal, setShowCopyModal] = useState(false)
+  const [pickRefreshKey, setPickRefreshKey] = useState(0)
   const [games, setGames] = useState<Game[]>([])
   const [weekKey, setWeekKey] = useState<string | null>(null)
   const [copiedCode, setCopiedCode] = useState(false)
@@ -326,26 +329,37 @@ export default function GroupDashboard({
       <div key={tab} className="animate-tab-fade">
         {tab === 'picks' && (
         <>
-          <div className="flex gap-2 mb-4 flex-wrap">
-            {weeks.map((w) => (
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <div className="flex gap-2 flex-wrap">
+              {weeks.map((w) => (
+                <button
+                  key={w.key}
+                  onClick={() => setWeekKey(w.key)}
+                  className={`text-xs px-3 py-1.5 rounded-full border flex items-center gap-1.5 ${weekKey === w.key ? 'border-[var(--color-light-amber)] text-[var(--color-light-amber)]' : 'border-[var(--color-field-line)] text-[var(--color-text-muted)]'}`}
+                >
+                  <IconCalendar size={11} />
+                  <span className="font-medium">{weekLabel(w.seasonType, w.week).replace(/\s*\d+$/, '')}</span>
+                  {w.seasonType !== 3 && (
+                    <span
+                      className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold font-mono-score shrink-0"
+                      style={{ background: 'var(--color-light-amber)', color: 'var(--color-field-night)' }}
+                    >
+                      {w.week}
+                    </span>
+                  )}
+                  {multiYear && <span className="text-[10px]">· {w.year}</span>}
+                </button>
+              ))}
+            </div>
+            {weekKey && (
               <button
-                key={w.key}
-                onClick={() => setWeekKey(w.key)}
-                className={`text-xs px-3 py-1.5 rounded-full border flex items-center gap-1.5 ${weekKey === w.key ? 'border-[var(--color-light-amber)] text-[var(--color-light-amber)]' : 'border-[var(--color-field-line)] text-[var(--color-text-muted)]'}`}
+                onClick={() => setShowCopyModal(true)}
+                title="Copiar predicciones de otra liga"
+                className="shrink-0 flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-full border border-dashed border-[var(--color-field-line)] text-[var(--color-text-muted)] hover:border-[var(--color-light-amber)] hover:text-[var(--color-light-amber)] transition"
               >
-                <IconCalendar size={11} />
-                <span className="font-medium">{weekLabel(w.seasonType, w.week).replace(/\s*\d+$/, '')}</span>
-                {w.seasonType !== 3 && (
-                  <span
-                    className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold font-mono-score shrink-0"
-                    style={{ background: 'var(--color-light-amber)', color: 'var(--color-field-night)' }}
-                  >
-                    {w.week}
-                  </span>
-                )}
-                {multiYear && <span className="text-[10px]">· {w.year}</span>}
+                <IconCopy size={11} /> Copiar de otra liga
               </button>
-            ))}
+            )}
           </div>
           {weeklyWinners && (
             <div className="flex items-center gap-2 text-sm bg-[rgba(242,183,5,0.08)] border border-[var(--color-light-amber)]/40 rounded-lg px-3 py-2 mb-4">
@@ -369,7 +383,7 @@ export default function GroupDashboard({
                   id={`game-${g.id}`}
                   className={g.id === highlightedGameId ? 'rounded-xl ring-2 ring-[var(--color-light-amber)] transition-all' : ''}
                 >
-                  <GameCard game={g} userId={user.id} members={members} pickedUserIds={pickedBy[g.id] ?? []} />
+                  <GameCard key={pickRefreshKey} game={g} userId={user.id} members={members} pickedUserIds={pickedBy[g.id] ?? []} />
                 </div>
               ))}
 
@@ -403,6 +417,16 @@ export default function GroupDashboard({
         </Suspense>
       )}
       </div>
+
+      {showCopyModal && weekKey && (
+        <CopyPicksModal
+          currentGroup={group}
+          weekKey={weekKey}
+          userId={user.id}
+          onClose={() => setShowCopyModal(false)}
+          onDone={() => { setPickRefreshKey((k) => k + 1); loadPickStatus() }}
+        />
+      )}
     </div>
   )
 }

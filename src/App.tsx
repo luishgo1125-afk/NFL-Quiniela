@@ -82,6 +82,12 @@ export default function App() {
   const [hasUnread, setHasUnread] = useState(false)
   const [focusGameId, setFocusGameId] = useState<string | null>(null)
 
+  // si la URL trae ?join=CODIGO (link directo de invitacion de un admin),
+  // lo guardamos para procesarlo en cuanto sepamos si hay sesion o no
+  const [pendingInviteCode] = useState<string | null>(() => new URLSearchParams(window.location.search).get('join'))
+  const [joining, setJoining] = useState(!!pendingInviteCode)
+  const [joinError, setJoinError] = useState<string | null>(null)
+
   // al tocar una notificacion de un partido, brinca a la liga correcta y le
   // pasa el id del partido a GroupDashboard para que se posicione ahi
   async function openGameFromNotification(gameId: string) {
@@ -92,6 +98,44 @@ export default function App() {
     setFocusGameId(gameData.id)
     setBottomTab('quinielas')
   }
+
+  // procesa el link de invitacion en cuanto hay una sesion activa (recien
+  // iniciada o ya existente): intenta unirlo a la liga (si ya era miembro no
+  // pasa nada malo, solo lo abrimos igual) y lo manda directo ahi.
+  // Ojo: "groups" solo se puede leer si ya eres miembro (RLS), asi que el
+  // orden importa -- primero join_group, y hasta despues se puede consultar.
+  useEffect(() => {
+    if (loading || !user || !pendingInviteCode) { if (!pendingInviteCode) setJoining(false); return }
+
+    async function processInvite() {
+      setJoining(true)
+      setJoinError(null)
+      const code = pendingInviteCode!.trim().toUpperCase()
+
+      await supabase.rpc('join_group', { p_invite_code: code })
+      // sin importar si join_group trono (por ejemplo "ya eres miembro"),
+      // igual checamos si de verdad quedo como miembro y lo abrimos
+      const { data: membership } = await supabase
+        .from('group_members')
+        .select('groups!inner(*)')
+        .eq('user_id', user!.id)
+        .eq('groups.invite_code', code)
+        .maybeSingle()
+
+      window.history.replaceState({}, '', window.location.pathname)
+
+      if (membership?.groups) {
+        setActiveGroup(membership.groups as any)
+        setBottomTab('quinielas')
+        setJoining(false)
+      } else {
+        setJoining(false)
+        setJoinError('No pudimos usar ese link de invitacion. Revisa que el codigo siga siendo valido.')
+      }
+    }
+    processInvite()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, user?.id])
 
   useEffect(() => {
     if (!user) return
@@ -138,6 +182,14 @@ export default function App() {
 
   if (!user) return <Login />
 
+  if (joining) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <span className="font-mono-score text-[var(--color-light-amber)] text-sm animate-pulse">UNIENDOTE A LA LIGA...</span>
+      </div>
+    )
+  }
+
   const activeGroupIsAdmin = activeGroup ? activeGroup.created_by === user.id : false
   const canCreate = user.id === SUPER_ADMIN_ID
 
@@ -168,6 +220,13 @@ export default function App() {
       <header className="sticky top-0 z-40 border-b border-[var(--color-field-line)] px-4 py-2.5 flex items-center" style={{ background: 'linear-gradient(180deg, rgba(242,183,5,0.05), var(--color-field-night)), var(--color-field-night)' }}>
         <img src="/logo.png" alt="Quiniela" className="h-10 w-auto" />
       </header>
+
+      {joinError && (
+        <div className="mx-4 mt-3 flex items-start justify-between gap-2 bg-[rgba(228,70,43,0.1)] border border-[var(--color-scoreboard-red)]/40 rounded-md px-3 py-2 text-xs text-[var(--color-scoreboard-red)]">
+          <span>{joinError}</span>
+          <button onClick={() => setJoinError(null)} className="shrink-0 leading-none">✕</button>
+        </div>
+      )}
 
       <Suspense fallback={<ScreenLoading />}>
         {bottomTab === 'ranking' && <GlobalRanking user={user} />}

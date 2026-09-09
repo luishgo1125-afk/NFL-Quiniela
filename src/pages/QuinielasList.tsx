@@ -111,9 +111,13 @@ export default function QuinielasList({ user, onSelect }: { user: User; onSelect
     load()
   }, [user.id])
 
+  function inviteLink(g: Group) {
+    return `${window.location.origin}${window.location.pathname}?join=${g.invite_code}`
+  }
+
   async function copyCode(g: Group) {
     try {
-      await navigator.clipboard.writeText(g.invite_code)
+      await navigator.clipboard.writeText(inviteLink(g))
       setCopiedId(g.id)
       setTimeout(() => setCopiedId(null), 1500)
     } catch {
@@ -198,10 +202,10 @@ export default function QuinielasList({ user, onSelect }: { user: User; onSelect
                     onClick={(e) => { e.stopPropagation(); copyCode(g) }}
                     className="text-xs font-semibold px-3 py-1.5 rounded-md border border-[var(--color-field-line)] text-[var(--color-text-muted)] hover:border-[var(--color-light-amber)] hover:text-[var(--color-light-amber)] transition flex items-center gap-1"
                   >
-                    <IconCopy size={11} /> {copiedId === g.id ? 'Copiado ✓' : 'Invitar'}
+                    <IconCopy size={11} /> {copiedId === g.id ? 'Copiado ✓' : 'Copiar link'}
                   </button>
                   <a
-                    href={`https://wa.me/?text=${encodeURIComponent(`Unete a mi quiniela "${g.name}" en Quiniela NFL. Codigo: ${g.invite_code}`)}`}
+                    href={`https://wa.me/?text=${encodeURIComponent(`Unete a mi quiniela "${g.name}" en Quiniela NFL: ${inviteLink(g)}`)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}

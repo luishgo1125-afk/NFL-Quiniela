@@ -43,7 +43,7 @@ export default function GroupDashboard({
 
   async function copyCode() {
     try {
-      await navigator.clipboard.writeText(group.invite_code)
+      await navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}?join=${group.invite_code}`)
       setCopiedCode(true)
       setTimeout(() => setCopiedCode(false), 1500)
     } catch {
@@ -270,7 +270,7 @@ export default function GroupDashboard({
               {copiedCode ? <>✓ Copiado</> : <IconCopy />}
             </button>
             <a
-              href={`https://wa.me/?text=${encodeURIComponent(`Unete a mi quiniela "${group.name}" en Quiniela NFL. Codigo: ${group.invite_code}`)}`}
+              href={`https://wa.me/?text=${encodeURIComponent(`Unete a mi quiniela "${group.name}" en Quiniela NFL: ${window.location.origin}${window.location.pathname}?join=${group.invite_code}`)}`}
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Compartir por WhatsApp"

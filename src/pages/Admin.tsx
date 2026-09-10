@@ -6,7 +6,7 @@ import { teamLogoUrl } from '../lib/teamLogos'
 import MembersManager from '../components/MembersManager'
 import AdminSpecialPicks from '../components/AdminSpecialPicks'
 import DangerZone from '../components/DangerZone'
-import { IconTrash, IconChevronRight } from '../components/icons'
+import { IconTrash, IconChevronRight, IconCheck } from '../components/icons'
 
 function SectionHeader({ title, open, onToggle }: { title: string; open: boolean; onToggle: () => void }) {
   return (
@@ -39,14 +39,33 @@ export default function Admin({
 }) {
   const groupId = group.id
   const [memberCount, setMemberCount] = useState<number | null>(null)
+  const [paymentMembers, setPaymentMembers] = useState<{ user_id: string; display_name: string; paid: boolean }[]>([])
+  const [payingId, setPayingId] = useState<string | null>(null)
+
+  async function loadPaymentMembers() {
+    const { data } = await supabase
+      .from('group_members')
+      .select('user_id, paid, profiles(display_name)')
+      .eq('group_id', groupId)
+      .order('paid', { ascending: true })
+    const list = (data ?? []).map((m: any) => ({ user_id: m.user_id, display_name: m.profiles?.display_name ?? 'Jugador', paid: m.paid }))
+    setPaymentMembers(list)
+    setMemberCount(list.length)
+  }
 
   useEffect(() => {
-    supabase
-      .from('group_members')
-      .select('user_id', { count: 'exact', head: true })
-      .eq('group_id', groupId)
-      .then(({ count }) => setMemberCount(count ?? null))
+    loadPaymentMembers()
   }, [groupId])
+
+  async function toggleMemberPaid(userId: string, current: boolean) {
+    setPayingId(userId)
+    const { error: err } = await supabase.rpc('set_member_paid', { p_group_id: groupId, p_user_id: userId, p_paid: !current })
+    setPayingId(null)
+    if (!err) {
+      setPaymentMembers((prev) => prev.map((m) => (m.user_id === userId ? { ...m, paid: !current } : m)))
+    }
+  }
+
   const [week, setWeek] = useState(1)
   const [manualSeasonType, setManualSeasonType] = useState<SeasonType>(2)
   const [homeTeam, setHomeTeam] = useState(NFL_TEAMS[0])
@@ -546,6 +565,43 @@ export default function Admin({
             {savingPrize ? 'Guardando...' : 'Guardar premio'}
           </button>
         </form>
+        )}
+
+        {openSections.premio && betAmount > 0 && paymentMembers.length > 0 && (
+        <div className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-4 space-y-3">
+          <div>
+            <h2 className="text-sm font-semibold">Quien ya pago</h2>
+            <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">
+              Solo tu (el admin) puedes ver y marcar esto. {paymentMembers.filter((m) => m.paid).length}/{paymentMembers.length} pagaron.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            {paymentMembers.map((m) => (
+              <button
+                key={m.user_id}
+                onClick={() => toggleMemberPaid(m.user_id, m.paid)}
+                disabled={payingId === m.user_id}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-md border transition disabled:opacity-50"
+                style={{
+                  background: m.paid ? 'rgba(61,139,95,0.08)' : 'var(--color-field-surface-raised)',
+                  borderColor: m.paid ? 'var(--color-turf-green)' : 'var(--color-field-line)',
+                }}
+              >
+                <span className="text-sm">{m.display_name}</span>
+                <span
+                  className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full"
+                  style={
+                    m.paid
+                      ? { background: 'rgba(61,139,95,0.15)', color: 'var(--color-turf-green)', border: '1px solid rgba(61,139,95,0.4)' }
+                      : { background: 'var(--color-field-line)', color: 'var(--color-text-muted)' }
+                  }
+                >
+                  {m.paid ? <><IconCheck size={11} /> Pago</> : 'Pendiente'}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
         )}
       </section>
 

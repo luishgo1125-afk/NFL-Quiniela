@@ -6,6 +6,7 @@ import GameCard from '../components/GameCard'
 import SpecialPicks from '../components/SpecialPicks'
 import Leaderboard from '../components/Leaderboard'
 import CopyPicksModal from '../components/CopyPicksModal'
+import { buildStandings } from '../lib/ranking'
 import { IconClipboard, IconStar, IconBarChart, IconGear, IconCalendar, IconTrophy, IconCopy, IconWhatsapp, IconAlertTriangle } from '../components/icons'
 import type { User } from '@supabase/supabase-js'
 
@@ -230,36 +231,20 @@ export default function GroupDashboard({
       if (!allFinal) { setWeeklyWinners(null); return }
 
       const finalIds = weekGames.map((g) => g.id)
-      const gameById: Record<string, typeof weekGames[number]> = {}
-      weekGames.forEach((g) => { gameById[g.id] = g })
       const { data } = await supabase.from('picks').select('user_id, game_id, points, pred_home_score, pred_away_score').in('game_id', finalIds)
 
-      const stats: Record<string, { points: number; exact: number; diff: number }> = {}
-      ;(data ?? []).forEach((p: any) => {
-        const cur = stats[p.user_id] ?? { points: 0, exact: 0, diff: 0 }
-        cur.points += p.points ?? 0
-        if (p.points === group.points_exact) cur.exact++
-        const g = gameById[p.game_id]
-        if (g) {
-          cur.diff += Math.abs((g.home_score ?? 0) - (p.pred_home_score ?? 0)) + Math.abs((g.away_score ?? 0) - (p.pred_away_score ?? 0))
-        }
-        stats[p.user_id] = cur
-      })
+      // misma funcion que usa la Tabla y "Tu posicion" -- mismo desempate,
+      // incluida la penalizacion de +20 por cada partido no predicho
+      const standings = buildStandings(members.map((m) => m.user_id), weekGames, data ?? [], group.points_exact)
+      if (standings.length === 0) { setWeeklyWinners(null); return }
 
-      const entries = Object.entries(stats)
-      if (entries.length === 0) { setWeeklyWinners(null); return }
-
-      // desempate: 1) puntos totales, 2) marcadores exactos acertados, 3) menor diferencia de puntos (real vs. predicho, ambos equipos)
-      entries.sort((a, b) => b[1].points - a[1].points || b[1].exact - a[1].exact || a[1].diff - b[1].diff)
-      const [topId, topStats] = entries[0]
-      if (topStats.points <= 0) { setWeeklyWinners(null); return }
+      const top = standings[0]
+      if (top.points <= 0) { setWeeklyWinners(null); return }
 
       // si sigue habiendo empate total incluso despues del desempate, son co-ganadores reales
-      const tied = entries.filter(
-        ([, s]) => s.points === topStats.points && s.exact === topStats.exact && s.diff === topStats.diff
-      )
-      const names = tied.map(([uid]) => members.find((m) => m.user_id === uid)?.display_name ?? 'Jugador')
-      setWeeklyWinners({ names, points: topStats.points })
+      const tied = standings.filter((s) => s.points === top.points && s.exactHits === top.exactHits && s.pointDiff === top.pointDiff)
+      const names = tied.map((s) => members.find((m) => m.user_id === s.user_id)?.display_name ?? 'Jugador')
+      setWeeklyWinners({ names, points: top.points })
     }
     computeWinner()
   }, [weekGames, members, group.points_exact])

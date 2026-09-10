@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { teamLogoUrl } from '../lib/teamLogos'
 import { IconGlobe, IconMedal, IconClipboardX, IconCalendar, IconCoin } from './icons'
 import { weekLabel, type Group } from '../lib/types'
+import { getRankedFinalGames, buildStandings } from '../lib/ranking'
 
 interface RecentPick {
   gameLabel: string
@@ -11,6 +12,7 @@ interface RecentPick {
   points: number
   diff: number
   weekLabelText: string
+  missed: boolean
 }
 
 interface Row {
@@ -322,16 +324,27 @@ function PlayerStatsModal({ row, onClose }: { row: Row; onClose: () => void }) {
         ) : (
           <div className="space-y-1.5">
             {row.recentPicks.map((p, i) => (
-              <div key={i} className="flex items-center justify-between text-xs bg-[var(--color-field-surface-raised)] rounded-md px-3 py-2">
+              <div
+                key={i}
+                className="flex items-center justify-between text-xs rounded-md px-3 py-2"
+                style={{
+                  background: p.missed ? 'rgba(228,70,43,0.08)' : 'var(--color-field-surface-raised)',
+                  border: p.missed ? '1px solid rgba(228,70,43,0.3)' : 'none',
+                }}
+              >
                 <div>
                   <div className="font-medium">{p.weekLabelText} · {p.gameLabel}</div>
-                  <div className="text-[10px] text-[var(--color-text-muted)] font-mono-score">Final {p.resultLabel} · Predijo {p.predLabel} · Dif +{p.diff}</div>
+                  <div className="text-[10px] text-[var(--color-text-muted)] font-mono-score">
+                    {p.missed
+                      ? <>Final {p.resultLabel} · <span className="text-[var(--color-scoreboard-red)] font-semibold">No participo</span> · Dif +{p.diff}</>
+                      : <>Final {p.resultLabel} · Predijo {p.predLabel} · Dif +{p.diff}</>}
+                  </div>
                 </div>
                 <span
                   className="font-mono-score font-700 shrink-0 ml-2"
-                  style={{ color: p.points > 0 ? '#3D8B5F' : 'var(--color-text-muted)' }}
+                  style={{ color: p.missed ? 'var(--color-scoreboard-red)' : p.points > 0 ? '#3D8B5F' : 'var(--color-text-muted)' }}
                 >
-                  {p.points > 0 ? `+${p.points}` : '0'}
+                  {p.missed ? `+${p.diff}` : p.points > 0 ? `+${p.points}` : '0'}
                 </span>
               </div>
             ))}
@@ -364,14 +377,8 @@ export default function Leaderboard({ group }: { group: Group }) {
         .select('user_id, profiles(display_name, favorite_team)')
         .eq('group_id', group.id)
 
-      const { data: allGames } = await supabase
-        .from('games')
-        .select('id, kickoff, status, year, season_type, week, home_team, away_team, home_score, away_score')
-        .eq('group_id', group.id)
-        .is('deleted_at', null)
-        .order('kickoff', { ascending: false })
-
-      const gameList = allGames ?? []
+      const { finalGames, allGames, currentWeekKey, activeWeekEntry } = await getRankedFinalGames(group, selectedWeekKey)
+      const gameList = allGames
 
       // lista de semanas disponibles (para el selector; solo se muestra en modo semanal)
       const weekMap = new Map<string, { year: number; seasonType: number; week: number }>()
@@ -384,33 +391,23 @@ export default function Leaderboard({ group }: { group: Group }) {
         .sort((a, b) => a.year - b.year || a.seasonType - b.seasonType || a.week - b.week)
       setWeeks(weeksList)
 
-      const nonFinal = gameList.filter((g) => g.status !== 'final').sort((a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime())
-      const currentRef = nonFinal[0] ?? gameList[0] ?? null
-      const currentKey = currentRef ? `${currentRef.year}:${currentRef.season_type}:${currentRef.week}` : null
-
-      const effectiveWeekKey = group.scoring_mode === 'weekly' ? (selectedWeekKey ?? currentKey) : null
-      if (group.scoring_mode === 'weekly' && selectedWeekKey === null && currentKey) {
-        setSelectedWeekKey(currentKey)
+      if (group.scoring_mode === 'weekly' && selectedWeekKey === null && currentWeekKey) {
+        setSelectedWeekKey(currentWeekKey)
       }
-      const activeWeekEntry = weeksList.find((w) => w.key === effectiveWeekKey) ?? null
 
       setWeekLabelText(
         group.scoring_mode === 'weekly'
           ? activeWeekEntry
             ? weekLabel(activeWeekEntry.seasonType, activeWeekEntry.week)
             : null
-          : currentRef
-          ? weekLabel(currentRef.season_type, currentRef.week)
+          : activeWeekEntry === null && currentWeekKey
+          ? (() => {
+              const [, st, w] = currentWeekKey.split(':').map(Number)
+              return weekLabel(st, w)
+            })()
           : null
       )
 
-      const finalGames = gameList.filter(
-        (g) =>
-          g.status === 'final' &&
-          (group.scoring_mode === 'weekly'
-            ? activeWeekEntry && g.season_type === activeWeekEntry.seasonType && g.week === activeWeekEntry.week && g.year === activeWeekEntry.year
-            : g.season_type !== 1) // en modo "temporada completa" la pretemporada no cuenta
-      )
       const finalGameIds = finalGames.map((g) => g.id)
       const gameById: Record<string, (typeof finalGames)[number]> = {}
       finalGames.forEach((g) => { gameById[g.id] = g })
@@ -424,6 +421,13 @@ export default function Leaderboard({ group }: { group: Group }) {
         picks = data ?? []
       }
 
+      // puntos/exactos/diferencia y el orden final salen de la misma funcion
+      // compartida que usa "Tu posicion" en la lista de Quinielas -- si cambia
+      // el criterio, solo se cambia en un lugar y nunca se desincronizan
+      const standings = buildStandings((members ?? []).map((m: any) => m.user_id), finalGames, picks, group.points_exact)
+      const standingByUser: Record<string, (typeof standings)[number]> = {}
+      standings.forEach((s) => { standingByUser[s.user_id] = s })
+
       const byUser: Record<string, any[]> = {}
       picks.forEach((p) => {
         byUser[p.user_id] = byUser[p.user_id] ?? []
@@ -434,19 +438,7 @@ export default function Leaderboard({ group }: { group: Group }) {
         const userPicks = (byUser[m.user_id] ?? []).slice().sort(
           (a, b) => new Date(gameById[b.game_id]?.kickoff ?? 0).getTime() - new Date(gameById[a.game_id]?.kickoff ?? 0).getTime()
         )
-        let points = 0
-        let hits = 0
-        let exactHits = 0
-        let pointDiff = 0
-        userPicks.forEach((p) => {
-          points += p.points ?? 0
-          if ((p.points ?? 0) > 0) hits++
-          if (p.points === group.points_exact) exactHits++
-          const g = gameById[p.game_id]
-          if (g) {
-            pointDiff += Math.abs((g.home_score ?? 0) - (p.pred_home_score ?? 0)) + Math.abs((g.away_score ?? 0) - (p.pred_away_score ?? 0))
-          }
-        })
+        const s = standingByUser[m.user_id] ?? { points: 0, hits: 0, exactHits: 0, pointDiff: 0, played: 0 }
 
         let streak = 0
         for (const p of userPicks) {
@@ -460,7 +452,10 @@ export default function Leaderboard({ group }: { group: Group }) {
           if ((p.points ?? 0) > 0) { running++; bestStreak = Math.max(bestStreak, running) } else { running = 0 }
         })
 
-        const recentPicks: RecentPick[] = userPicks.slice(0, 8).map((p) => {
+        const pickedGameIds = new Set(userPicks.map((p) => p.game_id))
+        const missedGames = finalGames.filter((g) => !pickedGameIds.has(g.id))
+
+        const playedEntries = userPicks.map((p) => {
           const g = gameById[p.game_id]
           const diff = g ? Math.abs((g.home_score ?? 0) - (p.pred_home_score ?? 0)) + Math.abs((g.away_score ?? 0) - (p.pred_away_score ?? 0)) : 0
           return {
@@ -470,36 +465,43 @@ export default function Leaderboard({ group }: { group: Group }) {
             points: p.points ?? 0,
             diff,
             weekLabelText: g ? weekLabel(g.season_type, g.week) : '',
+            missed: false,
+            kickoffTime: g ? new Date(g.kickoff).getTime() : 0,
           }
         })
+        const missedEntries = missedGames.map((g) => ({
+          gameLabel: `${g.away_team} @ ${g.home_team}`,
+          resultLabel: `${g.away_score}-${g.home_score}`,
+          predLabel: '',
+          points: 0,
+          diff: 20,
+          weekLabelText: weekLabel(g.season_type, g.week),
+          missed: true,
+          kickoffTime: new Date(g.kickoff).getTime(),
+        }))
+        const recentPicks: RecentPick[] = [...playedEntries, ...missedEntries]
+          .sort((a, b) => b.kickoffTime - a.kickoffTime)
+          .slice(0, 8)
+          .map(({ kickoffTime, ...rest }) => rest)
 
         return {
           user_id: m.user_id,
           display_name: m.profiles?.display_name ?? 'Jugador',
           favorite_team: m.profiles?.favorite_team ?? null,
-          points,
-          hits,
-          played: userPicks.length,
-          exactHits,
-          pointDiff,
+          points: s.points,
+          hits: s.hits,
+          played: s.played,
+          exactHits: s.exactHits,
+          pointDiff: s.pointDiff,
           streak,
           bestStreak,
           recentPicks,
           globalRank: rankByUser[m.user_id] ?? null,
         }
       })
-      // desempate: 1) puntos, 2) marcadores exactos, 3) menor diferencia de puntos —
-      // pero quien no registro ninguna prediccion (played=0) nunca debe ganarle
-      // el desempate a alguien que si jugo, aunque le haya ido mal (diff=0 por defecto
-      // no es lo mismo que una diferencia real de 0)
-      result.sort((a, b) => {
-        if (b.points !== a.points) return b.points - a.points
-        if (b.exactHits !== a.exactHits) return b.exactHits - a.exactHits
-        if (a.played === 0 && b.played === 0) return 0
-        if (a.played === 0) return 1
-        if (b.played === 0) return -1
-        return a.pointDiff - b.pointDiff
-      })
+      // el orden ya viene decidido por buildStandings (mismo desempate que
+      // "Tu posicion"); solo reordenamos result para que calce con standings
+      result.sort((a, b) => standings.findIndex((s) => s.user_id === a.user_id) - standings.findIndex((s) => s.user_id === b.user_id))
       setRows(result)
       setLoading(false)
     }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Group } from '../lib/types'
 import { weekLabel } from '../lib/types'
+import { getGroupStandings } from '../lib/ranking'
 import { IconClipboard, IconCalendar, IconUsers, IconCopy, IconWhatsapp, IconGear } from '../components/icons'
 import type { User } from '@supabase/supabase-js'
 
@@ -65,13 +66,11 @@ async function loadStats(group: Group, userId: string): Promise<GroupStats> {
   const liveCount = weekGames.filter((g) => g.status === 'live').length
 
   let myRank: number | null = null
-  const finalIds = gameList.filter((g) => g.status === 'final').map((g) => g.id)
-  if (finalIds.length > 0 && memberIds.length > 0) {
-    const { data: allPicks } = await supabase.from('picks').select('user_id, points').in('game_id', finalIds)
-    const totals: Record<string, number> = {}
-    ;(allPicks ?? []).forEach((p: any) => { totals[p.user_id] = (totals[p.user_id] ?? 0) + (p.points ?? 0) })
-    const ranked = memberIds.map((id) => ({ id, points: totals[id] ?? 0 })).sort((a, b) => b.points - a.points)
-    const idx = ranked.findIndex((r) => r.id === userId)
+  if (memberIds.length > 0) {
+    // misma funcion que usa la Tabla (respeta modo semanal/temporada y el
+    // desempate oficial), para que "Tu posicion" nunca se desincronice
+    const standings = await getGroupStandings(group, memberIds)
+    const idx = standings.findIndex((s) => s.user_id === userId)
     if (idx >= 0) myRank = idx + 1
   }
 

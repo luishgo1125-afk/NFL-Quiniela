@@ -145,10 +145,42 @@ export default function GameCard({
     weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
   })
 
-  const cardBorder = confirmed ? '#3D8B5F' : locked ? 'var(--color-field-line)' : 'var(--color-field-line)'
-  const cardBg = confirmed
+  const isFinal = game.status === 'final'
+  const won = isFinal && pick != null && (pick.points ?? 0) > 0
+  const missed = isFinal && (pick == null || (pick.points ?? 0) === 0)
+  const pendingConfirmed = !isFinal && confirmed
+
+  const cardBorder = won
+    ? 'var(--color-turf-green)'
+    : missed
+    ? 'var(--color-scoreboard-red)'
+    : pendingConfirmed
+    ? 'var(--color-light-amber)'
+    : 'var(--color-field-line)'
+
+  const cardBg = won
     ? 'linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.12)), rgba(61,139,95,0.08)'
+    : missed
+    ? 'linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.12)), rgba(228,70,43,0.07)'
+    : pendingConfirmed
+    ? 'linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.12)), rgba(242,183,5,0.06)'
     : 'linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.15)), var(--color-field-surface)'
+
+  const cardShadowColor = won
+    ? 'rgba(61,139,95,0.25)'
+    : missed
+    ? 'rgba(228,70,43,0.22)'
+    : pendingConfirmed
+    ? 'rgba(242,183,5,0.22)'
+    : 'rgba(0,0,0,0.45)'
+
+  const scoreInputClass = won
+    ? 'bg-[rgba(61,139,95,0.15)] border border-[var(--color-turf-green)] text-[var(--color-turf-green)]'
+    : missed
+    ? 'bg-[rgba(228,70,43,0.12)] border border-[var(--color-scoreboard-red)] text-[var(--color-scoreboard-red)]'
+    : pendingConfirmed
+    ? 'bg-[rgba(242,183,5,0.12)] border border-[var(--color-light-amber)] text-[var(--color-light-amber)]'
+    : 'bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] focus:border-[var(--color-light-amber)]'
 
   return (
     <div
@@ -156,9 +188,7 @@ export default function GameCard({
       style={{
         borderColor: cardBorder,
         background: cardBg,
-        boxShadow: confirmed
-          ? '0 6px 16px -4px rgba(61,139,95,0.25), 0 2px 6px rgba(0,0,0,0.3)'
-          : '0 6px 16px -4px rgba(0,0,0,0.45), 0 2px 6px rgba(0,0,0,0.3)',
+        boxShadow: `0 6px 16px -4px ${cardShadowColor}, 0 2px 6px rgba(0,0,0,0.3)`,
       }}
     >
       <div className="flex items-center justify-between mb-4">
@@ -167,15 +197,15 @@ export default function GameCard({
           {kickoffLabel}
         </span>
         {game.status === 'final' ? (
-          <StatusPill label="FINALIZADO" variant="green" icon={<IconCheck size={10} />} />
+          <StatusPill label="FINALIZADO" variant={won ? 'green' : 'red'} icon={<IconCheck size={10} />} />
         ) : game.status === 'live' ? (
           <StatusPill label={`EN VIVO${tickingClock ? ` · ${tickingClock}` : ''}`} variant="red" pulse />
         ) : locked ? (
           <StatusPill label="CERRADO" variant="muted" icon={<IconLock size={10} />} />
         ) : closingSoon ? (
-          <StatusPill label="CIERRA PRONTO" variant="amber" icon={<IconClock size={10} />} />
+          <StatusPill label="CIERRA PRONTO" variant={pendingConfirmed ? 'amber' : 'red'} icon={<IconClock size={10} />} />
         ) : (
-          <StatusPill label="ABIERTO" variant="green" />
+          <StatusPill label="ABIERTO" variant={pendingConfirmed ? 'amber' : 'muted'} />
         )}
       </div>
 
@@ -210,11 +240,7 @@ export default function GameCard({
               disabled={locked}
               onClick={(e) => e.stopPropagation()}
               onChange={(e) => setAway(e.target.value)}
-              className={`w-14 text-center font-mono-score text-xl rounded-md py-1.5 outline-none disabled:opacity-60 transition-colors ${
-                confirmed
-                  ? 'bg-[rgba(61,139,95,0.15)] border border-[#3D8B5F] text-[#3D8B5F]'
-                  : 'bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] focus:border-[var(--color-light-amber)]'
-              }`}
+              className={`w-14 text-center font-mono-score text-xl rounded-md py-1.5 outline-none disabled:opacity-60 transition-colors ${scoreInputClass}`}
             />
             <span className="text-[var(--color-text-muted)]">–</span>
             <input
@@ -226,11 +252,7 @@ export default function GameCard({
               disabled={locked}
               onClick={(e) => e.stopPropagation()}
               onChange={(e) => setHome(e.target.value)}
-              className={`w-14 text-center font-mono-score text-xl rounded-md py-1.5 outline-none disabled:opacity-60 transition-colors ${
-                confirmed
-                  ? 'bg-[rgba(61,139,95,0.15)] border border-[#3D8B5F] text-[#3D8B5F]'
-                  : 'bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] focus:border-[var(--color-light-amber)]'
-              }`}
+              className={`w-14 text-center font-mono-score text-xl rounded-md py-1.5 outline-none disabled:opacity-60 transition-colors ${scoreInputClass}`}
             />
           </div>
 

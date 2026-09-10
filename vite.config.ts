@@ -7,6 +7,11 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      // registramos el service worker a mano en main.tsx (via
+      // virtual:pwa-register) para poder revisar actualizaciones cada hora
+      // y loguear que esta pasando -- si el plugin TAMBIEN auto-inyecta su
+      // propio registro (comportamiento default), pueden pisarse entre si
+      injectRegister: false,
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'sw.ts',

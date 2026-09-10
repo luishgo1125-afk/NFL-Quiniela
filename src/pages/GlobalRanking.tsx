@@ -13,6 +13,7 @@ interface RankRow {
   total_played: number
   exact_hits: number
   hit_pct: number
+  point_diff: number
 }
 
 const RANK_STYLES = [
@@ -324,7 +325,7 @@ export default function GlobalRanking({ user }: { user: User }) {
                         {isMe && <span className="text-[9px] text-[var(--color-light-amber)] font-normal shrink-0">(tu)</span>}
                       </p>
                       <p className="text-[11px] text-[var(--color-text-muted)] font-mono-score">
-                        {r.total_hits}/{r.total_played} aciertos
+                        {r.total_hits}/{r.total_played} aciertos · Dif +{r.point_diff}
                       </p>
                     </div>
                   </div>

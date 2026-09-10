@@ -218,8 +218,9 @@ export default function App() {
 
   return (
     <div className="pb-16">
-      <header className="sticky top-0 z-40 border-b border-[var(--color-field-line)] px-4 py-2.5 flex items-center" style={{ background: 'linear-gradient(180deg, rgba(242,183,5,0.05), var(--color-field-night)), var(--color-field-night)' }}>
-        <img src="/logo.png" alt="Quiniela" className="h-10 w-auto" />
+      <header className="sticky top-0 z-40 border-b border-[var(--color-field-line)] px-4 py-2.5 flex items-center" style={{ background: 'linear-gradient(180deg, rgba(242,183,5,0.05), var(--color-page-bg)), var(--color-page-bg)' }}>
+        <img src="/logo.png" alt="Quiniela" className="h-10 w-auto logo-dark" />
+        <img src="/logo-light.png" alt="Quiniela" className="h-10 w-auto logo-light" />
       </header>
 
       {joinError && (

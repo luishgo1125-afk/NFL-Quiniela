@@ -674,7 +674,7 @@ export default function Admin({
                   </span>
                 </button>
                 {open && (
-                  <div className="p-3 space-y-2 bg-[var(--color-field-night)]/40">
+                  <div className="p-3 space-y-2 bg-[var(--color-page-bg)]/60">
                     {wk.games.map((g) => (
                       <AdminGameRow key={g.id} game={g} onFinal={setFinalScore} onDelete={deleteGame} />
                     ))}
@@ -695,7 +695,7 @@ export default function Admin({
                 </span>
               </h2>
             </div>
-            <div className="p-3 space-y-2 bg-[var(--color-field-night)]/40">
+            <div className="p-3 space-y-2 bg-[var(--color-page-bg)]/60">
               {(() => {
                 const map = new Map<string, { key: string; year: number; seasonType: number; week: number; games: Game[] }>()
                 deletedGames.forEach((g) => {

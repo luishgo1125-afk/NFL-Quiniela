@@ -5,8 +5,10 @@ import { teamLogoUrl } from '../lib/teamLogos'
 import {
   IconUser, IconBell, IconLock, IconEye, IconEyeOff, IconMedal,
   IconPencil, IconMail, IconShield, IconLogout, IconChevronRight, IconStar, IconTarget, IconFlame, IconUsers,
+  IconMoon, IconSun,
 } from '../components/icons'
 import { pushSupported, isPushEnabled, enablePush, disablePush } from '../lib/push'
+import { getStoredTheme, setTheme, type Theme } from '../lib/theme'
 import type { User } from '@supabase/supabase-js'
 
 interface GlobalStats {
@@ -216,6 +218,13 @@ export default function Profile({
 
   const [pushEnabled, setPushEnabled] = useState(false)
   const [pushBusy, setPushBusy] = useState(false)
+  const [theme, setThemeState] = useState<Theme>(() => getStoredTheme())
+
+  function toggleTheme() {
+    const next: Theme = theme === 'dark' ? 'light' : 'dark'
+    setTheme(next)
+    setThemeState(next)
+  }
 
   const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null)
   const [groupCount, setGroupCount] = useState(0)
@@ -445,6 +454,26 @@ export default function Profile({
 
       {/* Lista de configuracion */}
       <div className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg divide-y divide-[var(--color-field-line)] overflow-hidden">
+        <div className="flex items-center gap-3 px-4 py-3.5">
+          {theme === 'dark' ? (
+            <IconMoon size={18} className="text-[var(--color-light-amber)] shrink-0" />
+          ) : (
+            <IconSun size={18} className="text-[var(--color-light-amber)] shrink-0" />
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold">Apariencia</p>
+            <p className="text-[10px] text-[var(--color-text-muted)]">{theme === 'dark' ? 'Modo noche' : 'Modo dia'}</p>
+          </div>
+          <button
+            onClick={toggleTheme}
+            aria-label="Cambiar entre modo dia y modo noche"
+            className="w-11 h-6 rounded-full relative transition shrink-0"
+            style={{ background: theme === 'light' ? '#F2B705' : 'var(--color-field-line)' }}
+          >
+            <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all" style={{ left: theme === 'light' ? '22px' : '2px' }} />
+          </button>
+        </div>
+
         <div className="flex items-center gap-3 px-4 py-3.5">
           <IconBell size={18} className="text-[var(--color-light-amber)] shrink-0" />
           <div className="flex-1 min-w-0">

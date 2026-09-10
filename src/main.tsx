@@ -1,8 +1,11 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { registerSW } from 'virtual:pwa-register'
+import { initTheme } from './lib/theme'
 import './index.css'
 import App from './App'
+
+initTheme()
 
 // Sin esto, el navegador nunca revisa si hay una version nueva del service
 // worker -- se queda con lo cacheado hasta que se fuerce un refresh manual.

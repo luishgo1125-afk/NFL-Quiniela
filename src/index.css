@@ -16,17 +16,52 @@
   --color-turf-green: #3D8B5F;
   --color-text-primary: #ECEFF3;
   --color-text-muted: #8A94A3;
+
+  /* fondo de pagina, separado de --color-field-night porque ese se usa en
+     muchos lados como color de TEXTO sobre botones ambar, no solo como fondo
+     -- separarlo permite un modo claro sin romper el contraste de esos textos */
+  --color-page-bg: #0A0E13;
+}
+
+/* ==== Modo claro (dia) ====
+   Solo cambiamos las superficies (fondo de pagina, tarjetas, texto) --
+   --color-field-night, el ambar y los colores de marcador (rojo/verde) se
+   quedan iguales en ambos modos, porque tambien se usan como color de TEXTO
+   sobre fondos ambar/de color (ej. el numero dentro de un circulo dorado), y
+   cambiarlos rompería el contraste en esos casos. */
+html.theme-light {
+  --color-page-bg: #F4F5F7;
+  --color-field-surface: #FFFFFF;
+  --color-field-surface-raised: #EDEFF3;
+  --color-field-line: #D7DBE2;
+  --color-text-primary: #12161C;
+  --color-text-muted: #5B6472;
 }
 
 body {
-  background-color: var(--color-field-night);
+  background-color: var(--color-page-bg);
   background-image:
     radial-gradient(ellipse 80% 50% at 50% -10%, rgba(242, 183, 5, 0.08), transparent),
     repeating-linear-gradient(180deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 3px);
   color: var(--color-text-primary);
   font-family: var(--font-body);
   min-height: 100vh;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
+
+html.theme-light body {
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(242, 183, 5, 0.10), transparent),
+    repeating-linear-gradient(180deg, rgba(0,0,0,0.015) 0px, rgba(0,0,0,0.015) 1px, transparent 1px, transparent 3px);
+}
+
+/* logo oscuro (texto claro) para modo noche, logo claro (texto oscuro) para
+   modo dia -- se togglea con puro CSS para que cambie al instante junto con
+   el resto del tema, sin depender de que este componente sepa del estado */
+.logo-dark { display: block; }
+.logo-light { display: none; }
+html.theme-light .logo-dark { display: none; }
+html.theme-light .logo-light { display: block; }
 
 .font-display {
   font-family: var(--font-display);

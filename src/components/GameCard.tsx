@@ -41,7 +41,7 @@ interface MemberInfo {
 }
 
 const LOCK_MINUTES = 30
-const WARNING_MINUTES = 150 // "cierra pronto" empieza 2.5h antes del cierre real (2h antes de kickoff)
+const WARNING_MINUTES = 120 // "cierra pronto" empieza 2h antes del cierre real (2h antes de kickoff)
 export default function GameCard({
   game,
   userId,

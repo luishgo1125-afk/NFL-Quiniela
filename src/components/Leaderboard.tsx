@@ -63,8 +63,10 @@ function drawCircleImage(ctx: CanvasRenderingContext2D, img: HTMLImageElement, c
 }
 
 async function shareLeaderboardImage(group: Group, weekLabelText: string | null, rows: Row[]) {
+  const totalPrize = group.bet_amount > 0 ? group.bet_amount * rows.length : 0
+  const prizeSplits = [group.prize_split_1, group.prize_split_2, group.prize_split_3]
   const rowHeight = 64
-  const headerHeight = 132
+  const headerHeight = totalPrize > 0 ? 156 : 132
   const footerHeight = 56
   const width = 720
   const height = headerHeight + rows.length * rowHeight + footerHeight
@@ -119,6 +121,12 @@ async function shareLeaderboardImage(group: Group, weekLabelText: string | null,
   const subtitle = weekLabelText ? `Tabla de posiciones · ${weekLabelText}` : 'Tabla de posiciones'
   ctx.fillText(subtitle, 104, 76)
 
+  if (totalPrize > 0) {
+    ctx.fillStyle = '#3D8B5F'
+    ctx.font = '700 16px Arial'
+    ctx.fillText(`Premio total: $${totalPrize.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`, 104, 98)
+  }
+
   ctx.strokeStyle = '#2A3542'
   ctx.lineWidth = 1
   ctx.beginPath()
@@ -166,7 +174,7 @@ async function shareLeaderboardImage(group: Group, weekLabelText: string | null,
     ctx.fillText(r.display_name, 108, y + rowHeight / 2)
     ctx.fillStyle = '#8A94A3'
     ctx.font = '400 13px Arial'
-    ctx.fillText(`${r.hits}/${r.played} aciertos`, 108, y + rowHeight / 2 + 20)
+    ctx.fillText(`${r.hits}/${r.played} aciertos · Dif +${r.pointDiff}`, 108, y + rowHeight / 2 + 20)
 
     ctx.fillStyle = '#ECEFF3'
     ctx.font = '700 26px Arial'
@@ -175,6 +183,13 @@ async function shareLeaderboardImage(group: Group, weekLabelText: string | null,
     ctx.font = '400 12px Arial'
     ctx.fillStyle = '#8A94A3'
     ctx.fillText('pts', width - 28, y + rowHeight / 2 + 22)
+
+    if (totalPrize > 0 && i < 3) {
+      const prize = totalPrize * prizeSplits[i] / 100
+      ctx.fillStyle = '#3D8B5F'
+      ctx.font = '700 22px Arial'
+      ctx.fillText(`$${prize.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`, width - 118, y + rowHeight / 2 + 8)
+    }
     ctx.textAlign = 'left'
   })
 

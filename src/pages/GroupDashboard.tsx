@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, lazy, Suspense } from 'react'
+import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import type { Game, Group } from '../lib/types'
 import { weekLabel } from '../lib/types'
@@ -221,7 +222,6 @@ export default function GroupDashboard({
     if (!needsConfirmation || !weekKey) { setConfirmedUserIds(null); return }
     setConfirmedUserIds(null)
     const [y, st, w] = weekKey.split(':').map(Number)
-    console.log('[confirmacion] revisando semana', { groupId: group.id, y, st, w })
     supabase
       .from('week_confirmations')
       .select('user_id')
@@ -229,8 +229,7 @@ export default function GroupDashboard({
       .eq('year', y)
       .eq('season_type', st)
       .eq('week', w)
-      .then(({ data, error: err }) => {
-        console.log('[confirmacion] resultado:', data, 'error:', err)
+      .then(({ data }) => {
         setConfirmedUserIds(new Set((data ?? []).map((c: any) => c.user_id)))
       })
   }, [needsConfirmation, weekKey, group.id])
@@ -246,7 +245,7 @@ export default function GroupDashboard({
     if (!err) {
       setConfirmedUserIds((prev) => new Set([...(prev ?? []), user.id]))
     } else {
-      console.error('[confirmacion] fallo al confirmar:', err)
+      console.error('Error al confirmar participacion:', err)
     }
   }
 
@@ -323,8 +322,29 @@ export default function GroupDashboard({
     if (tab === 'especiales' && !group.special_picks_enabled) setTab('picks')
   }, [tab, group.special_picks_enabled])
 
+  // el boton de "Actualizar" vive visualmente en el header de arriba (junto
+  // al logo), pero su logica se queda aqui -- solo se muestra en la pestaña
+  // de Predicciones, y solo para el admin
+  const headerSlot = typeof document !== 'undefined' ? document.getElementById('header-right-slot') : null
+  const syncButtonPortal =
+    headerSlot && isAdmin && tab === 'picks' && weekKey
+      ? createPortal(
+          <button
+            onClick={handleSyncCurrentWeek}
+            disabled={syncingWeek}
+            title="Actualizar partidos de esta semana desde la NFL"
+            className="flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-full border border-[var(--color-light-amber)]/50 text-[var(--color-light-amber)] hover:bg-[rgba(242,183,5,0.1)] transition disabled:opacity-50"
+          >
+            <IconRefresh size={11} className={syncingWeek ? 'animate-spin' : ''} />
+            {syncingWeek ? 'Actualizando...' : 'Actualizar'}
+          </button>,
+          headerSlot
+        )
+      : null
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
+      {syncButtonPortal}
       <div className="flex items-center gap-3 mb-1">
         {group.logo_url ? (
           <img src={group.logo_url} alt={group.name} className="w-12 h-12 rounded-full object-cover border border-[var(--color-field-line)]" />
@@ -439,19 +459,8 @@ export default function GroupDashboard({
                 </button>
               ))}
             </div>
-            {weekKey && (
+            {weekKey && group.allow_copy_picks && (
               <div className="flex items-center gap-2 shrink-0">
-                {isAdmin && (
-                  <button
-                    onClick={handleSyncCurrentWeek}
-                    disabled={syncingWeek}
-                    title="Actualizar partidos de esta semana desde la NFL"
-                    className="flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-full border border-[var(--color-light-amber)]/50 text-[var(--color-light-amber)] hover:bg-[rgba(242,183,5,0.1)] transition disabled:opacity-50"
-                  >
-                    <IconRefresh size={11} className={syncingWeek ? 'animate-spin' : ''} />
-                    {syncingWeek ? 'Actualizando...' : 'Actualizar'}
-                  </button>
-                )}
                 <button
                   onClick={() => setShowCopyModal(true)}
                   title="Copiar predicciones de otra liga"
@@ -547,7 +556,6 @@ export default function GroupDashboard({
             </p>
           ) : (
             <div className="space-y-3">
-              {console.log('[confirmacion] render:', { needsConfirmation, weekConfirmed, isFirstWeek, weekKey, weeksFirstKey: weeks[0]?.key })}
               {weekGames.map((g) => (
                 <div
                   key={g.id}

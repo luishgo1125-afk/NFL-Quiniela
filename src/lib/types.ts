@@ -18,6 +18,7 @@ export interface Group {
   prize_split_1: number
   prize_split_2: number
   prize_split_3: number
+  allow_copy_picks: boolean
 }
 
 export interface GroupMember {

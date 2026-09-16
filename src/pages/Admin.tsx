@@ -208,6 +208,17 @@ export default function Admin({
     }
   }
 
+  const [savingCopyToggle, setSavingCopyToggle] = useState(false)
+  async function toggleCopyPicksEnabled() {
+    setSavingCopyToggle(true)
+    const { data, error: err } = await supabase.rpc('set_copy_picks_enabled', {
+      p_group_id: groupId,
+      p_enabled: !group.allow_copy_picks,
+    })
+    setSavingCopyToggle(false)
+    if (!err) onGroupUpdated(data)
+  }
+
   async function syncWeekFromEspn(e?: React.FormEvent) {
     e?.preventDefault()
     setSyncing(true)
@@ -405,6 +416,26 @@ export default function Admin({
             {savingGroup ? 'Guardando...' : 'Guardar cambios de la liga'}
           </button>
         </form>
+        )}
+
+        {openSections.liga && (
+        <div className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg divide-y divide-[var(--color-field-line)] overflow-hidden">
+          <div className="flex items-center gap-3 px-4 py-3.5">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold">Copiar de otra liga</p>
+              <p className="text-[10px] text-[var(--color-text-muted)]">Permite a los jugadores copiar sus predicciones desde otra de sus ligas</p>
+            </div>
+            <button
+              onClick={toggleCopyPicksEnabled}
+              disabled={savingCopyToggle}
+              aria-label="Habilitar copiar de otra liga"
+              className="w-11 h-6 rounded-full relative transition shrink-0 disabled:opacity-50"
+              style={{ background: group.allow_copy_picks ? '#F2B705' : 'var(--color-field-line)' }}
+            >
+              <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all" style={{ left: group.allow_copy_picks ? '22px' : '2px' }} />
+            </button>
+          </div>
+        </div>
         )}
       </section>
 

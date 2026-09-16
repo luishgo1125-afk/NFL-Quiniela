@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import type { Game, Pick } from '../lib/types'
 import { TEAM_NAMES } from '../lib/types'
 import { teamLogoUrl } from '../lib/teamLogos'
-import { IconCalendar, IconClock, IconLock, IconCheck, IconBookmark, IconHourglass } from './icons'
+import { IconCalendar, IconClock, IconLock, IconCheck, IconBookmark, IconHourglass, IconTrash } from './icons'
 import StatusPill from './StatusPill'
 
 // Cuenta hacia atras en pantalla, segundo a segundo, entre cada sincronizacion
@@ -41,17 +41,21 @@ interface MemberInfo {
 }
 
 const LOCK_MINUTES = 30
-const WARNING_MINUTES = 120 // "cierra pronto" empieza 2h antes del cierre real (2h antes de kickoff)
+const WARNING_MINUTES = 150 // "cierra pronto" empieza 2.5h antes del cierre real (2h antes de kickoff)
 export default function GameCard({
   game,
   userId,
   members,
   pickedUserIds,
+  forceLocked,
+  forceLockedReason,
 }: {
   game: Game
   userId: string
   members: MemberInfo[]
   pickedUserIds: string[]
+  forceLocked?: boolean
+  forceLockedReason?: string
 }) {
   const [pick, setPick] = useState<Pick | null>(null)
   const [home, setHome] = useState('')
@@ -63,7 +67,8 @@ export default function GameCard({
 
   const kickoffTime = new Date(game.kickoff).getTime()
   const lockTime = kickoffTime - LOCK_MINUTES * 60 * 1000
-  const locked = lockTime <= Date.now()
+  const naturallyLocked = lockTime <= Date.now()
+  const locked = naturallyLocked || !!forceLocked
   // la base de datos deja ver los pronosticos de los demas justo al kickoff
   // (no desde que se cierra la prediccion, que es un poco antes) -- usamos
   // este momento para saber cuando ya se pueden mostrar
@@ -124,6 +129,22 @@ export default function GameCard({
       setPick(data)
       setSaved(true)
       setTimeout(() => setSaved(false), 1500)
+    }
+  }
+
+  const [deleting, setDeleting] = useState(false)
+  async function deletePick() {
+    if (locked || !pick || deleting) return
+    if (!window.confirm('¿Eliminar tu predicción de este partido?')) return
+    setDeleting(true)
+    const { error, data } = await supabase.from('picks').delete().eq('game_id', game.id).eq('user_id', userId).select()
+    setDeleting(false)
+    if (!error && data && data.length > 0) {
+      setPick(null)
+      setHome('')
+      setAway('')
+    } else {
+      alert('No se pudo eliminar la predicción. Puede que el partido ya haya cerrado.')
     }
   }
 
@@ -200,6 +221,8 @@ export default function GameCard({
           <StatusPill label="FINALIZADO" variant={won ? 'green' : 'red'} icon={<IconCheck size={10} />} />
         ) : game.status === 'live' ? (
           <StatusPill label={`EN VIVO${tickingClock ? ` · ${tickingClock}` : ''}`} variant="red" pulse />
+        ) : forceLocked && !naturallyLocked ? (
+          <StatusPill label="CONFIRMA PARA JUGAR" variant="amber" icon={<IconLock size={10} />} />
         ) : locked ? (
           <StatusPill label="CERRADO" variant="muted" icon={<IconLock size={10} />} />
         ) : closingSoon ? (
@@ -209,9 +232,13 @@ export default function GameCard({
         )}
       </div>
 
-      {locked && !pick ? (
+      {naturallyLocked && !pick ? (
         <div className="text-center py-3 text-sm text-[var(--color-text-muted)] italic">
           No participaste en este partido
+        </div>
+      ) : forceLocked ? (
+        <div className="text-center py-3 text-sm text-[var(--color-light-amber)] italic">
+          {forceLockedReason ?? 'Confirma tu participacion para poder predecir'}
         </div>
       ) : (
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
@@ -369,19 +396,32 @@ export default function GameCard({
       )}
 
       {!locked && (
-        <button
-          onClick={save}
-          disabled={saving || home === '' || away === '' || confirmed}
-          className={`mt-3 w-full text-xs font-semibold rounded-md py-2 transition disabled:opacity-70 flex items-center justify-center gap-1.5 ${
-            confirmed ? 'bg-[#3D8B5F] text-white' : 'bg-[var(--color-light-amber)] text-[var(--color-field-night)] hover:brightness-110'
-          }`}
-        >
-          {saved || confirmed ? (
-            <><IconCheck size={13} /> Predicción guardada</>
-          ) : (
-            <><IconBookmark size={13} /> {saving ? 'Guardando...' : 'Guardar predicción'}</>
+        <div className="flex items-center gap-2 mt-3">
+          <button
+            onClick={save}
+            disabled={saving || home === '' || away === '' || confirmed}
+            className={`flex-1 text-xs font-semibold rounded-md py-2 transition disabled:opacity-70 flex items-center justify-center gap-1.5 ${
+              confirmed ? 'bg-[#3D8B5F] text-white' : 'bg-[var(--color-light-amber)] text-[var(--color-field-night)] hover:brightness-110'
+            }`}
+          >
+            {saved || confirmed ? (
+              <><IconCheck size={13} /> Predicción guardada</>
+            ) : (
+              <><IconBookmark size={13} /> {saving ? 'Guardando...' : 'Guardar predicción'}</>
+            )}
+          </button>
+          {pick && (
+            <button
+              onClick={deletePick}
+              disabled={deleting}
+              title="Eliminar predicción"
+              aria-label="Eliminar predicción"
+              className="flex-1 text-xs font-semibold rounded-md py-2 transition disabled:opacity-70 flex items-center justify-center gap-1.5 bg-[var(--color-scoreboard-red)] text-white hover:brightness-110"
+            >
+              <IconTrash size={13} /> {deleting ? 'Eliminando...' : 'Eliminar predicción'}
+            </button>
           )}
-        </button>
+        </div>
       )}
     </div>
   )

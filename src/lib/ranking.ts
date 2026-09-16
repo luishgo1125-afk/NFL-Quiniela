@@ -22,7 +22,7 @@ export interface RankablePick {
   pred_away_score: number
 }
 
-interface WeekEntry {
+export interface WeekEntry {
   year: number
   seasonType: number
   week: number
@@ -122,11 +122,62 @@ export function buildStandings(userIds: string[], finalGames: RankableGame[], pi
   return result
 }
 
+// En modo "semana a semana", a partir de la 2da semana hay que haber
+// confirmado participacion ANTES de que arranque el primer partido de esa
+// semana -- quien no lo hizo a tiempo queda totalmente fuera de la tabla de
+// esa semana (no aparece, ni con penalizacion). La primera semana de la liga
+// nunca pide esto.
+export async function getEligibleUserIds(
+  group: Group,
+  userIds: string[],
+  allGames: RankableGame[],
+  activeWeekEntry: WeekEntry | null
+): Promise<string[]> {
+  if (group.scoring_mode !== 'weekly' || !activeWeekEntry) return userIds
+
+  const weekMap = new Map<string, WeekEntry>()
+  allGames.forEach((g) => {
+    const key = `${g.year}:${g.season_type}:${g.week}`
+    if (!weekMap.has(key)) weekMap.set(key, { year: g.year, seasonType: g.season_type, week: g.week })
+  })
+  const sortedWeeks = Array.from(weekMap.values()).sort(
+    (a, b) => a.year - b.year || a.seasonType - b.seasonType || a.week - b.week
+  )
+  const firstWeek = sortedWeeks[0] ?? null
+  const isFirstWeek =
+    firstWeek != null &&
+    firstWeek.year === activeWeekEntry.year &&
+    firstWeek.seasonType === activeWeekEntry.seasonType &&
+    firstWeek.week === activeWeekEntry.week
+  console.log('[getEligibleUserIds]', { activeWeekEntry, firstWeek, isFirstWeek, sortedWeeks, scoringMode: group.scoring_mode })
+  if (isFirstWeek) return userIds
+
+  const weekGamesForThis = allGames.filter(
+    (g) => g.year === activeWeekEntry.year && g.season_type === activeWeekEntry.seasonType && g.week === activeWeekEntry.week
+  )
+  if (weekGamesForThis.length === 0) return userIds
+  const firstKickoff = Math.min(...weekGamesForThis.map((g) => new Date(g.kickoff).getTime()))
+
+  const { data } = await supabase
+    .from('week_confirmations')
+    .select('user_id, confirmed_at')
+    .eq('group_id', group.id)
+    .eq('year', activeWeekEntry.year)
+    .eq('season_type', activeWeekEntry.seasonType)
+    .eq('week', activeWeekEntry.week)
+
+  const confirmedInTime = new Set(
+    (data ?? []).filter((c: any) => new Date(c.confirmed_at).getTime() <= firstKickoff).map((c: any) => c.user_id)
+  )
+  return userIds.filter((uid) => confirmedInTime.has(uid))
+}
+
 // Conveniencia: trae y calcula el ranking completo de una liga de un jalon
 // (usado por pantallas que solo necesitan la posicion, no todo el detalle
 // que si renderiza la Tabla).
 export async function getGroupStandings(group: Group, userIds: string[], weekKey?: string | null): Promise<Standing[]> {
-  const { finalGames } = await getRankedFinalGames(group, weekKey)
+  const { finalGames, allGames, activeWeekEntry } = await getRankedFinalGames(group, weekKey)
+  const eligibleUserIds = await getEligibleUserIds(group, userIds, allGames, activeWeekEntry)
   const finalGameIds = finalGames.map((g) => g.id)
   let picks: RankablePick[] = []
   if (finalGameIds.length > 0) {
@@ -136,5 +187,5 @@ export async function getGroupStandings(group: Group, userIds: string[], weekKey
       .in('game_id', finalGameIds)
     picks = (data ?? []) as RankablePick[]
   }
-  return buildStandings(userIds, finalGames, picks, group.points_exact)
+  return buildStandings(eligibleUserIds, finalGames, picks, group.points_exact)
 }

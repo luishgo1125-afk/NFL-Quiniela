@@ -6,8 +6,9 @@ import GameCard from '../components/GameCard'
 import SpecialPicks from '../components/SpecialPicks'
 import Leaderboard from '../components/Leaderboard'
 import CopyPicksModal from '../components/CopyPicksModal'
-import { buildStandings } from '../lib/ranking'
-import { IconClipboard, IconStar, IconBarChart, IconGear, IconCalendar, IconTrophy, IconCopy, IconWhatsapp, IconAlertTriangle } from '../components/icons'
+import { buildStandings, getEligibleUserIds } from '../lib/ranking'
+import { syncGroupWeekFromEspn } from '../lib/syncGames'
+import { IconClipboard, IconStar, IconBarChart, IconGear, IconCalendar, IconTrophy, IconCopy, IconWhatsapp, IconAlertTriangle, IconRefresh } from '../components/icons'
 import type { User } from '@supabase/supabase-js'
 
 // Admin es la pantalla mas pesada (formularios, importador de ESPN, gestor de
@@ -35,6 +36,25 @@ export default function GroupDashboard({
   const [tab, setTab] = useState<'picks' | 'especiales' | 'tabla' | 'admin'>('picks')
   const [showCopyModal, setShowCopyModal] = useState(false)
   const [pickRefreshKey, setPickRefreshKey] = useState(0)
+  const [syncingWeek, setSyncingWeek] = useState(false)
+  const [syncWeekMsg, setSyncWeekMsg] = useState<string | null>(null)
+
+  async function handleSyncCurrentWeek() {
+    if (!weekKey || syncingWeek) return
+    setSyncingWeek(true)
+    setSyncWeekMsg(null)
+    try {
+      const [y, st, w] = weekKey.split(':').map(Number)
+      const result = await syncGroupWeekFromEspn(group.id, games, y, st as 1 | 2 | 3, w)
+      await loadGames()
+      setSyncWeekMsg(`${result.created} agregado(s), ${result.updated} actualizado(s)`)
+    } catch (err) {
+      setSyncWeekMsg(err instanceof Error ? err.message : 'No se pudo sincronizar')
+    } finally {
+      setSyncingWeek(false)
+      setTimeout(() => setSyncWeekMsg(null), 4000)
+    }
+  }
   const [games, setGames] = useState<Game[]>([])
   const [weekKey, setWeekKey] = useState<string | null>(null)
   const [copiedCode, setCopiedCode] = useState(false)
@@ -189,6 +209,49 @@ export default function GroupDashboard({
   const selectedWeek = useMemo(() => weeks.find((w) => w.key === weekKey) ?? null, [weeks, weekKey])
   const liveNow = useMemo(() => games.filter((g) => !g.deleted_at && g.status === 'live'), [games])
 
+  // en modo "semana a semana", a partir de la 2da semana hay que confirmar
+  // participacion (compromiso de pago) antes de poder predecir esa semana
+  const isFirstWeek = weeks.length > 0 && weekKey === weeks[0].key
+  const needsConfirmation = group.scoring_mode === 'weekly' && weekKey !== null && !isFirstWeek
+  const [confirmedUserIds, setConfirmedUserIds] = useState<Set<string> | null>(null)
+  const [confirming, setConfirming] = useState(false)
+  const weekConfirmed = !needsConfirmation ? true : confirmedUserIds === null ? null : confirmedUserIds.has(user.id)
+
+  useEffect(() => {
+    if (!needsConfirmation || !weekKey) { setConfirmedUserIds(null); return }
+    setConfirmedUserIds(null)
+    const [y, st, w] = weekKey.split(':').map(Number)
+    console.log('[confirmacion] revisando semana', { groupId: group.id, y, st, w })
+    supabase
+      .from('week_confirmations')
+      .select('user_id')
+      .eq('group_id', group.id)
+      .eq('year', y)
+      .eq('season_type', st)
+      .eq('week', w)
+      .then(({ data, error: err }) => {
+        console.log('[confirmacion] resultado:', data, 'error:', err)
+        setConfirmedUserIds(new Set((data ?? []).map((c: any) => c.user_id)))
+      })
+  }, [needsConfirmation, weekKey, group.id])
+
+  async function confirmParticipation() {
+    if (!weekKey || confirming) return
+    setConfirming(true)
+    const [y, st, w] = weekKey.split(':').map(Number)
+    const { error: err } = await supabase
+      .from('week_confirmations')
+      .insert({ group_id: group.id, user_id: user.id, year: y, season_type: st, week: w })
+    setConfirming(false)
+    if (!err) {
+      setConfirmedUserIds((prev) => new Set([...(prev ?? []), user.id]))
+    } else {
+      console.error('[confirmacion] fallo al confirmar:', err)
+    }
+  }
+
+  const visibleMembers = needsConfirmation && confirmedUserIds ? members.filter((m) => confirmedUserIds.has(m.user_id)) : members
+
   // se refresca cada 30s para que la cuenta regresiva de "cierra en" se sienta viva
   const [nowTick, setNowTick] = useState(() => Date.now())
   useEffect(() => {
@@ -233,9 +296,16 @@ export default function GroupDashboard({
       const finalIds = weekGames.map((g) => g.id)
       const { data } = await supabase.from('picks').select('user_id, game_id, points, pred_home_score, pred_away_score').in('game_id', finalIds)
 
+      // quien no confirmo su participacion a tiempo esta semana no cuenta
+      // para nada de esto -- ni gana, ni se le penaliza, simplemente no aplica
+      const activeWeekEntry = weekKey
+        ? (([y, st, w]) => ({ year: y, seasonType: st, week: w }))(weekKey.split(':').map(Number) as [number, number, number])
+        : null
+      const eligibleUserIds = await getEligibleUserIds(group, members.map((m) => m.user_id), games, activeWeekEntry)
+
       // misma funcion que usa la Tabla y "Tu posicion" -- mismo desempate,
       // incluida la penalizacion de +20 por cada partido no predicho
-      const standings = buildStandings(members.map((m) => m.user_id), weekGames, data ?? [], group.points_exact)
+      const standings = buildStandings(eligibleUserIds, weekGames, data ?? [], group.points_exact)
       if (standings.length === 0) { setWeeklyWinners(null); return }
 
       const top = standings[0]
@@ -247,7 +317,7 @@ export default function GroupDashboard({
       setWeeklyWinners({ names, points: top.points })
     }
     computeWinner()
-  }, [weekGames, members, group.points_exact])
+  }, [weekGames, members, group, weekKey, games])
 
   useEffect(() => {
     if (tab === 'especiales' && !group.special_picks_enabled) setTab('picks')
@@ -370,15 +440,31 @@ export default function GroupDashboard({
               ))}
             </div>
             {weekKey && (
-              <button
-                onClick={() => setShowCopyModal(true)}
-                title="Copiar predicciones de otra liga"
-                className="shrink-0 flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-full border border-dashed border-[var(--color-field-line)] text-[var(--color-text-muted)] hover:border-[var(--color-light-amber)] hover:text-[var(--color-light-amber)] transition"
-              >
-                <IconCopy size={11} /> Copiar de otra liga
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                {isAdmin && (
+                  <button
+                    onClick={handleSyncCurrentWeek}
+                    disabled={syncingWeek}
+                    title="Actualizar partidos de esta semana desde la NFL"
+                    className="flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-full border border-[var(--color-light-amber)]/50 text-[var(--color-light-amber)] hover:bg-[rgba(242,183,5,0.1)] transition disabled:opacity-50"
+                  >
+                    <IconRefresh size={11} className={syncingWeek ? 'animate-spin' : ''} />
+                    {syncingWeek ? 'Actualizando...' : 'Actualizar'}
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowCopyModal(true)}
+                  title="Copiar predicciones de otra liga"
+                  className="flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-full border border-dashed border-[var(--color-field-line)] text-[var(--color-text-muted)] hover:border-[var(--color-light-amber)] hover:text-[var(--color-light-amber)] transition"
+                >
+                  <IconCopy size={11} /> Copiar de otra liga
+                </button>
+              </div>
             )}
           </div>
+          {syncWeekMsg && (
+            <p className="text-[10px] text-[var(--color-turf-green)] text-right -mt-2 mb-3">{syncWeekMsg}</p>
+          )}
 
           {weekPicksTotal > 0 && (() => {
             const closingSoonBanner = nextLock != null && nextLock - nowTick < 3 * 60 * 60 * 1000
@@ -437,19 +523,46 @@ export default function GroupDashboard({
               </span>
             </div>
           )}
+
+          {needsConfirmation && weekConfirmed === false && (
+            <div className="flex items-center justify-between gap-3 bg-[rgba(242,183,5,0.08)] border border-[var(--color-light-amber)] rounded-lg px-4 py-3 mb-4">
+              <div>
+                <p className="text-sm font-semibold text-[var(--color-light-amber)]">Confirma tu participacion de esta semana</p>
+                <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">
+                  Los puntos se reinician cada semana en esta liga. Confirma que vas a pagar tu apuesta{group.bet_amount > 0 ? ` ($${group.bet_amount.toLocaleString('es-MX')})` : ''} para poder predecir.
+                </p>
+              </div>
+              <button
+                onClick={confirmParticipation}
+                disabled={confirming}
+                className="shrink-0 bg-[var(--color-light-amber)] text-[var(--color-field-night)] font-semibold rounded-md px-4 py-2 text-xs hover:brightness-110 disabled:opacity-50"
+              >
+                {confirming ? 'Confirmando...' : 'Confirmar'}
+              </button>
+            </div>
+          )}
           {weekGames.length === 0 ? (
             <p className="text-sm text-[var(--color-text-muted)]">
               {isAdmin ? 'Todavia no capturas partidos. Ve a la pestaña Administrar.' : 'El administrador aun no captura partidos para esta semana.'}
             </p>
           ) : (
             <div className="space-y-3">
+              {console.log('[confirmacion] render:', { needsConfirmation, weekConfirmed, isFirstWeek, weekKey, weeksFirstKey: weeks[0]?.key })}
               {weekGames.map((g) => (
                 <div
                   key={g.id}
                   id={`game-${g.id}`}
                   className={g.id === highlightedGameId ? 'rounded-xl ring-2 ring-[var(--color-light-amber)] transition-all' : ''}
                 >
-                  <GameCard key={pickRefreshKey} game={g} userId={user.id} members={members} pickedUserIds={pickedBy[g.id] ?? []} />
+                  <GameCard
+                    key={pickRefreshKey}
+                    game={g}
+                    userId={user.id}
+                    members={visibleMembers}
+                    pickedUserIds={pickedBy[g.id] ?? []}
+                    forceLocked={needsConfirmation && weekConfirmed === false}
+                    forceLockedReason="Confirma tu participacion arriba para poder predecir"
+                  />
                 </div>
               ))}
 

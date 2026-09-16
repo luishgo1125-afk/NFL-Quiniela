@@ -365,3 +365,12 @@ export function IconSun({ size = 16, className = '' }: IconProps) {
     </svg>
   )
 }
+
+export function IconRefresh({ size = 16, className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M21 12a9 9 0 0 1-9 9 9 9 0 0 1-6.36-2.64L3 16M3 12a9 9 0 0 1 9-9 9 9 0 0 1 6.36 2.64L21 8" />
+      <path d="M3 16v-4h4M21 8v4h-4" />
+    </svg>
+  )
+}

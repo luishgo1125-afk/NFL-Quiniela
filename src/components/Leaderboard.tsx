@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { teamLogoUrl } from '../lib/teamLogos'
 import { IconGlobe, IconMedal, IconClipboardX, IconCalendar, IconCoin } from './icons'
 import { weekLabel, type Group } from '../lib/types'
-import { getRankedFinalGames, buildStandings } from '../lib/ranking'
+import { getRankedFinalGames, buildStandings, getEligibleUserIds } from '../lib/ranking'
 
 interface RecentPick {
   gameLabel: string
@@ -436,10 +436,23 @@ export default function Leaderboard({ group }: { group: Group }) {
         picks = data ?? []
       }
 
+      // en modo semanal, a partir de la 2da semana, quien no confirmo su
+      // participacion ANTES de que arrancara el primer partido de esa semana
+      // queda totalmente fuera de esta tabla (no solo penalizado)
+      const eligibleUserIds = await getEligibleUserIds(group, (members ?? []).map((m: any) => m.user_id), allGames, activeWeekEntry)
+      console.log('[tabla] diagnostico:', {
+        scoringMode: group.scoring_mode,
+        selectedWeekKey,
+        activeWeekEntry,
+        totalMembers: (members ?? []).length,
+        eligibleUserIds,
+      })
+      const eligibleMembers = (members ?? []).filter((m: any) => eligibleUserIds.includes(m.user_id))
+
       // puntos/exactos/diferencia y el orden final salen de la misma funcion
       // compartida que usa "Tu posicion" en la lista de Quinielas -- si cambia
       // el criterio, solo se cambia en un lugar y nunca se desincronizan
-      const standings = buildStandings((members ?? []).map((m: any) => m.user_id), finalGames, picks, group.points_exact)
+      const standings = buildStandings(eligibleUserIds, finalGames, picks, group.points_exact)
       const standingByUser: Record<string, (typeof standings)[number]> = {}
       standings.forEach((s) => { standingByUser[s.user_id] = s })
 
@@ -449,7 +462,7 @@ export default function Leaderboard({ group }: { group: Group }) {
         byUser[p.user_id].push(p)
       })
 
-      const result: Row[] = (members ?? []).map((m: any) => {
+      const result: Row[] = eligibleMembers.map((m: any) => {
         const userPicks = (byUser[m.user_id] ?? []).slice().sort(
           (a, b) => new Date(gameById[b.game_id]?.kickoff ?? 0).getTime() - new Date(gameById[a.game_id]?.kickoff ?? 0).getTime()
         )

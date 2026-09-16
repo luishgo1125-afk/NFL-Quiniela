@@ -13,7 +13,13 @@ export interface Group {
   points_winner: number
   points_exact: number
   special_picks_enabled: boolean
-  scoring_mode: 'season' | 'weekly'
+  scoring_mode: 'season' | 'weekly' | 'range'
+  range_start_year: number | null
+  range_start_season_type: number | null
+  range_start_week: number | null
+  range_end_year: number | null
+  range_end_season_type: number | null
+  range_end_week: number | null
   bet_amount: number
   prize_split_1: number
   prize_split_2: number

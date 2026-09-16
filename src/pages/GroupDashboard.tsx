@@ -437,15 +437,15 @@ export default function GroupDashboard({
       <div key={tab} className="animate-tab-fade">
         {tab === 'picks' && (
         <>
-          <div className="flex items-center justify-between gap-2 mb-4">
-            <div className="flex gap-2 flex-wrap">
+          <div className="mb-4">
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
               {weeks.map((w) => (
                 <button
                   key={w.key}
                   onClick={() => setWeekKey(w.key)}
-                  className={`text-xs px-3 py-1.5 rounded-full border flex items-center gap-1.5 ${weekKey === w.key ? 'border-[var(--color-light-amber)] text-[var(--color-light-amber)]' : 'border-[var(--color-field-line)] text-[var(--color-text-muted)]'}`}
+                  className={`text-xs px-2 py-2 rounded-md border flex items-center justify-center gap-1.5 ${weekKey === w.key ? 'border-[var(--color-light-amber)] text-[var(--color-light-amber)] bg-[rgba(242,183,5,0.08)]' : 'border-[var(--color-field-line)] text-[var(--color-text-muted)]'}`}
                 >
-                  <IconCalendar size={11} />
+                  <IconCalendar size={11} className="shrink-0" />
                   <span className="font-medium">{weekLabel(w.seasonType, w.week).replace(/\s*\d+$/, '')}</span>
                   {w.seasonType !== 3 && (
                     <span
@@ -460,7 +460,7 @@ export default function GroupDashboard({
               ))}
             </div>
             {weekKey && group.allow_copy_picks && (
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex justify-end mt-2">
                 <button
                   onClick={() => setShowCopyModal(true)}
                   title="Copiar predicciones de otra liga"
@@ -523,13 +523,19 @@ export default function GroupDashboard({
           })()}
 
           {weeklyWinners && (
-            <div className="flex items-center gap-2 text-sm bg-[rgba(242,183,5,0.08)] border border-[var(--color-light-amber)]/40 rounded-lg px-3 py-2 mb-4">
-              <span className="text-lg">🏆</span>
-              <span>
-                {weeklyWinners.names.length > 1 ? 'Empate en la jornada: ' : 'Ganador de la jornada: '}
-                <strong>{weeklyWinners.names.join(' y ')}</strong>
-                <span className="text-[var(--color-text-muted)]"> · {weeklyWinners.points} pts</span>
-              </span>
+            <div className="flex items-center gap-3 bg-[rgba(242,183,5,0.08)] border border-[var(--color-light-amber)]/40 rounded-lg px-3 py-2.5 mb-4">
+              <div className="w-8 h-8 rounded-full bg-[rgba(242,183,5,0.15)] flex items-center justify-center shrink-0 text-[var(--color-light-amber)]">
+                <IconTrophy size={16} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-light-amber)]">
+                  {weeklyWinners.names.length > 1 ? 'Empate en la jornada' : 'Ganador de la jornada'}
+                </p>
+                <p className="text-sm font-semibold truncate">
+                  {weeklyWinners.names.join(' y ')}
+                  <span className="font-normal text-[var(--color-text-muted)]"> · {weeklyWinners.points} pts</span>
+                </p>
+              </div>
             </div>
           )}
 

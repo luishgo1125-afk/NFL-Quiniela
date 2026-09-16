@@ -534,7 +534,18 @@ export default function Leaderboard({ group }: { group: Group }) {
       setLoading(false)
     }
     load()
-  }, [group.id, group.points_exact, group.scoring_mode, selectedWeekKey])
+  }, [
+    group.id,
+    group.points_exact,
+    group.scoring_mode,
+    group.range_start_year,
+    group.range_start_season_type,
+    group.range_start_week,
+    group.range_end_year,
+    group.range_end_season_type,
+    group.range_end_week,
+    selectedWeekKey,
+  ])
 
   if (loading) return <p className="text-[var(--color-text-muted)] text-sm">Cargando tabla...</p>
   if (rows.length === 0) return <p className="text-[var(--color-text-muted)] text-sm">Todavia no hay nadie en este grupo.</p>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { NFL_TEAMS, weekLabel, type Game, type Group } from '../lib/types'
+import { compareWeekEntries } from '../lib/ranking'
 import { fetchEspnWeek, guessCurrentWeek, type SeasonType } from '../lib/espn'
 import { teamLogoUrl } from '../lib/teamLogos'
 import MembersManager from '../components/MembersManager'
@@ -89,6 +90,41 @@ export default function Admin({
   const [savingMode, setSavingMode] = useState(false)
   const [modeErr, setModeErr] = useState<string | null>(null)
 
+  // que modo se ve seleccionado/expandido en la UI -- separado de
+  // group.scoring_mode porque para "rango" el usuario necesita elegir las
+  // semanas ANTES de guardar, no se activa con un solo click como los otros
+  const [modeChoice, setModeChoice] = useState<'season' | 'weekly' | 'range'>(group.scoring_mode)
+  const weeks = useMemo(() => {
+    const map = new Map<string, { year: number; seasonType: number; week: number }>()
+    games.filter((g) => !g.deleted_at).forEach((g) => {
+      const key = `${g.year}:${g.season_type}:${g.week}`
+      if (!map.has(key)) map.set(key, { year: g.year, seasonType: g.season_type, week: g.week })
+    })
+    return Array.from(map.entries())
+      .map(([key, v]) => ({ key, ...v }))
+      .sort((a, b) => a.year - b.year || a.seasonType - b.seasonType || a.week - b.week)
+  }, [games])
+  const multiYear = useMemo(() => new Set(games.map((g) => g.year)).size > 1, [games])
+
+  const [rangeStartKey, setRangeStartKey] = useState(
+    group.range_start_year && group.range_start_season_type && group.range_start_week
+      ? `${group.range_start_year}:${group.range_start_season_type}:${group.range_start_week}`
+      : ''
+  )
+  const [rangeEndKey, setRangeEndKey] = useState(
+    group.range_end_year && group.range_end_season_type && group.range_end_week
+      ? `${group.range_end_year}:${group.range_end_season_type}:${group.range_end_week}`
+      : ''
+  )
+  const [savingRange, setSavingRange] = useState(false)
+  const [rangeMsg, setRangeMsg] = useState<string | null>(null)
+
+  function selectMode(mode: 'season' | 'weekly' | 'range') {
+    setModeChoice(mode)
+    setModeErr(null)
+    if (mode === 'season' || mode === 'weekly') void changeScoringMode(mode)
+  }
+
   async function changeScoringMode(mode: 'season' | 'weekly') {
     if (mode === group.scoring_mode || savingMode) return
     setSavingMode(true)
@@ -96,10 +132,43 @@ export default function Admin({
     const { data, error: err } = await supabase.rpc('set_scoring_mode', {
       p_group_id: groupId,
       p_scoring_mode: mode,
+      p_range_start_year: null,
+      p_range_start_season_type: null,
+      p_range_start_week: null,
+      p_range_end_year: null,
+      p_range_end_season_type: null,
+      p_range_end_week: null,
     })
     setSavingMode(false)
     if (err) { setModeErr(err.message); return }
     onGroupUpdated(data)
+  }
+
+  async function saveScoringRange() {
+    if (!rangeStartKey || !rangeEndKey || savingRange) return
+    const [sy, sst, sw] = rangeStartKey.split(':').map(Number)
+    const [ey, est, ew] = rangeEndKey.split(':').map(Number)
+    if (compareWeekEntries({ year: sy, seasonType: sst, week: sw }, { year: ey, seasonType: est, week: ew }) > 0) {
+      setModeErr('La semana de inicio debe ser antes (o igual) que la semana final')
+      return
+    }
+    setSavingRange(true)
+    setModeErr(null)
+    setRangeMsg(null)
+    const { data, error: err } = await supabase.rpc('set_scoring_mode', {
+      p_group_id: groupId,
+      p_scoring_mode: 'range',
+      p_range_start_year: sy,
+      p_range_start_season_type: sst,
+      p_range_start_week: sw,
+      p_range_end_year: ey,
+      p_range_end_season_type: est,
+      p_range_end_week: ew,
+    })
+    setSavingRange(false)
+    if (err) { setModeErr(err.message); return }
+    onGroupUpdated(data)
+    setRangeMsg('Rango guardado.')
   }
 
   async function saveScoringRules(e: React.FormEvent) {
@@ -484,13 +553,13 @@ export default function Admin({
 
           <div className="space-y-3">
             <h2 className="text-sm font-semibold">Modo de puntuacion</h2>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <button
                 type="button"
-                onClick={() => changeScoringMode('season')}
+                onClick={() => selectMode('season')}
                 disabled={savingMode}
                 className={`text-left rounded-md border px-3 py-2.5 transition disabled:opacity-50 ${
-                  group.scoring_mode === 'season'
+                  modeChoice === 'season'
                     ? 'border-[var(--color-light-amber)] bg-[rgba(242,183,5,0.08)]'
                     : 'border-[var(--color-field-line)] hover:border-[var(--color-light-amber)]'
                 }`}
@@ -500,10 +569,10 @@ export default function Admin({
               </button>
               <button
                 type="button"
-                onClick={() => changeScoringMode('weekly')}
+                onClick={() => selectMode('weekly')}
                 disabled={savingMode}
                 className={`text-left rounded-md border px-3 py-2.5 transition disabled:opacity-50 ${
-                  group.scoring_mode === 'weekly'
+                  modeChoice === 'weekly'
                     ? 'border-[var(--color-light-amber)] bg-[rgba(242,183,5,0.08)]'
                     : 'border-[var(--color-field-line)] hover:border-[var(--color-light-amber)]'
                 }`}
@@ -511,7 +580,70 @@ export default function Admin({
                 <p className="text-xs font-semibold">Semana a semana</p>
                 <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">La tabla se reinicia en 0 cada semana; hay un ganador por semana</p>
               </button>
+              <button
+                type="button"
+                onClick={() => selectMode('range')}
+                disabled={savingMode}
+                className={`text-left rounded-md border px-3 py-2.5 transition disabled:opacity-50 ${
+                  modeChoice === 'range'
+                    ? 'border-[var(--color-light-amber)] bg-[rgba(242,183,5,0.08)]'
+                    : 'border-[var(--color-field-line)] hover:border-[var(--color-light-amber)]'
+                }`}
+              >
+                <p className="text-xs font-semibold">Rango de semanas</p>
+                <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">Tu eliges entre que semana y que semana cuentan los puntos</p>
+              </button>
             </div>
+
+            {modeChoice === 'range' && weeks.length === 0 && (
+              <p className="text-[10px] text-[var(--color-text-muted)] border border-dashed border-[var(--color-field-line)] rounded-md px-3 py-2.5">
+                Todavia no hay partidos en esta liga. Agrega o sincroniza partidos primero (mas abajo, en "Partidos") para poder elegir el rango de semanas.
+              </p>
+            )}
+
+            {modeChoice === 'range' && weeks.length > 0 && (
+              <div className="rounded-md border border-[var(--color-field-line)] px-3 py-3 space-y-2.5">
+                <p className="text-[10px] text-[var(--color-text-muted)]">Solo cuentan para la tabla los partidos finalizados entre estas dos semanas (incluidas)</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="text-xs text-[var(--color-text-muted)]">
+                    Desde
+                    <select
+                      value={rangeStartKey}
+                      onChange={(e) => { setRangeStartKey(e.target.value); setRangeMsg(null) }}
+                      className="w-full mt-1 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-2 py-2 text-xs outline-none focus:border-[var(--color-light-amber)]"
+                    >
+                      <option value="" disabled>Elige semana</option>
+                      {weeks.map((w) => (
+                        <option key={w.key} value={w.key}>{weekLabel(w.seasonType, w.week)}{multiYear ? ` ${w.year}` : ''}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="text-xs text-[var(--color-text-muted)]">
+                    Hasta
+                    <select
+                      value={rangeEndKey}
+                      onChange={(e) => { setRangeEndKey(e.target.value); setRangeMsg(null) }}
+                      className="w-full mt-1 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-2 py-2 text-xs outline-none focus:border-[var(--color-light-amber)]"
+                    >
+                      <option value="" disabled>Elige semana</option>
+                      {weeks.map((w) => (
+                        <option key={w.key} value={w.key}>{weekLabel(w.seasonType, w.week)}{multiYear ? ` ${w.year}` : ''}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <button
+                  type="button"
+                  onClick={saveScoringRange}
+                  disabled={savingRange || !rangeStartKey || !rangeEndKey}
+                  className="w-full bg-[var(--color-light-amber)] text-[var(--color-field-night)] font-semibold rounded-md py-2 text-xs hover:brightness-110 disabled:opacity-50"
+                >
+                  {savingRange ? 'Guardando...' : 'Guardar rango'}
+                </button>
+                {rangeMsg && <p className="text-[var(--color-turf-green)] text-xs">{rangeMsg}</p>}
+              </div>
+            )}
+
             {modeErr && <p className="text-[var(--color-scoreboard-red)] text-xs">{modeErr}</p>}
             <p className="text-[10px] text-[var(--color-text-muted)]">Cambiar esto afecta como todos los miembros ven la tabla desde ahora.</p>
           </div>

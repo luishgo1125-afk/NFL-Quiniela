@@ -28,6 +28,13 @@ export interface WeekEntry {
   week: number
 }
 
+// Orden cronologico de dos semanas (misma logica que se repite en la UI para
+// ordenar tabs de semana): negativo si a es antes que b, positivo si es
+// despues, 0 si son la misma.
+export function compareWeekEntries(a: WeekEntry, b: WeekEntry): number {
+  return a.year - b.year || a.seasonType - b.seasonType || a.week - b.week
+}
+
 // Trae los partidos "que cuentan" para el ranking de esta liga: si esta en
 // modo semanal, solo los de la semana indicada (o la actual si no se indica);
 // si esta en modo temporada completa, todos los finalizados EXCEPTO
@@ -58,13 +65,25 @@ export async function getRankedFinalGames(
     activeWeekEntry = { year: y, seasonType: st, week: w }
   }
 
-  const finalGames = allGames.filter(
-    (g) =>
-      g.status === 'final' &&
-      (group.scoring_mode === 'weekly'
-        ? activeWeekEntry && g.season_type === activeWeekEntry.seasonType && g.week === activeWeekEntry.week && g.year === activeWeekEntry.year
-        : g.season_type !== 1) // en modo "temporada completa" la pretemporada no cuenta
-  )
+  const finalGames = allGames.filter((g) => {
+    if (g.status !== 'final') return false
+
+    if (group.scoring_mode === 'weekly') {
+      return !!activeWeekEntry && g.season_type === activeWeekEntry.seasonType && g.week === activeWeekEntry.week && g.year === activeWeekEntry.year
+    }
+
+    if (group.scoring_mode === 'range') {
+      // si el admin aun no configuro el rango, se comporta como temporada
+      // completa mientras tanto (para no dejar la tabla vacia)
+      if (!group.range_start_week || !group.range_end_week) return g.season_type !== 1
+      const entry: WeekEntry = { year: g.year, seasonType: g.season_type, week: g.week }
+      const start: WeekEntry = { year: group.range_start_year!, seasonType: group.range_start_season_type!, week: group.range_start_week! }
+      const end: WeekEntry = { year: group.range_end_year!, seasonType: group.range_end_season_type!, week: group.range_end_week! }
+      return compareWeekEntries(entry, start) >= 0 && compareWeekEntries(entry, end) <= 0
+    }
+
+    return g.season_type !== 1 // en modo "temporada completa" la pretemporada no cuenta
+  })
 
   return { finalGames, allGames, currentWeekKey, activeWeekEntry }
 }

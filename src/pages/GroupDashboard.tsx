@@ -62,6 +62,9 @@ export default function GroupDashboard({
   const [members, setMembers] = useState<{ user_id: string; display_name: string; favorite_team: string | null }[]>([])
   const [pickedBy, setPickedBy] = useState<Record<string, string[]>>({})
   const isAdmin = group.created_by === user.id
+  // se incrementa cuando llega un cambio en tiempo real de pagos (desde
+  // otro dispositivo/pestaña), para forzar que se vuelva a consultar "cuanto debo"
+  const [paymentRefreshTick, setPaymentRefreshTick] = useState(0)
 
   async function copyCode() {
     try {
@@ -155,6 +158,16 @@ export default function GroupDashboard({
         'postgres_changes',
         { event: '*', schema: 'public', table: 'picks' },
         () => loadPickStatus()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'week_payments', filter: `group_id=eq.${group.id}` },
+        () => setPaymentRefreshTick((t) => t + 1)
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'group_members', filter: `group_id=eq.${group.id}` },
+        () => setPaymentRefreshTick((t) => t + 1)
       )
       .subscribe((status, err) => {
         console.log('[realtime] estado del canal games:', status, err ?? '')
@@ -374,7 +387,7 @@ export default function GroupDashboard({
     }
     loadMyPaymentStatus()
     return () => { cancelled = true }
-  }, [group.id, group.bet_amount, group.scoring_mode, user.id, weekKey, weeks, games, tab])
+  }, [group.id, group.bet_amount, group.scoring_mode, user.id, weekKey, weeks, games, tab, paymentRefreshTick])
 
   useEffect(() => {
     if (tab === 'especiales' && !group.special_picks_enabled) setTab('picks')

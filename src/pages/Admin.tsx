@@ -42,8 +42,26 @@ export default function Admin({
   const [memberCount, setMemberCount] = useState<number | null>(null)
   const [paymentMembers, setPaymentMembers] = useState<{ user_id: string; display_name: string; paid: boolean }[]>([])
   const [payingId, setPayingId] = useState<string | null>(null)
+  // en modo "semana a semana" el pago se marca por jornada; en los otros
+  // modos hay un solo pago para toda la liga (paymentWeekKey se queda null)
+  const [paymentWeekKey, setPaymentWeekKey] = useState<string | null>(null)
 
-  async function loadPaymentMembers() {
+  async function loadPaymentMembers(weekKey: string | null) {
+    if (group.scoring_mode === 'weekly') {
+      if (!weekKey) { setPaymentMembers([]); return }
+      const [y, st, w] = weekKey.split(':').map(Number)
+      const [{ data: membersData }, { data: paymentsData }] = await Promise.all([
+        supabase.from('group_members').select('user_id, profiles(display_name)').eq('group_id', groupId),
+        supabase.from('week_payments').select('user_id, paid').eq('group_id', groupId).eq('year', y).eq('season_type', st).eq('week', w),
+      ])
+      const paidMap = new Map((paymentsData ?? []).map((p: any) => [p.user_id, p.paid]))
+      const list = (membersData ?? [])
+        .map((m: any) => ({ user_id: m.user_id, display_name: m.profiles?.display_name ?? 'Jugador', paid: paidMap.get(m.user_id) ?? false }))
+        .sort((a, b) => Number(a.paid) - Number(b.paid))
+      setPaymentMembers(list)
+      setMemberCount(list.length)
+      return
+    }
     const { data } = await supabase
       .from('group_members')
       .select('user_id, paid, profiles(display_name)')
@@ -55,12 +73,28 @@ export default function Admin({
   }
 
   useEffect(() => {
-    loadPaymentMembers()
-  }, [groupId])
+    loadPaymentMembers(paymentWeekKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId, group.scoring_mode, paymentWeekKey])
 
   async function toggleMemberPaid(userId: string, current: boolean) {
     setPayingId(userId)
-    const { error: err } = await supabase.rpc('set_member_paid', { p_group_id: groupId, p_user_id: userId, p_paid: !current })
+    let err
+    if (group.scoring_mode === 'weekly' && paymentWeekKey) {
+      const [y, st, w] = paymentWeekKey.split(':').map(Number)
+      const res = await supabase.rpc('set_week_member_paid', {
+        p_group_id: groupId,
+        p_user_id: userId,
+        p_year: y,
+        p_season_type: st,
+        p_week: w,
+        p_paid: !current,
+      })
+      err = res.error
+    } else {
+      const res = await supabase.rpc('set_member_paid', { p_group_id: groupId, p_user_id: userId, p_paid: !current })
+      err = res.error
+    }
     setPayingId(null)
     if (!err) {
       setPaymentMembers((prev) => prev.map((m) => (m.user_id === userId ? { ...m, paid: !current } : m)))
@@ -105,6 +139,14 @@ export default function Admin({
       .sort((a, b) => a.year - b.year || a.seasonType - b.seasonType || a.week - b.week)
   }, [games])
   const multiYear = useMemo(() => new Set(games.map((g) => g.year)).size > 1, [games])
+
+  // por default, al entrar en modo "semana a semana" se muestra la jornada
+  // mas reciente (la ultima de la lista)
+  useEffect(() => {
+    if (group.scoring_mode === 'weekly' && !paymentWeekKey && weeks.length > 0) {
+      setPaymentWeekKey(weeks[weeks.length - 1].key)
+    }
+  }, [group.scoring_mode, weeks, paymentWeekKey])
 
   const [rangeStartKey, setRangeStartKey] = useState(
     group.range_start_year && group.range_start_season_type && group.range_start_week
@@ -730,14 +772,38 @@ export default function Admin({
         </form>
         )}
 
-        {openSections.premio && betAmount > 0 && paymentMembers.length > 0 && (
+        {openSections.premio && betAmount > 0 && memberCount !== null && memberCount > 0 && (
         <div className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-4 space-y-3">
           <div>
             <h2 className="text-sm font-semibold">Quien ya pago</h2>
             <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">
-              Solo tu (el admin) puedes ver y marcar esto. {paymentMembers.filter((m) => m.paid).length}/{paymentMembers.length} pagaron.
+              Solo tu (el admin) puedes ver y marcar esto. {paymentMembers.filter((m) => m.paid).length}/{paymentMembers.length} pagaron
+              {group.scoring_mode === 'weekly' ? ' esta jornada.' : '.'}
             </p>
           </div>
+
+          {group.scoring_mode === 'weekly' && (
+            weeks.length === 0 ? (
+              <p className="text-[10px] text-[var(--color-text-muted)] border border-dashed border-[var(--color-field-line)] rounded-md px-3 py-2.5">
+                Todavia no hay partidos/jornadas en esta liga.
+              </p>
+            ) : (
+              <label className="text-xs text-[var(--color-text-muted)] block">
+                Jornada
+                <select
+                  value={paymentWeekKey ?? ''}
+                  onChange={(e) => setPaymentWeekKey(e.target.value)}
+                  className="w-full mt-1 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-2 py-2 text-xs outline-none focus:border-[var(--color-light-amber)]"
+                >
+                  {weeks.map((w) => (
+                    <option key={w.key} value={w.key}>{weekLabel(w.seasonType, w.week)}{multiYear ? ` ${w.year}` : ''}</option>
+                  ))}
+                </select>
+              </label>
+            )
+          )}
+
+          {(group.scoring_mode !== 'weekly' || paymentWeekKey) && (
           <div className="space-y-1.5">
             {paymentMembers.map((m) => (
               <button
@@ -764,6 +830,7 @@ export default function Admin({
               </button>
             ))}
           </div>
+          )}
         </div>
         )}
       </section>

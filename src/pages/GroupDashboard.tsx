@@ -9,7 +9,7 @@ import Leaderboard from '../components/Leaderboard'
 import CopyPicksModal from '../components/CopyPicksModal'
 import { buildStandings, getEligibleUserIds } from '../lib/ranking'
 import { syncGroupWeekFromEspn } from '../lib/syncGames'
-import { IconClipboard, IconStar, IconBarChart, IconGear, IconCalendar, IconTrophy, IconCopy, IconWhatsapp, IconAlertTriangle, IconRefresh } from '../components/icons'
+import { IconClipboard, IconStar, IconBarChart, IconGear, IconCalendar, IconTrophy, IconCopy, IconWhatsapp, IconAlertTriangle, IconRefresh, IconCoin } from '../components/icons'
 import type { User } from '@supabase/supabase-js'
 
 // Admin es la pantalla mas pesada (formularios, importador de ESPN, gestor de
@@ -318,6 +318,64 @@ export default function GroupDashboard({
     computeWinner()
   }, [weekGames, members, group, weekKey, games])
 
+  // "tienes pago pendiente" -- solo lo ve el propio usuario, nunca a los
+  // demas miembros. En modo semanal se suma TODO lo que deba desde la
+  // primera jornada hasta la que tiene abierta ahora (si entra a jugar la
+  // semana 5 y no pago la 3 ni la 4, le aparece el total acumulado).
+  // En los demas modos es el pago unico de toda la liga.
+  const [myPaymentDue, setMyPaymentDue] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadMyPaymentStatus() {
+      if (tab !== 'picks') return // solo hace falta tenerlo al dia cuando se ve esta pestaña
+      if (group.bet_amount <= 0) { setMyPaymentDue(0); return }
+
+      if (group.scoring_mode === 'weekly') {
+        if (!weekKey) { setMyPaymentDue(0); return }
+        const currentIdx = weeks.findIndex((w) => w.key === weekKey)
+        if (currentIdx === -1) { setMyPaymentDue(0); return }
+        const weeksSoFar = weeks.slice(0, currentIdx + 1) // desde la 1a jornada hasta la actual, incluida
+        const pastWeeks = weeksSoFar.slice(0, -1)
+        const currentWeekEntry = weeksSoFar[weeksSoFar.length - 1] ?? null
+
+        const gameIds = games.filter((g) => !g.deleted_at).map((g) => g.id)
+        const gameWeekMap = new Map(games.map((g) => [g.id, `${g.year}:${g.season_type}:${g.week}`]))
+
+        const [{ data: paymentsData }, { data: picksData }] = await Promise.all([
+          supabase.from('week_payments').select('year, season_type, week, paid').eq('group_id', group.id).eq('user_id', user.id),
+          gameIds.length > 0
+            ? supabase.from('picks').select('game_id').eq('user_id', user.id).in('game_id', gameIds)
+            : Promise.resolve({ data: [] as { game_id: string }[] }),
+        ])
+
+        const paidSet = new Set((paymentsData ?? []).filter((p: any) => p.paid).map((p: any) => `${p.year}:${p.season_type}:${p.week}`))
+        // semanas donde de verdad predijo algo -- si nunca metio ni una sola
+        // prediccion esa jornada, no se le cuenta como deuda pasada
+        const participatedWeeks = new Set((picksData ?? []).map((p: any) => gameWeekMap.get(p.game_id)).filter(Boolean) as string[])
+
+        // en jornadas pasadas, solo cuenta si de verdad jugo esa semana; la
+        // jornada actual siempre cuenta (es el recordatorio de "vas a jugar
+        // esta semana, no se te olvide pagar"), aunque aun no haya predicho nada ahi
+        const unpaidPast = pastWeeks.filter((w) => participatedWeeks.has(w.key) && !paidSet.has(w.key))
+        const currentOwed = currentWeekEntry && !paidSet.has(currentWeekEntry.key) ? [currentWeekEntry] : []
+        const unpaidCount = unpaidPast.length + currentOwed.length
+        if (!cancelled) setMyPaymentDue(unpaidCount * group.bet_amount)
+        return
+      }
+
+      const { data } = await supabase
+        .from('group_members')
+        .select('paid')
+        .eq('group_id', group.id)
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (!cancelled) setMyPaymentDue(data?.paid ? 0 : group.bet_amount)
+    }
+    loadMyPaymentStatus()
+    return () => { cancelled = true }
+  }, [group.id, group.bet_amount, group.scoring_mode, user.id, weekKey, weeks, games, tab])
+
   useEffect(() => {
     if (tab === 'especiales' && !group.special_picks_enabled) setTab('picks')
   }, [tab, group.special_picks_enabled])
@@ -521,6 +579,25 @@ export default function GroupDashboard({
               </div>
             )
           })()}
+
+          {myPaymentDue > 0 && (
+            <div className="flex items-center gap-3 bg-[rgba(228,70,43,0.08)] border border-[var(--color-scoreboard-red)]/40 rounded-lg px-3 py-2.5 mb-4">
+              <div className="w-8 h-8 rounded-full bg-[rgba(228,70,43,0.15)] flex items-center justify-center shrink-0 text-[var(--color-scoreboard-red)]">
+                <IconCoin size={16} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-scoreboard-red)]">
+                  Tienes pago pendiente
+                </p>
+                <p className="text-sm font-semibold truncate">
+                  Debes ${myPaymentDue.toLocaleString('es-MX')}
+                  {group.scoring_mode === 'weekly' && myPaymentDue > group.bet_amount ? (
+                    <span className="font-normal text-[var(--color-text-muted)]"> · {Math.round(myPaymentDue / group.bet_amount)} jornadas sin pagar</span>
+                  ) : null}
+                </p>
+              </div>
+            </div>
+          )}
 
           {weeklyWinners && (
             <div className="flex items-center gap-3 bg-[rgba(242,183,5,0.08)] border border-[var(--color-light-amber)]/40 rounded-lg px-3 py-2.5 mb-4">

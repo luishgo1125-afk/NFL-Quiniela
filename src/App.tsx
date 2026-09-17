@@ -5,6 +5,7 @@ import Login from './pages/Login'
 import BottomNav, { type BottomTab } from './components/BottomNav'
 import NewGroupModal, { SUPER_ADMIN_ID } from './components/NewGroupModal'
 import type { Group } from './lib/types'
+import { pushSupported, enablePush } from './lib/push'
 
 // cada pantalla se descarga solo cuando el usuario de verdad entra a ella,
 // en vez de que el primer carga tenga que traer el codigo de toda la app junta
@@ -137,6 +138,20 @@ export default function App() {
     processInvite()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, user?.id])
+
+  // apenas hay sesion, le pide el permiso de notificaciones solo una vez por
+  // dispositivo -- si dice que no (o lo ignora), no se le vuelve a insistir
+  // solo; siempre puede activarlo despues a mano desde su Perfil
+  useEffect(() => {
+    if (!user || !pushSupported()) return
+    const flagKey = `push-auto-prompt-${user.id}`
+    if (localStorage.getItem(flagKey)) return
+    localStorage.setItem(flagKey, '1')
+    if (Notification.permission !== 'default') return // ya habia contestado antes (en otra pestana/instalacion)
+    enablePush(user.id).catch(() => {
+      // si bloquea el permiso o algo falla, no pasa nada -- se queda como esta
+    })
+  }, [user?.id])
 
   useEffect(() => {
     if (!user) return

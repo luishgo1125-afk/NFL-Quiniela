@@ -69,6 +69,18 @@ export const TEAM_NAMES: Record<string, string> = {
   TEN: 'Titans', WSH: 'Commanders',
 }
 
+// Ciudad/region de cada equipo, para mostrarla arriba de la abreviatura en
+// la tarjeta de partido (ej. "ATLANTA" arriba de "ATL").
+export const TEAM_CITIES: Record<string, string> = {
+  ARI: 'Arizona', ATL: 'Atlanta', BAL: 'Baltimore', BUF: 'Buffalo', CAR: 'Carolina',
+  CHI: 'Chicago', CIN: 'Cincinnati', CLE: 'Cleveland', DAL: 'Dallas', DEN: 'Denver',
+  DET: 'Detroit', GB: 'Green Bay', HOU: 'Houston', IND: 'Indianapolis', JAX: 'Jacksonville',
+  KC: 'Kansas City', LV: 'Las Vegas', LAC: 'Los Angeles', LAR: 'Los Angeles', MIA: 'Miami',
+  MIN: 'Minnesota', NE: 'New England', NO: 'New Orleans', NYG: 'New York', NYJ: 'New York',
+  PHI: 'Philadelphia', PIT: 'Pittsburgh', SF: 'San Francisco', SEA: 'Seattle', TB: 'Tampa Bay',
+  TEN: 'Tennessee', WSH: 'Washington',
+}
+
 export interface Pick {
   id: string
   game_id: string

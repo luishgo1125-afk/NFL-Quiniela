@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Game, Pick } from '../lib/types'
-import { TEAM_NAMES } from '../lib/types'
+import { TEAM_NAMES, TEAM_CITIES } from '../lib/types'
 import { teamLogoUrl } from '../lib/teamLogos'
-import { IconCalendar, IconClock, IconLock, IconCheck, IconBookmark, IconHourglass, IconTrash } from './icons'
+import { IconCalendar, IconClock, IconLock, IconCheck, IconBookmark, IconHourglass, IconTrash, IconUsers, IconTrophy } from './icons'
 import StatusPill from './StatusPill'
 
 // Cuenta hacia atras en pantalla, segundo a segundo, entre cada sincronizacion
@@ -49,6 +49,8 @@ export default function GameCard({
   pickedUserIds,
   forceLocked,
   forceLockedReason,
+  pointsWinner,
+  pointsExact,
 }: {
   game: Game
   userId: string
@@ -56,6 +58,8 @@ export default function GameCard({
   pickedUserIds: string[]
   forceLocked?: boolean
   forceLockedReason?: string
+  pointsWinner?: number
+  pointsExact?: number
 }) {
   const [pick, setPick] = useState<Pick | null>(null)
   const [home, setHome] = useState('')
@@ -195,26 +199,34 @@ export default function GameCard({
     ? 'rgba(242,183,5,0.22)'
     : 'rgba(0,0,0,0.45)'
 
-  const scoreInputClass = won
+  // el color dorado (prediccion guardada) solo se le pone a la casilla del
+  // equipo que va ganando en tu prediccion -- el otro lado se queda neutro
+  const scoreInputBaseClass = won
     ? 'bg-[rgba(61,139,95,0.15)] border border-[var(--color-turf-green)] text-[var(--color-turf-green)]'
     : missed
     ? 'bg-[rgba(228,70,43,0.12)] border border-[var(--color-scoreboard-red)] text-[var(--color-scoreboard-red)]'
-    : pendingConfirmed
-    ? 'bg-[rgba(242,183,5,0.12)] border border-[var(--color-light-amber)] text-[var(--color-light-amber)]'
     : 'bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] focus:border-[var(--color-light-amber)]'
+
+  const awayScoreInputClass = !won && !missed && awayLeading
+    ? 'bg-[rgba(242,183,5,0.18)] border-2 border-[var(--color-light-amber)] text-[var(--color-light-amber)]'
+    : scoreInputBaseClass
+
+  const homeScoreInputClass = !won && !missed && homeLeading
+    ? 'bg-[rgba(242,183,5,0.18)] border-2 border-[var(--color-light-amber)] text-[var(--color-light-amber)]'
+    : scoreInputBaseClass
 
   return (
     <div
-      className={`rounded-xl border p-5 transition-all duration-150 hover:-translate-y-0.5 ${!locked && !confirmed ? 'scoreboard-glow' : ''}`}
+      className={`relative overflow-hidden rounded-3xl border p-5 transition-all duration-150 hover:-translate-y-0.5 ${!locked && !confirmed ? 'scoreboard-glow' : ''}`}
       style={{
         borderColor: cardBorder,
-        background: cardBg,
+        background: `radial-gradient(480px 220px at 8% 15%, rgba(228,70,43,0.16), transparent 65%), radial-gradient(480px 220px at 92% 15%, rgba(61,139,95,0.18), transparent 65%), ${cardBg}`,
         boxShadow: `0 6px 16px -4px ${cardShadowColor}, 0 2px 6px rgba(0,0,0,0.3)`,
       }}
     >
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-xs text-[var(--color-text-muted)] flex items-center gap-1.5">
-          <IconCalendar size={12} />
+      <div className="flex items-center justify-between mb-5">
+        <span className="text-sm text-[var(--color-text-muted)] flex items-center gap-1.5">
+          <IconCalendar size={14} />
           {kickoffLabel}
         </span>
         {game.status === 'final' ? (
@@ -241,62 +253,136 @@ export default function GameCard({
           {forceLockedReason ?? 'Confirma tu participacion para poder predecir'}
         </div>
       ) : (
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-          <div
-            onClick={() => selectWinner('away')}
-            className={`text-right ${!locked ? 'cursor-pointer' : ''}`}
-          >
-            <div className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wide mb-0.5">{TEAM_NAMES[game.away_team] ?? ''}</div>
+        <div>
+          <div className="grid items-center gap-x-1 gap-y-1.5" style={{ gridTemplateColumns: 'auto 1fr auto 1fr auto' }}>
+            {/* escudo + abreviatura del visitante, encerrados juntos -- fila 2, columnas 1-2 */}
             <div
-              className="inline-flex items-center justify-end gap-2 mb-1 px-2 py-1 rounded-lg transition-colors"
-              style={{ background: awayLeading ? 'rgba(242,183,5,0.1)' : 'transparent', boxShadow: awayLeading ? 'inset 0 0 0 1px rgba(242,183,5,0.4)' : 'none' }}
+              onClick={() => selectWinner('away')}
+              className={`flex items-center gap-3 rounded-3xl px-3 py-2 transition-shadow ${!locked ? 'cursor-pointer' : ''}`}
+              style={{
+                gridColumn: '1 / span 2',
+                gridRow: '2',
+                justifySelf: 'start',
+                boxShadow: awayLeading ? 'inset 0 0 0 3px var(--color-light-amber)' : undefined,
+                background: awayLeading ? 'rgba(242,183,5,0.08)' : undefined,
+              }}
             >
-              <img src={teamLogoUrl(game.away_team)} alt={game.away_team} className="w-9 h-9 object-contain" loading="lazy" />
-              <span className="font-display text-2xl font-700">{game.away_team}</span>
+              <img src={teamLogoUrl(game.away_team)} alt={game.away_team} className="w-20 h-20 object-contain shrink-0" loading="lazy" />
+              <span className={`font-display text-4xl font-800 leading-none ${awayLeading ? 'text-[var(--color-light-amber)]' : ''}`}>{game.away_team}</span>
             </div>
-            <div className="text-[10px] text-[var(--color-text-muted)]">VISITANTE</div>
+
+            {/* ciudad del visitante -- col 2, fila 1 */}
+            <span
+              onClick={() => selectWinner('away')}
+              className={`text-[11px] font-bold text-[var(--color-light-amber)] uppercase tracking-wider truncate text-center ${!locked ? 'cursor-pointer' : ''}`}
+              style={{ gridColumn: '2', gridRow: '1' }}
+            >
+              {TEAM_CITIES[game.away_team] ?? ''}
+            </span>
+
+            {/* escudo NFL -- col 3, fila 1 */}
+            <img
+              src="https://a.espncdn.com/i/teamlogos/leagues/500/nfl.png"
+              alt="NFL"
+              className="w-8 h-8 object-contain opacity-90 justify-self-center"
+              style={{ gridColumn: '3', gridRow: '1' }}
+              loading="lazy"
+            />
+
+            {/* ciudad del local -- col 4, fila 1 */}
+            <span
+              onClick={() => selectWinner('home')}
+              className={`text-[11px] font-bold text-[var(--color-light-amber)] uppercase tracking-wider truncate text-center ${!locked ? 'cursor-pointer' : ''}`}
+              style={{ gridColumn: '4', gridRow: '1' }}
+            >
+              {TEAM_CITIES[game.home_team] ?? ''}
+            </span>
+
+            {/* escudo + abreviatura del local, encerrados juntos -- fila 2, columnas 4-5 */}
+            <div
+              onClick={() => selectWinner('home')}
+              className={`flex items-center justify-end gap-3 rounded-3xl px-3 py-2 transition-shadow ${!locked ? 'cursor-pointer' : ''}`}
+              style={{
+                gridColumn: '4 / span 2',
+                gridRow: '2',
+                justifySelf: 'end',
+                boxShadow: homeLeading ? 'inset 0 0 0 3px var(--color-light-amber)' : undefined,
+                background: homeLeading ? 'rgba(242,183,5,0.08)' : undefined,
+              }}
+            >
+              <span className={`font-display text-4xl font-800 leading-none ${homeLeading ? 'text-[var(--color-light-amber)]' : ''}`}>{game.home_team}</span>
+              <img src={teamLogoUrl(game.home_team)} alt={game.home_team} className="w-20 h-20 object-contain shrink-0" loading="lazy" />
+            </div>
+
+            {/* marcador -- col 3, fila 2 */}
+            <div className="flex items-center gap-1.5 justify-self-center" style={{ gridColumn: '3', gridRow: '2' }}>
+              <input
+                type="number"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                min={0}
+                value={away}
+                disabled={locked}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => setAway(e.target.value)}
+                className={`w-16 h-16 text-center font-mono-score text-3xl font-800 rounded-3xl outline-none disabled:opacity-60 transition-colors ${awayScoreInputClass}`}
+                style={awayLeading ? { boxShadow: '0 0 8px 0 rgba(242,183,5,0.5)' } : undefined}
+              />
+              <span className="text-[var(--color-text-muted)] text-xl">–</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                min={0}
+                value={home}
+                disabled={locked}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => setHome(e.target.value)}
+                className={`w-16 h-16 text-center font-mono-score text-3xl font-800 rounded-3xl outline-none disabled:opacity-60 transition-colors ${homeScoreInputClass}`}
+                style={homeLeading ? { boxShadow: '0 0 8px 0 rgba(242,183,5,0.5)' } : undefined}
+              />
+            </div>
+
+            {/* apodo + pill del visitante -- col 2, fila 3 */}
+            <div
+              onClick={() => selectWinner('away')}
+              className={`flex flex-col items-center min-w-0 ${!locked ? 'cursor-pointer' : ''}`}
+              style={{ gridColumn: '2', gridRow: '3' }}
+            >
+              <span className="text-xs text-[var(--color-text-muted)] truncate max-w-full">{TEAM_NAMES[game.away_team] ?? ''}</span>
+              <span
+                className="mt-1.5 text-[9px] font-bold uppercase tracking-wide px-3 py-1 rounded-full whitespace-nowrap"
+                style={{ background: 'rgba(228,70,43,0.18)', color: '#FF6B52' }}
+              >
+                Visitante
+              </span>
+            </div>
+
+            {/* "TU PREDICCION" -- col 3, fila 3 */}
+            <span
+              className="text-[10px] font-bold uppercase tracking-wide text-[var(--color-light-amber)] whitespace-nowrap justify-self-center"
+              style={{ gridColumn: '3', gridRow: '3' }}
+            >
+              Tu prediccion
+            </span>
+
+            {/* apodo + pill del local -- col 4, fila 3 */}
+            <div
+              onClick={() => selectWinner('home')}
+              className={`flex flex-col items-center min-w-0 ${!locked ? 'cursor-pointer' : ''}`}
+              style={{ gridColumn: '4', gridRow: '3' }}
+            >
+              <span className="text-xs text-[var(--color-text-muted)] truncate max-w-full">{TEAM_NAMES[game.home_team] ?? ''}</span>
+              <span
+                className="mt-1.5 text-[9px] font-bold uppercase tracking-wide px-3 py-1 rounded-full whitespace-nowrap"
+                style={{ background: 'rgba(61,139,95,0.2)', color: '#4ADE80' }}
+              >
+                Local
+              </span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              min={0}
-              value={away}
-              disabled={locked}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => setAway(e.target.value)}
-              className={`w-14 text-center font-mono-score text-xl rounded-md py-1.5 outline-none disabled:opacity-60 transition-colors ${scoreInputClass}`}
-            />
-            <span className="text-[var(--color-text-muted)]">–</span>
-            <input
-              type="number"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              min={0}
-              value={home}
-              disabled={locked}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => setHome(e.target.value)}
-              className={`w-14 text-center font-mono-score text-xl rounded-md py-1.5 outline-none disabled:opacity-60 transition-colors ${scoreInputClass}`}
-            />
-          </div>
-
-          <div
-            onClick={() => selectWinner('home')}
-            className={`text-left ${!locked ? 'cursor-pointer' : ''}`}
-          >
-            <div className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wide mb-0.5">{TEAM_NAMES[game.home_team] ?? ''}</div>
-            <div
-              className="inline-flex items-center justify-start gap-2 mb-1 px-2 py-1 rounded-lg transition-colors"
-              style={{ background: homeLeading ? 'rgba(242,183,5,0.1)' : 'transparent', boxShadow: homeLeading ? 'inset 0 0 0 1px rgba(242,183,5,0.4)' : 'none' }}
-            >
-              <span className="font-display text-2xl font-700">{game.home_team}</span>
-              <img src={teamLogoUrl(game.home_team)} alt={game.home_team} className="w-9 h-9 object-contain" loading="lazy" />
-            </div>
-            <div className="text-[10px] text-[var(--color-text-muted)]">LOCAL</div>
-          </div>
+          
         </div>
       )}
 
@@ -315,8 +401,9 @@ export default function GameCard({
           onClick={() => setShowPickers(true)}
           className="flex items-center gap-1.5 mt-4 flex-wrap w-full text-left hover:opacity-80 transition"
         >
-          <span className="text-[10px] text-[var(--color-text-muted)] mr-1 underline decoration-dotted">
-            {pickedUserIds.length}/{members.length} ya predijeron
+          <IconUsers size={13} className="text-[var(--color-text-muted)] shrink-0" />
+          <span className="text-xs text-[var(--color-text-muted)]">
+            {pickedUserIds.length}/{members.length}
           </span>
           {members.map((m) => {
             const done = pickedUserIds.includes(m.user_id)
@@ -400,18 +487,18 @@ export default function GameCard({
       )}
 
       {!locked && (
-        <div className="flex items-center gap-2 mt-3">
+        <div className="flex gap-2 mt-5">
           <button
             onClick={save}
             disabled={saving || home === '' || away === '' || confirmed}
-            className={`flex-1 text-xs font-semibold rounded-md py-2 transition disabled:opacity-70 flex items-center justify-center gap-1.5 ${
-              confirmed ? 'bg-[#3D8B5F] text-white' : 'bg-[var(--color-light-amber)] text-[var(--color-field-night)] hover:brightness-110'
+            className={`flex-1 text-sm font-bold rounded-xl py-2.5 transition disabled:opacity-70 flex items-center justify-center gap-2 ${
+              confirmed ? 'bg-[rgba(61,139,95,0.15)] border border-[var(--color-turf-green)] text-[var(--color-turf-green)]' : 'bg-[var(--color-light-amber)] text-[var(--color-field-night)] hover:brightness-110'
             }`}
           >
             {saved || confirmed ? (
-              <><IconCheck size={13} /> Predicción guardada</>
+              <><IconCheck size={16} /> Predicción guardada</>
             ) : (
-              <><IconBookmark size={13} /> {saving ? 'Guardando...' : 'Guardar predicción'}</>
+              <><IconBookmark size={16} /> {saving ? 'Guardando...' : 'Guardar predicción'}</>
             )}
           </button>
           {pick && (
@@ -420,9 +507,9 @@ export default function GameCard({
               disabled={deleting}
               title="Eliminar predicción"
               aria-label="Eliminar predicción"
-              className="flex-1 text-xs font-semibold rounded-md py-2 transition disabled:opacity-70 flex items-center justify-center gap-1.5 bg-[var(--color-scoreboard-red)] text-white hover:brightness-110"
+              className="flex-1 text-sm font-bold rounded-xl py-2.5 transition disabled:opacity-70 flex items-center justify-center gap-2 bg-[rgba(228,70,43,0.12)] border border-[var(--color-scoreboard-red)] text-[var(--color-scoreboard-red)] hover:bg-[rgba(228,70,43,0.2)]"
             >
-              <IconTrash size={13} /> {deleting ? 'Eliminando...' : 'Eliminar predicción'}
+              <IconTrash size={16} /> {deleting ? 'Eliminando...' : 'Eliminar predicción'}
             </button>
           )}
         </div>

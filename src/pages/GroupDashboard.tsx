@@ -666,6 +666,8 @@ export default function GroupDashboard({
                     pickedUserIds={pickedBy[g.id] ?? []}
                     forceLocked={needsConfirmation && weekConfirmed === false}
                     forceLockedReason="Confirma tu participacion arriba para poder predecir"
+                    pointsWinner={group.points_winner}
+                    pointsExact={group.points_exact}
                   />
                 </div>
               ))}

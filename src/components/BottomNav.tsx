@@ -20,7 +20,7 @@ export default function BottomNav({
     { key: 'ranking', label: 'Ranking', icon: (a) => <IconGlobe size={20} className={a ? 'text-[var(--color-light-amber)]' : ''} /> },
     { key: 'crear', label: canCreate ? 'Crear' : 'Unirse', icon: () => <IconPlusCircle size={22} /> },
     { key: 'posiciones', label: 'Posiciones', icon: (a) => <IconShield size={20} className={a ? 'text-[var(--color-light-amber)]' : ''} /> },
-    { key: 'notificaciones', label: 'Avisos', icon: (a) => <IconBell size={20} className={a ? 'text-[var(--color-light-amber)]' : ''} /> },
+    { key: 'notificaciones', label: 'Notificaciones', icon: (a) => <IconBell size={20} className={a ? 'text-[var(--color-light-amber)]' : ''} /> },
   ]
 
   return (

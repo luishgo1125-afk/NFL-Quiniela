@@ -268,7 +268,6 @@ export default function GameCard({
               }}
             >
               <img src={teamLogoUrl(game.away_team)} alt={game.away_team} className="w-20 h-20 object-contain shrink-0" loading="lazy" />
-              <span className={`font-display text-4xl font-800 leading-none ${awayLeading ? 'text-[var(--color-light-amber)]' : ''}`}>{game.away_team}</span>
             </div>
 
             {/* ciudad del visitante -- col 2, fila 1 */}
@@ -310,7 +309,6 @@ export default function GameCard({
                 background: homeLeading ? 'rgba(242,183,5,0.08)' : undefined,
               }}
             >
-              <span className={`font-display text-4xl font-800 leading-none ${homeLeading ? 'text-[var(--color-light-amber)]' : ''}`}>{game.home_team}</span>
               <img src={teamLogoUrl(game.home_team)} alt={game.home_team} className="w-20 h-20 object-contain shrink-0" loading="lazy" />
             </div>
 
@@ -382,7 +380,7 @@ export default function GameCard({
             </div>
           </div>
 
-          
+         
         </div>
       )}
 
@@ -402,7 +400,7 @@ export default function GameCard({
           className="flex items-center gap-1.5 mt-4 flex-wrap w-full text-left hover:opacity-80 transition"
         >
           <IconUsers size={13} className="text-[var(--color-text-muted)] shrink-0" />
-          <span className="text-xs text-[var(--color-text-muted)]">
+          <span className="text-xs text-[var(--color-text-muted)] ">
             {pickedUserIds.length}/{members.length}
           </span>
           {members.map((m) => {

@@ -6,11 +6,13 @@ import BottomNav, { type BottomTab } from './components/BottomNav'
 import NewGroupModal, { SUPER_ADMIN_ID } from './components/NewGroupModal'
 import type { Group } from './lib/types'
 import { pushSupported, enablePush } from './lib/push'
+import { IconUser } from './components/icons'
 
 // cada pantalla se descarga solo cuando el usuario de verdad entra a ella,
 // en vez de que el primer carga tenga que traer el codigo de toda la app junta
 const QuinielasList = lazy(() => import('./pages/QuinielasList'))
 const GlobalRanking = lazy(() => import('./pages/GlobalRanking'))
+const NflStandings = lazy(() => import('./pages/NflStandings'))
 const GroupDashboard = lazy(() => import('./pages/GroupDashboard'))
 const Notifications = lazy(() => import('./pages/Notifications'))
 const Profile = lazy(() => import('./pages/Profile'))
@@ -239,7 +241,18 @@ export default function App() {
           <img src="/logo.png" alt="Quiniela" className="h-10 w-auto logo-dark" />
           <img src="/logo-light.png" alt="Quiniela" className="h-10 w-auto logo-light" />
         </div>
-        <div id="header-right-slot" className="flex items-center" />
+        <div className="flex items-center gap-2">
+          <div id="header-right-slot" className="flex items-center" />
+          {bottomTab !== 'perfil' && (
+            <button
+              onClick={() => setBottomTab('perfil')}
+              title="Perfil"
+              className="w-8 h-8 rounded-full flex items-center justify-center border border-[var(--color-field-line)] text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)] hover:border-[var(--color-light-amber)] transition"
+            >
+              <IconUser size={16} />
+            </button>
+          )}
+        </div>
       </header>
 
       {joinError && (
@@ -251,6 +264,7 @@ export default function App() {
 
       <Suspense fallback={<ScreenLoading />}>
         {bottomTab === 'ranking' && <GlobalRanking user={user} />}
+        {bottomTab === 'posiciones' && <NflStandings />}
 
         {bottomTab === 'quinielas' && (
           activeGroup ? (

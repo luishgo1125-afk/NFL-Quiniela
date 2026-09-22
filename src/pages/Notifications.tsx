@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { IconBell, IconCheck, IconStar, IconTarget, IconClipboardX, IconTrophy, IconUsers, IconClock } from '../components/icons'
+import { IconBell, IconCheck, IconStar, IconTarget, IconClipboardX, IconTrophy, IconUsers, IconClock, IconTrash } from '../components/icons'
 import type { User } from '@supabase/supabase-js'
 
 interface NotificationItem {
@@ -72,6 +72,62 @@ const FILTERS: { key: 'todas' | Category; label: string }[] = [
   { key: 'sistema', label: 'Sistema' },
 ]
 
+const SWIPE_DELETE_THRESHOLD = 80
+
+// Envuelve una tarjeta de notificacion y le agrega "deslizar a la izquierda
+// para eliminar" -- funciona con touch (celular) y con mouse (desktop),
+// ambos via Pointer Events. Si el usuario solo tocó sin arrastrar, el click
+// normal de la tarjeta (abrir la notificacion) sigue funcionando igual.
+function SwipeableNotifRow({ id, onDelete, children }: { id: string; onDelete: () => void; children: React.ReactNode }) {
+  const [dragX, setDragX] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const [removing, setRemoving] = useState(false)
+  const startX = useRef(0)
+  const moved = useRef(false)
+
+  function onPointerDown(e: React.PointerEvent) {
+    startX.current = e.clientX
+    moved.current = false
+    setDragging(true)
+  }
+  function onPointerMove(e: React.PointerEvent) {
+    if (!dragging) return
+    const delta = e.clientX - startX.current
+    if (Math.abs(delta) > 6) moved.current = true
+    setDragX(Math.min(0, delta)) // solo se desliza hacia la izquierda
+  }
+  function endDrag() {
+    setDragging(false)
+    if (dragX < -SWIPE_DELETE_THRESHOLD) {
+      setRemoving(true)
+      setDragX(-400)
+      setTimeout(onDelete, 150)
+    } else {
+      setDragX(0)
+    }
+  }
+
+  return (
+    <div className={`relative overflow-hidden rounded-lg transition-opacity ${removing ? 'opacity-0' : ''}`}>
+      <div className="absolute inset-0 flex items-center justify-end pr-5 rounded-lg" style={{ background: 'var(--color-scoreboard-red)' }}>
+        <IconTrash size={16} className="text-white" />
+      </div>
+      <div
+        key={id}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onClickCapture={(e) => { if (moved.current) { e.preventDefault(); e.stopPropagation() } }}
+        className="touch-pan-y"
+        style={{ transform: `translateX(${dragX}px)`, transition: dragging ? 'none' : 'transform 0.2s ease' }}
+      >
+        {children}
+      </div>
+    </div>
+  )
+}
+
 export default function Notifications({ user, onOpenGame }: { user: User; onOpenGame?: (gameId: string) => void }) {
   const [notifs, setNotifs] = useState<NotificationItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -134,36 +190,46 @@ export default function Notifications({ user, onOpenGame }: { user: User; onOpen
     setNotifs((prev) => prev.map((n) => (n.read_at ? n : { ...n, read_at: now })))
   }
 
+  async function removeNotif(n: NotificationItem) {
+    setNotifs((prev) => prev.filter((x) => x.id !== n.id))
+    const { error } = await supabase.from('notifications').delete().eq('id', n.id)
+    if (error) {
+      // si fallo el borrado, la regresamos a la lista
+      setNotifs((prev) => [...prev, n].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()))
+    }
+  }
+
   function renderCard(item: { n: NotificationItem; cat: Category; icon: IconKind; color: string }) {
     const { n, icon, color } = item
     const [line1, line2] = n.body.split('\n')
     const unread = !n.read_at
     return (
-      <button
-        key={n.id}
-        onClick={() => handleTap(n)}
-        className="w-full text-left bg-[var(--color-field-surface)] border rounded-lg pl-4 pr-3 py-3 transition flex items-center gap-3.5"
-        style={{ borderColor: unread ? 'var(--color-light-amber)' : 'var(--color-field-line)' }}
-      >
-        <span
-          className="w-9 h-9 rounded-lg bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] flex items-center justify-center shrink-0"
-          style={{ color }}
+      <SwipeableNotifRow key={n.id} id={n.id} onDelete={() => removeNotif(n)}>
+        <button
+          onClick={() => handleTap(n)}
+          className="w-full text-left bg-[var(--color-field-surface)] border rounded-lg pl-4 pr-3 py-3 transition flex items-center gap-3.5"
+          style={{ borderColor: unread ? 'var(--color-light-amber)' : 'var(--color-field-line)' }}
         >
-          <NotifIcon kind={icon} size={17} />
-        </span>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-semibold flex items-center gap-2 min-w-0">
-              {unread && <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-light-amber)] shrink-0" />}
-              <span className={`truncate ${unread ? '' : 'text-[var(--color-text-muted)] font-medium'}`}>{n.title}</span>
-            </p>
-            <span className="text-[10px] text-[var(--color-text-muted)] font-mono-score shrink-0">{timeAgo(n.created_at)}</span>
+          <span
+            className="w-9 h-9 rounded-lg bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] flex items-center justify-center shrink-0"
+            style={{ color }}
+          >
+            <NotifIcon kind={icon} size={17} />
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-semibold flex items-center gap-2 min-w-0">
+                {unread && <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-light-amber)] shrink-0" />}
+                <span className={`truncate ${unread ? '' : 'text-[var(--color-text-muted)] font-medium'}`}>{n.title}</span>
+              </p>
+              <span className="text-[10px] text-[var(--color-text-muted)] font-mono-score shrink-0">{timeAgo(n.created_at)}</span>
+            </div>
+            {line1 && <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{line1}</p>}
+            {line2 && <p className="text-[10px] text-[var(--color-text-muted)]/80 mt-0.5">{line2}</p>}
           </div>
-          {line1 && <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{line1}</p>}
-          {line2 && <p className="text-[10px] text-[var(--color-text-muted)]/80 mt-0.5">{line2}</p>}
-        </div>
-        <span className="text-[var(--color-text-muted)] shrink-0 text-lg">›</span>
-      </button>
+          <span className="text-[var(--color-text-muted)] shrink-0 text-lg">›</span>
+        </button>
+      </SwipeableNotifRow>
     )
   }
 

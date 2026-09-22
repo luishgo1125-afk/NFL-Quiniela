@@ -1,6 +1,6 @@
-import { IconHome, IconGlobe, IconPlusCircle, IconBell, IconUser } from './icons'
+import { IconHome, IconGlobe, IconPlusCircle, IconBell, IconShield } from './icons'
 
-export type BottomTab = 'quinielas' | 'ranking' | 'notificaciones' | 'perfil'
+export type BottomTab = 'quinielas' | 'ranking' | 'posiciones' | 'notificaciones' | 'perfil'
 
 export default function BottomNav({
   active,
@@ -17,10 +17,10 @@ export default function BottomNav({
 }) {
   const items: { key: BottomTab | 'crear'; label: string; icon: (active: boolean) => React.ReactNode }[] = [
     { key: 'quinielas', label: 'Quinielas', icon: (a) => <IconHome size={20} className={a ? 'text-[var(--color-light-amber)]' : ''} /> },
-    { key: 'ranking', label: 'Ranking global', icon: (a) => <IconGlobe size={20} className={a ? 'text-[var(--color-light-amber)]' : ''} /> },
-    { key: 'crear', label: canCreate ? 'Crear quiniela' : 'Unirse a quiniela', icon: () => <IconPlusCircle size={22} /> },
-    { key: 'notificaciones', label: 'Notificaciones', icon: (a) => <IconBell size={20} className={a ? 'text-[var(--color-light-amber)]' : ''} /> },
-    { key: 'perfil', label: 'Perfil', icon: (a) => <IconUser size={20} className={a ? 'text-[var(--color-light-amber)]' : ''} /> },
+    { key: 'ranking', label: 'Ranking', icon: (a) => <IconGlobe size={20} className={a ? 'text-[var(--color-light-amber)]' : ''} /> },
+    { key: 'crear', label: canCreate ? 'Crear' : 'Unirse', icon: () => <IconPlusCircle size={22} /> },
+    { key: 'posiciones', label: 'Posiciones', icon: (a) => <IconShield size={20} className={a ? 'text-[var(--color-light-amber)]' : ''} /> },
+    { key: 'notificaciones', label: 'Avisos', icon: (a) => <IconBell size={20} className={a ? 'text-[var(--color-light-amber)]' : ''} /> },
   ]
 
   return (
@@ -28,7 +28,7 @@ export default function BottomNav({
       className="fixed bottom-0 left-0 right-0 border-t z-30"
       style={{ background: 'var(--color-field-surface)', borderColor: 'var(--color-field-line)' }}
     >
-      <div className="max-w-2xl mx-auto grid grid-cols-5">
+      <div className="max-w-2xl mx-auto grid" style={{ gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' }}>
         {items.map((item) => {
           const isActive = item.key !== 'crear' && item.key === active
           const isCreate = item.key === 'crear'

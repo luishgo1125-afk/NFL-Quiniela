@@ -345,7 +345,11 @@ export default function GameCard({
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4" onClick={() => setShowPickers(false)}>
           <div onClick={(e) => e.stopPropagation()} className="w-full max-w-xs bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold">{game.away_team} @ {game.home_team}</h3>
+              <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                <img src={teamLogoUrl(game.away_team)} alt={game.away_team} className="w-5 h-5 object-contain" loading="lazy" />
+                {game.away_team} @ {game.home_team}
+                <img src={teamLogoUrl(game.home_team)} alt={game.home_team} className="w-5 h-5 object-contain" loading="lazy" />
+              </h3>
               <button onClick={() => setShowPickers(false)} className="text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)] text-lg leading-none">✕</button>
             </div>
             {locked && !othersVisible && (

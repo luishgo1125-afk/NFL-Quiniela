@@ -4,12 +4,11 @@ import { supabase } from '../lib/supabase'
 import type { Game, Group } from '../lib/types'
 import { weekLabel } from '../lib/types'
 import GameCard from '../components/GameCard'
-import SpecialPicks from '../components/SpecialPicks'
 import Leaderboard from '../components/Leaderboard'
 import CopyPicksModal from '../components/CopyPicksModal'
 import { buildStandings, getEligibleUserIds } from '../lib/ranking'
 import { syncGroupWeekFromEspn } from '../lib/syncGames'
-import { IconClipboard, IconStar, IconBarChart, IconGear, IconCalendar, IconTrophy, IconCopy, IconWhatsapp, IconAlertTriangle, IconRefresh, IconCoin } from '../components/icons'
+import { IconClipboard, IconBarChart, IconGear, IconCalendar, IconTrophy, IconCopy, IconWhatsapp, IconAlertTriangle, IconRefresh, IconCoin } from '../components/icons'
 import type { User } from '@supabase/supabase-js'
 
 // Admin es la pantalla mas pesada (formularios, importador de ESPN, gestor de
@@ -34,7 +33,7 @@ export default function GroupDashboard({
 }) {
   const [group, setGroupState] = useState(initialGroup)
   const setGroup = (g: Group) => { setGroupState(g); onGroupChange?.(g) }
-  const [tab, setTab] = useState<'picks' | 'especiales' | 'tabla' | 'admin'>('picks')
+  const [tab, setTab] = useState<'picks' | 'tabla' | 'admin'>('picks')
   const [showCopyModal, setShowCopyModal] = useState(false)
   const [pickRefreshKey, setPickRefreshKey] = useState(0)
   const [syncingWeek, setSyncingWeek] = useState(false)
@@ -389,10 +388,6 @@ export default function GroupDashboard({
     return () => { cancelled = true }
   }, [group.id, group.bet_amount, group.scoring_mode, user.id, weekKey, weeks, games, tab, paymentRefreshTick])
 
-  useEffect(() => {
-    if (tab === 'especiales' && !group.special_picks_enabled) setTab('picks')
-  }, [tab, group.special_picks_enabled])
-
   // el boton de "Actualizar" vive visualmente en el header de arriba (junto
   // al logo), pero su logica se queda aqui -- solo se muestra en la pestaña
   // de Predicciones, y solo para el admin
@@ -461,16 +456,6 @@ export default function GroupDashboard({
           )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          {group.special_picks_enabled && (
-            <button
-              onClick={() => setTab('especiales')}
-              aria-label="Predicciones especiales"
-              title="Predicciones especiales"
-              className={`p-2 rounded-md border transition ${tab === 'especiales' ? 'border-[var(--color-light-amber)] text-[var(--color-light-amber)] bg-[rgba(242,183,5,0.1)]' : 'border-[var(--color-field-line)] text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)] hover:border-[var(--color-light-amber)]'}`}
-            >
-              <IconStar size={16} />
-            </button>
-          )}
           {isAdmin && (
             <button
               onClick={() => setTab('admin')}
@@ -498,7 +483,7 @@ export default function GroupDashboard({
         ))}
       </div>
 
-      {(tab === 'especiales' || tab === 'admin') && (
+      {tab === 'admin' && (
         <button onClick={() => setTab('picks')} className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)] mb-4 flex items-center gap-1">
           ← Volver a predicciones
         </button>
@@ -691,8 +676,6 @@ export default function GroupDashboard({
           )}
         </>
       )}
-
-      {tab === 'especiales' && <SpecialPicks group={group} userId={user.id} />}
 
       {tab === 'tabla' && <Leaderboard group={group} />}
 

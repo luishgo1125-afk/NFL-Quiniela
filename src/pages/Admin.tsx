@@ -5,21 +5,83 @@ import { compareWeekEntries } from '../lib/ranking'
 import { fetchEspnWeek, guessCurrentWeek, type SeasonType } from '../lib/espn'
 import { teamLogoUrl } from '../lib/teamLogos'
 import MembersManager from '../components/MembersManager'
-import AdminSpecialPicks from '../components/AdminSpecialPicks'
 import DangerZone from '../components/DangerZone'
-import { IconTrash, IconChevronRight, IconCheck } from '../components/icons'
+import { IconTrash, IconChevronRight, IconCheck, IconPencil, IconTarget, IconTrophy, IconUsers, IconCalendar, IconBookmark } from '../components/icons'
 
-function SectionHeader({ title, open, onToggle }: { title: string; open: boolean; onToggle: () => void }) {
+function SettingsCard({
+  icon,
+  title,
+  description,
+  summary,
+  open,
+  onToggle,
+  danger,
+  children,
+}: {
+  icon: React.ReactNode
+  title: string
+  description: string
+  summary?: string
+  open: boolean
+  onToggle: () => void
+  danger?: boolean
+  children?: React.ReactNode
+}) {
+  const accent = danger ? 'var(--color-scoreboard-red)' : 'var(--color-light-amber)'
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className="w-full flex items-center gap-2 py-1"
+    <div
+      className="rounded-3xl border overflow-hidden transition-colors"
+      style={{
+        borderColor: open ? accent : 'var(--color-field-line)',
+        boxShadow: open ? `0 0 0 1px ${accent}, 0 0 24px -10px ${danger ? 'rgba(228,70,43,0.5)' : 'rgba(242,183,5,0.5)'}` : 'none',
+      }}
     >
-      <IconChevronRight size={14} className={`text-[var(--color-light-amber)] shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
-      <h1 className="text-xs font-bold uppercase tracking-wider text-[var(--color-light-amber)] shrink-0">{title}</h1>
-      <div className="flex-1 h-px bg-[var(--color-field-line)]" />
-    </button>
+      <button type="button" onClick={onToggle} className="w-full flex items-center gap-3 px-5 py-4 text-left">
+        <span
+          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+          style={{ background: danger ? 'rgba(228,70,43,0.12)' : 'rgba(242,183,5,0.12)', color: danger ? '#FF6B52' : accent }}
+        >
+          {icon}
+        </span>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-extrabold uppercase tracking-wide" style={{ color: danger ? '#FF6B52' : accent }}>{title}</p>
+          <p className="text-xs text-[var(--color-text-muted)] mt-0.5 truncate">{description}</p>
+        </div>
+        {!open && summary && (
+          <span className="text-xs text-[var(--color-text-muted)] shrink-0 text-right hidden sm:block">{summary}</span>
+        )}
+        <IconChevronRight size={16} className={`shrink-0 transition-transform ${danger ? 'text-[var(--color-scoreboard-red)]' : 'text-[var(--color-light-amber)]'} ${open ? 'rotate-90' : ''}`} />
+      </button>
+      {open && children && <div className="px-5 pb-5 pt-1 space-y-4">{children}</div>}
+    </div>
+  )
+}
+
+function Stepper({ label, description, value, onChange, min = -50 }: { label: string; description: string; value: number; onChange: (v: number) => void; min?: number }) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-1">
+      <div className="min-w-0">
+        <p className="text-sm font-semibold">{label}</p>
+        <p className="text-xs text-[var(--color-text-muted)]">{description}</p>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <button
+          type="button"
+          onClick={() => onChange(Math.max(min, value - 1))}
+          className="w-8 h-8 rounded-lg border border-[var(--color-field-line)] flex items-center justify-center text-[var(--color-text-muted)] hover:border-[var(--color-light-amber)] hover:text-[var(--color-light-amber)] transition text-lg leading-none"
+        >
+          −
+        </button>
+        <span className={`w-12 text-center font-mono-score text-sm bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-lg py-1.5 ${value < 0 ? 'text-[var(--color-scoreboard-red)]' : ''}`}>{value}</span>
+        <button
+          type="button"
+          onClick={() => onChange(value + 1)}
+          className="w-8 h-8 rounded-lg border border-[var(--color-field-line)] flex items-center justify-center text-[var(--color-text-muted)] hover:border-[var(--color-light-amber)] hover:text-[var(--color-light-amber)] transition text-lg leading-none"
+        >
+          +
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -39,6 +101,8 @@ export default function Admin({
   onLeftAdmin: () => void
 }) {
   const groupId = group.id
+  // partido cuyas predicciones se estan corrigiendo a mano (modal), null = cerrado
+  const [editPicksGame, setEditPicksGame] = useState<Game | null>(null)
   const [memberCount, setMemberCount] = useState<number | null>(null)
   const [paymentMembers, setPaymentMembers] = useState<{ user_id: string; display_name: string; paid: boolean }[]>([])
   const [payingId, setPayingId] = useState<string | null>(null)
@@ -117,6 +181,8 @@ export default function Admin({
 
   const [pointsWinner, setPointsWinner] = useState(group.points_winner ?? 1)
   const [pointsExact, setPointsExact] = useState(group.points_exact ?? 3)
+  const [pointsTeamTotal, setPointsTeamTotal] = useState(group.points_team_total ?? 1)
+  const [recalcFinal, setRecalcFinal] = useState(false)
   const [savingRules, setSavingRules] = useState(false)
   const [rulesMsg, setRulesMsg] = useState<string | null>(null)
   const [rulesErr, setRulesErr] = useState<string | null>(null)
@@ -139,6 +205,12 @@ export default function Admin({
       .sort((a, b) => a.year - b.year || a.seasonType - b.seasonType || a.week - b.week)
   }, [games])
   const multiYear = useMemo(() => new Set(games.map((g) => g.year)).size > 1, [games])
+  const latestWeek = weeks.length > 0 ? weeks[weeks.length - 1] : null
+  const gamesInLatestWeek = latestWeek
+    ? games.filter((g) => !g.deleted_at && g.year === latestWeek.year && g.season_type === latestWeek.seasonType && g.week === latestWeek.week).length
+    : 0
+  const ligaSummary = latestWeek ? `NFL ${latestWeek.year} · ${weekLabel(latestWeek.seasonType, latestWeek.week).replace('WEEK', 'Semana')}` : ''
+  const partidosSummary = latestWeek ? `${gamesInLatestWeek} partidos · ${weekLabel(latestWeek.seasonType, latestWeek.week).replace('WEEK', 'Semana')}` : `${games.filter((g) => !g.deleted_at).length} partidos`
 
   // por default, al entrar en modo "semana a semana" se muestra la jornada
   // mas reciente (la ultima de la lista)
@@ -213,8 +285,7 @@ export default function Admin({
     setRangeMsg('Rango guardado.')
   }
 
-  async function saveScoringRules(e: React.FormEvent) {
-    e.preventDefault()
+  async function saveScoringRules() {
     setSavingRules(true)
     setRulesMsg(null)
     setRulesErr(null)
@@ -222,11 +293,13 @@ export default function Admin({
       p_group_id: groupId,
       p_points_winner: pointsWinner,
       p_points_exact: pointsExact,
+      p_points_team_total: pointsTeamTotal,
+      p_recalculate_final: recalcFinal,
     })
     setSavingRules(false)
     if (err) { setRulesErr(err.message); return }
     onGroupUpdated(data)
-    setRulesMsg('Guardado — se recalcularon los partidos ya finalizados.')
+    setRulesMsg(recalcFinal ? 'Guardado — se recalcularon tambien los partidos ya jugados.' : 'Guardado — se aplicara a los partidos que falten por jugar.')
   }
 
   const [betAmount, setBetAmount] = useState(group.bet_amount ?? 0)
@@ -268,7 +341,7 @@ export default function Admin({
   const [syncMsg, setSyncMsg] = useState<string | null>(null)
   const [autoSync, setAutoSync] = useState(false)
   const [expandedWeeks, setExpandedWeeks] = useState<Record<string, boolean>>({})
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({ liga: true })
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({})
 
   function toggleSection(key: string) {
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }))
@@ -327,6 +400,17 @@ export default function Admin({
       p_enabled: !group.allow_copy_picks,
     })
     setSavingCopyToggle(false)
+    if (!err) onGroupUpdated(data)
+  }
+
+  const [savingFinalizedToggle, setSavingFinalizedToggle] = useState(false)
+  async function toggleFinalized() {
+    setSavingFinalizedToggle(true)
+    const { data, error: err } = await supabase.rpc('set_group_finalized', {
+      p_group_id: groupId,
+      p_finalized: !group.finalized,
+    })
+    setSavingFinalizedToggle(false)
     if (!err) onGroupUpdated(data)
   }
 
@@ -490,15 +574,25 @@ export default function Admin({
   }
 
   return (
-    <div className="space-y-8">
-      <section className="space-y-3">
-        <SectionHeader title="Liga" open={!!openSections.liga} onToggle={() => toggleSection('liga')} />
-        {openSections.liga && (
-        <form onSubmit={saveGroupInfo} className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-4 space-y-3">
+    <>
+    <div>
+      <h1 className="text-2xl font-extrabold tracking-tight">AJUSTES DE LA LIGA</h1>
+      <p className="text-sm text-[var(--color-text-muted)] mt-1 mb-6">Administra las reglas y configuracion de tu quiniela.</p>
+    </div>
+    <div className="space-y-4">
+      <SettingsCard
+        icon={<IconPencil size={18} />}
+        title="Liga"
+        description="Nombre, temporada y configuracion general"
+        summary={ligaSummary}
+        open={!!openSections.liga}
+        onToggle={() => toggleSection('liga')}
+      >
+        <form onSubmit={saveGroupInfo} className="bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-lg p-4 space-y-3">
           <h2 className="text-sm font-semibold">Nombre y foto de la liga</h2>
           <div className="flex items-center gap-4">
             <label className="cursor-pointer shrink-0">
-              <div className="w-16 h-16 rounded-full overflow-hidden bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] flex items-center justify-center">
+              <div className="w-16 h-16 rounded-full overflow-hidden bg-[var(--color-field-surface)] border border-[var(--color-field-line)] flex items-center justify-center">
                 {logoPreview ? (
                   <img src={logoPreview} alt="Logo de la liga" className="w-full h-full object-cover" />
                 ) : (
@@ -517,7 +611,7 @@ export default function Admin({
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
               required
-              className="flex-1 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
+              className="flex-1 bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
             />
           </div>
           {groupErr && <p className="text-[var(--color-scoreboard-red)] text-xs">{groupErr}</p>}
@@ -527,10 +621,8 @@ export default function Admin({
             {savingGroup ? 'Guardando...' : 'Guardar cambios de la liga'}
           </button>
         </form>
-        )}
 
-        {openSections.liga && (
-        <div className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg divide-y divide-[var(--color-field-line)] overflow-hidden">
+        <div className="bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-lg overflow-hidden divide-y divide-[var(--color-field-line)]">
           <div className="flex items-center gap-3 px-4 py-3.5">
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold">Copiar de otra liga</p>
@@ -546,54 +638,64 @@ export default function Admin({
               <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all" style={{ left: group.allow_copy_picks ? '22px' : '2px' }} />
             </button>
           </div>
-        </div>
-        )}
-      </section>
-
-      <section className="space-y-3">
-        <SectionHeader title="Puntuación" open={!!openSections.puntuacion} onToggle={() => toggleSection('puntuacion')} />
-        {openSections.puntuacion && (
-        <div className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-4 space-y-5">
-          <form onSubmit={saveScoringRules} className="space-y-3">
-            <div>
-              <h2 className="text-sm font-semibold">Criterios de puntos</h2>
-              <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">
-                Al guardar, se recalculan automaticamente los puntos de todos los partidos ya finalizados con las nuevas reglas.
-              </p>
+          <div className="flex items-center gap-3 px-4 py-3.5">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold">Marcar como finalizada</p>
+              <p className="text-[10px] text-[var(--color-text-muted)]">La liga se muestra como FINALIZADA en la lista de quinielas, sin importar los partidos</p>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="text-xs text-[var(--color-text-muted)]">
-                Acertar al equipo ganador
-                <input
-                  type="number"
-                  min={0}
-                  value={pointsWinner}
-                  onChange={(e) => setPointsWinner(Number(e.target.value))}
-                  className="w-full mt-1 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
-                />
-              </label>
-              <label className="text-xs text-[var(--color-text-muted)]">
-                Acertar el marcador exacto
-                <input
-                  type="number"
-                  min={0}
-                  value={pointsExact}
-                  onChange={(e) => setPointsExact(Number(e.target.value))}
-                  className="w-full mt-1 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
-                />
-              </label>
-            </div>
-            {rulesErr && <p className="text-[var(--color-scoreboard-red)] text-xs">{rulesErr}</p>}
-            {rulesMsg && <p className="text-[var(--color-turf-green)] text-xs">{rulesMsg}</p>}
-            <button type="submit" disabled={savingRules}
-              className="w-full bg-[var(--color-light-amber)] text-[var(--color-field-night)] font-semibold rounded-md py-2 text-sm hover:brightness-110 disabled:opacity-50">
-              {savingRules ? 'Guardando...' : 'Guardar criterios'}
+            <button
+              onClick={toggleFinalized}
+              disabled={savingFinalizedToggle}
+              aria-label="Marcar liga como finalizada"
+              className="w-11 h-6 rounded-full relative transition shrink-0 disabled:opacity-50"
+              style={{ background: group.finalized ? 'var(--color-scoreboard-red)' : 'var(--color-field-line)' }}
+            >
+              <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all" style={{ left: group.finalized ? '22px' : '2px' }} />
             </button>
-          </form>
+          </div>
+        </div>
+      </SettingsCard>
 
-          <div className="h-px bg-[var(--color-field-line)]" />
+      <SettingsCard
+        icon={<IconTarget size={18} />}
+        title="Puntuacion"
+        description="Configura los puntos de cada prediccion"
+        open={!!openSections.puntuacion}
+        onToggle={() => toggleSection('puntuacion')}
+      >
+        <div className="bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-lg p-4 space-y-1 divide-y divide-[var(--color-field-line)]">
+          <div className="pb-3">
+            <Stepper label="Prediccion del ganador" description="Puntos por acertar el equipo ganador" value={pointsWinner} onChange={setPointsWinner} />
+          </div>
+          <div className="py-3">
+            <Stepper label="Marcador exacto" description="Puntos por acertar el marcador completo" value={pointsExact} onChange={setPointsExact} />
+          </div>
+          <div className="pt-3">
+            <Stepper label="Puntos de un equipo" description="Por acertar cuanto anota un equipo (no se suma si ya le atinaste al marcador exacto)" value={pointsTeamTotal} onChange={setPointsTeamTotal} />
+          </div>
+        </div>
+        <label className="flex items-start gap-2.5 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-lg px-3 py-2.5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={recalcFinal}
+            onChange={(e) => setRecalcFinal(e.target.checked)}
+            className="mt-0.5 w-4 h-4 accent-[var(--color-light-amber)] shrink-0"
+          />
+          <span className="text-xs">
+            <span className="font-semibold block">Aplicar tambien a partidos ya jugados</span>
+            <span className="text-[var(--color-text-muted)]">Si lo activas, se recalculan de una vez todos los partidos en FINAL con las reglas nuevas. Si lo dejas apagado, solo afecta a los que falten por jugar.</span>
+          </span>
+        </label>
+        {rulesErr && <p className="text-[var(--color-scoreboard-red)] text-xs">{rulesErr}</p>}
+        {rulesMsg && <p className="text-[var(--color-turf-green)] text-xs">{rulesMsg}</p>}
+        <button onClick={saveScoringRules} disabled={savingRules}
+          className="w-full bg-[var(--color-light-amber)] text-[var(--color-field-night)] font-semibold rounded-md py-2.5 text-sm hover:brightness-110 disabled:opacity-50 flex items-center justify-center gap-2">
+          <IconBookmark size={14} /> {savingRules ? 'Guardando...' : 'Guardar cambios'}
+        </button>
 
-          <div className="space-y-3">
+        <div className="h-px bg-[var(--color-field-line)]" />
+
+        <div className="space-y-3">
             <h2 className="text-sm font-semibold">Modo de puntuacion</h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <button
@@ -688,19 +790,18 @@ export default function Admin({
 
             {modeErr && <p className="text-[var(--color-scoreboard-red)] text-xs">{modeErr}</p>}
             <p className="text-[10px] text-[var(--color-text-muted)]">Cambiar esto afecta como todos los miembros ven la tabla desde ahora.</p>
-          </div>
-
-          <div className="h-px bg-[var(--color-field-line)]" />
-
-          <AdminSpecialPicks group={group} onGroupUpdated={onGroupUpdated} />
         </div>
-        )}
-      </section>
+      </SettingsCard>
 
-      <section className="space-y-3">
-        <SectionHeader title="Premio" open={!!openSections.premio} onToggle={() => toggleSection('premio')} />
-        {openSections.premio && (
-        <form onSubmit={savePrizeSettings} className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-4 space-y-4">
+      <SettingsCard
+        icon={<IconTrophy size={18} />}
+        title="Premio"
+        description="Configura el premio de la quiniela"
+        summary={betAmount > 0 ? `$${betAmount.toLocaleString('es-MX')} por participante` : 'Sin premio configurado'}
+        open={!!openSections.premio}
+        onToggle={() => toggleSection('premio')}
+      >
+        <form onSubmit={savePrizeSettings} className="bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-lg p-4 space-y-4">
           <div>
             <h2 className="text-sm font-semibold">Monto por participante</h2>
             <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">
@@ -770,10 +871,9 @@ export default function Admin({
             {savingPrize ? 'Guardando...' : 'Guardar premio'}
           </button>
         </form>
-        )}
 
-        {openSections.premio && betAmount > 0 && memberCount !== null && memberCount > 0 && (
-        <div className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-4 space-y-3">
+        {betAmount > 0 && memberCount !== null && memberCount > 0 && (
+        <div className="bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-lg p-4 space-y-3">
           <div>
             <h2 className="text-sm font-semibold">Quien ya pago</h2>
             <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">
@@ -833,18 +933,28 @@ export default function Admin({
           )}
         </div>
         )}
-      </section>
+      </SettingsCard>
 
-      <section className="space-y-3">
-        <SectionHeader title="Miembros" open={!!openSections.miembros} onToggle={() => toggleSection('miembros')} />
-        {openSections.miembros && <MembersManager group={group} />}
-      </section>
+      <SettingsCard
+        icon={<IconUsers size={18} />}
+        title="Miembros"
+        description="Gestiona participantes de la liga"
+        summary={memberCount != null ? `${memberCount} miembro${memberCount !== 1 ? 's' : ''}` : undefined}
+        open={!!openSections.miembros}
+        onToggle={() => toggleSection('miembros')}
+      >
+        <MembersManager group={group} />
+      </SettingsCard>
 
-      <section className="space-y-3">
-        <SectionHeader title="Partidos" open={!!openSections.partidos} onToggle={() => toggleSection('partidos')} />
-        {openSections.partidos && (
-        <>
-        <form onSubmit={syncWeekFromEspn} className="bg-[var(--color-field-surface)] border border-[var(--color-light-amber)]/40 rounded-lg p-4 space-y-3">
+      <SettingsCard
+        icon={<IconCalendar size={18} />}
+        title="Partidos"
+        description="Selecciona los partidos disponibles"
+        summary={partidosSummary}
+        open={!!openSections.partidos}
+        onToggle={() => toggleSection('partidos')}
+      >
+        <form onSubmit={syncWeekFromEspn} className="bg-[var(--color-field-surface-raised)] border border-[var(--color-light-amber)]/40 rounded-lg p-4 space-y-3">
           <div>
             <h2 className="text-sm font-semibold">Importar semana automaticamente</h2>
             <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
@@ -855,7 +965,7 @@ export default function Admin({
             <label className="text-xs text-[var(--color-text-muted)]">
               Temporada
               <select value={syncType} onChange={(e) => setSyncType(Number(e.target.value) as SeasonType)}
-                className="w-full mt-1 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]">
+                className="w-full mt-1 bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]">
                 <option value={2}>Regular</option>
                 <option value={1}>Pretemporada</option>
                 <option value={3}>Playoffs</option>
@@ -962,7 +1072,7 @@ export default function Admin({
                 {open && (
                   <div className="p-3 space-y-2 bg-[var(--color-page-bg)]/60">
                     {wk.games.map((g) => (
-                      <AdminGameRow key={g.id} game={g} onFinal={setFinalScore} onDelete={deleteGame} />
+                      <AdminGameRow key={g.id} game={g} onFinal={setFinalScore} onDelete={deleteGame} onEditPicks={setEditPicksGame} />
                     ))}
                   </div>
                 )}
@@ -1018,21 +1128,45 @@ export default function Admin({
             </div>
           </div>
         )}
-        </>
-        )}
-      </section>
+      </SettingsCard>
 
-      <section className="space-y-3">
-        <SectionHeader title="Peligro" open={!!openSections.peligro} onToggle={() => toggleSection('peligro')} />
+      <SettingsCard
+        icon={<IconTrash size={18} />}
+        title="Zona de peligro"
+        description="Acciones irreversibles para esta liga"
+        open={true}
+        onToggle={() => {}}
+        danger
+      >
+        <button
+          type="button"
+          onClick={() => toggleSection('peligro')}
+          className="w-full flex items-center gap-3 px-4 py-3.5 rounded-lg border border-[var(--color-scoreboard-red)]/40 bg-[rgba(228,70,43,0.06)] hover:bg-[rgba(228,70,43,0.12)] transition text-left"
+        >
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold">Eliminar liga</p>
+            <p className="text-[10px] text-[var(--color-text-muted)]">Esta accion no se puede deshacer</p>
+          </div>
+          <IconChevronRight size={16} className={`shrink-0 text-[var(--color-scoreboard-red)] transition-transform ${openSections.peligro ? 'rotate-90' : ''}`} />
+        </button>
         {openSections.peligro && (
           <DangerZone group={group} onGroupUpdated={onGroupUpdated} onLeftAdmin={onLeftAdmin} onDeleted={onBack} />
         )}
-      </section>
+      </SettingsCard>
     </div>
+
+    {editPicksGame && (
+      <EditGamePicksModal
+        game={editPicksGame}
+        groupId={groupId}
+        onClose={() => setEditPicksGame(null)}
+      />
+    )}
+    </>
   )
 }
 
-function AdminGameRow({ game, onFinal, onDelete }: { game: Game; onFinal: (g: Game, h: number, a: number) => void; onDelete: (id: string) => void }) {
+function AdminGameRow({ game, onFinal, onDelete, onEditPicks }: { game: Game; onFinal: (g: Game, h: number, a: number) => void; onDelete: (id: string) => void; onEditPicks: (g: Game) => void }) {
   const [home, setHome] = useState(game.home_score?.toString() ?? '')
   const [away, setAway] = useState(game.away_score?.toString() ?? '')
 
@@ -1058,9 +1192,137 @@ function AdminGameRow({ game, onFinal, onDelete }: { game: Game; onFinal: (g: Ga
         >
           Finalizar
         </button>
+        {game.status === 'final' && (
+          <button
+            onClick={() => onEditPicks(game)}
+            title="Corregir la prediccion de un jugador"
+            className="flex items-center gap-1 text-xs font-semibold text-[var(--color-light-amber)] bg-[rgba(242,183,5,0.1)] border border-[var(--color-light-amber)]/40 rounded-md px-2.5 py-1.5 hover:bg-[rgba(242,183,5,0.2)] transition"
+          >
+            <IconPencil size={12} /> Predicciones
+          </button>
+        )}
         <button onClick={() => onDelete(game.id)} className="flex items-center gap-1 text-xs font-semibold text-[var(--color-scoreboard-red)] bg-[rgba(228,70,43,0.1)] border border-[var(--color-scoreboard-red)]/40 rounded-md px-2.5 py-1.5 hover:bg-[rgba(228,70,43,0.2)] transition">
           <IconTrash size={12} /> Borrar
         </button>
+      </div>
+    </div>
+  )
+}
+
+function EditGamePicksModal({ game, groupId, onClose }: { game: Game; groupId: string; onClose: () => void }) {
+  const [rows, setRows] = useState<{ user_id: string; display_name: string; home: string; away: string; points: number | null; corrected: boolean }[] | null>(null)
+  const [savingId, setSavingId] = useState<string | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      const { data, error: loadErr } = await supabase
+        .from('picks')
+        .select('user_id, pred_home_score, pred_away_score, points, admin_corrected_at, profiles(display_name)')
+        .eq('game_id', game.id)
+      if (cancelled) return
+      if (loadErr) { setErr(loadErr.message); setRows([]); return }
+      const list = (data ?? [])
+        .map((p: any) => ({
+          user_id: p.user_id,
+          display_name: p.profiles?.display_name ?? 'Jugador',
+          home: p.pred_home_score?.toString() ?? '',
+          away: p.pred_away_score?.toString() ?? '',
+          points: p.points,
+          corrected: !!p.admin_corrected_at,
+        }))
+        .sort((a, b) => a.display_name.localeCompare(b.display_name))
+      setRows(list)
+    }
+    load()
+    return () => { cancelled = true }
+  }, [game.id])
+
+  async function saveRow(userId: string, home: string, away: string) {
+    if (home === '' || away === '') return
+    setSavingId(userId)
+    setErr(null)
+    const { error: saveErr } = await supabase.rpc('admin_set_pick', {
+      p_group_id: groupId,
+      p_game_id: game.id,
+      p_user_id: userId,
+      p_home_score: Number(home),
+      p_away_score: Number(away),
+    })
+    setSavingId(null)
+    if (saveErr) { setErr(saveErr.message); return }
+    // vuelve a traer los puntos ya recalculados para ese jugador
+    const { data } = await supabase.from('picks').select('points').eq('game_id', game.id).eq('user_id', userId).maybeSingle()
+    setRows((prev) => (prev ?? []).map((r) => (r.user_id === userId ? { ...r, home, away, points: data?.points ?? r.points, corrected: true } : r)))
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 px-3 pb-3 sm:p-4" onClick={onClose}>
+      <div
+        className="w-full sm:max-w-md max-h-[85vh] overflow-y-auto bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-xl p-4 space-y-3"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-semibold">Corregir predicciones</h2>
+            <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">
+              {game.away_team} @ {game.home_team} · resultado real {game.away_score}-{game.home_score}
+            </p>
+          </div>
+          <button onClick={onClose} className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)]">Cerrar</button>
+        </div>
+
+        <p className="text-[10px] text-[var(--color-text-muted)]">
+          Cambia el marcador que predijo un jugador y sus puntos de este partido se recalculan solos al guardar. Solo se puede corregir <strong>una vez</strong> por jugador.
+        </p>
+
+        {err && <p className="text-[var(--color-scoreboard-red)] text-xs">{err}</p>}
+
+        {rows === null ? (
+          <p className="text-xs text-[var(--color-text-muted)] text-center py-4">Cargando...</p>
+        ) : rows.length === 0 ? (
+          <p className="text-xs text-[var(--color-text-muted)] text-center py-4">Nadie predijo este partido.</p>
+        ) : (
+          <div className="space-y-2">
+            {rows.map((r) => (
+              <div key={r.user_id} className="flex items-center justify-between gap-2 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2">
+                <span className="text-sm truncate">{r.display_name}</span>
+                {r.corrected ? (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-mono-score text-xs text-[var(--color-text-muted)]">{r.away}–{r.home}</span>
+                    <span className="text-[10px] text-[var(--color-text-muted)]">Ya se corrigio</span>
+                    <span className="text-[10px] text-[var(--color-text-muted)] w-8 text-right shrink-0">{r.points ?? '–'}pt</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <input
+                      type="number" inputMode="numeric" pattern="[0-9]*" min={0}
+                      value={r.away}
+                      onChange={(e) => setRows((prev) => (prev ?? []).map((row) => (row.user_id === r.user_id ? { ...row, away: e.target.value } : row)))}
+                      className="w-10 text-center font-mono-score text-xs bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-md py-1 outline-none focus:border-[var(--color-light-amber)]"
+                    />
+                    <span className="text-[var(--color-text-muted)] text-xs">–</span>
+                    <input
+                      type="number" inputMode="numeric" pattern="[0-9]*" min={0}
+                      value={r.home}
+                      onChange={(e) => setRows((prev) => (prev ?? []).map((row) => (row.user_id === r.user_id ? { ...row, home: e.target.value } : row)))}
+                      className="w-10 text-center font-mono-score text-xs bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-md py-1 outline-none focus:border-[var(--color-light-amber)]"
+                    />
+                    <button
+                      onClick={() => saveRow(r.user_id, r.home, r.away)}
+                      disabled={savingId === r.user_id}
+                      className="text-[10px] font-semibold bg-[var(--color-light-amber)] text-[var(--color-field-night)] rounded-md px-2 py-1.5 hover:brightness-110 disabled:opacity-50"
+                    >
+                      {savingId === r.user_id ? '...' : 'Guardar'}
+                    </button>
+                    <span className="text-[10px] text-[var(--color-text-muted)] w-8 text-right shrink-0">{r.points ?? '–'}pt</span>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

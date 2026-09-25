@@ -199,6 +199,18 @@ export default function Notifications({ user, onOpenGame }: { user: User; onOpen
     }
   }
 
+  async function deleteAllNotifs() {
+    if (notifs.length === 0) return
+    if (!confirm('¿Eliminar todas tus notificaciones? Esto no se puede deshacer.')) return
+    const prev = notifs
+    setNotifs([])
+    const { error } = await supabase.from('notifications').delete().eq('user_id', user.id)
+    if (error) {
+      // si fallo el borrado, las regresamos a la lista
+      setNotifs(prev)
+    }
+  }
+
   function renderCard(item: { n: NotificationItem; cat: Category; icon: IconKind; color: string }) {
     const { n, icon, color } = item
     const [line1, line2] = n.body.split('\n')
@@ -249,6 +261,21 @@ export default function Notifications({ user, onOpenGame }: { user: User; onOpen
           </button>
         )}
       </div>
+
+      {notifs.length > 0 && (
+        <div className="flex items-center justify-between gap-3 bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg px-4 py-3 mt-4">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">Borrar historial</p>
+            <p className="text-[10px] text-[var(--color-text-muted)]">Elimina todas tus notificaciones de una vez</p>
+          </div>
+          <button
+            onClick={deleteAllNotifs}
+            className="shrink-0 flex items-center gap-1.5 text-xs font-semibold text-[var(--color-scoreboard-red)] border border-[var(--color-scoreboard-red)]/40 rounded-md px-3 py-1.5 hover:bg-[rgba(228,70,43,0.1)] transition"
+          >
+            <IconTrash size={13} /> Eliminar todas
+          </button>
+        </div>
+      )}
 
       <div className="flex gap-2 flex-wrap my-6">
         {FILTERS.map((f) => (

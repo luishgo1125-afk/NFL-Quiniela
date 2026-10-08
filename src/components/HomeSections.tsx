@@ -105,7 +105,7 @@ export function WhatsAppCta() {
 }
 
 export function SiteFooter() {
-  return <footer className="home-footer" data-spot="footer">© {new Date().getFullYear()} Quiniela · Predice. Compite. Gana.</footer>
+  return <footer className="home-footer" data-spot="footer">© {new Date().getFullYear()} Quiniela · Predice. Compite. Gana. · <a href="#privacidad" className="home-footer-link">Aviso de privacidad</a></footer>
 }
 
 let clearSpot: (() => void) | null = null

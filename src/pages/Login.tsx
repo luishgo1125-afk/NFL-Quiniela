@@ -183,6 +183,15 @@ export default function Login({ initialMode = 'signin', onBack }: { initialMode?
                 minLength={6}
                 className="w-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
               />
+              {mode === 'signup' && (
+                <label className="flex items-start gap-2 text-xs text-[var(--color-text-muted)] leading-snug cursor-pointer">
+                  <input type="checkbox" required className="mt-0.5 accent-[#F2B705]" />
+                  <span>
+                    He leído y acepto el{' '}
+                    <a href="#privacidad" target="_blank" rel="noopener noreferrer" className="text-[var(--color-light-amber)] underline">Aviso de privacidad</a>.
+                  </span>
+                </label>
+              )}
               {error && <p className="text-[var(--color-scoreboard-red)] text-xs">{error}</p>}
               <button
                 type="submit"

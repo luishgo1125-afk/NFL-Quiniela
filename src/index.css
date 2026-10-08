@@ -430,3 +430,21 @@ button.rk-pod:hover, .rk-pod:hover { transform: translateY(-2px); border-color: 
 @media (max-width: 480px) { .profile-chip-name { max-width: 70px; } }
 .home-nav-links .profile-chip { height: 34px; padding: 0 12px 0 4px; color: var(--color-text-primary); text-transform: none; letter-spacing: 0; }
 .home-nav-links .profile-chip .profile-chip-name { font-family: var(--font-body, 'Space Grotesk', sans-serif); font-size: 13px; }
+
+/* ===== Aviso de privacidad ===== */
+.home-footer-link { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.home-footer-link:hover { color: var(--color-light-amber); }
+.privacy-page { padding-bottom: 64px; }
+.privacy-back { background: none; border: 0; color: var(--color-text-muted); font-size: 13px; cursor: pointer; margin-bottom: 20px; padding: 0; }
+.privacy-back:hover { color: var(--color-light-amber); }
+.privacy-h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(34px, 4vw, 48px); text-transform: uppercase; line-height: 1; margin: 0; }
+.privacy-updated { font-size: 12px; color: var(--color-text-muted); margin: 8px 0 20px; }
+.privacy-lead { font-size: 16px; line-height: 1.6; color: var(--color-text-muted); margin: 0 0 8px; }
+.privacy-sec { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--color-field-line); }
+.privacy-sec h2 { font-family: var(--font-display); font-weight: 700; font-size: 22px; margin: 0 0 10px; }
+.privacy-sec p, .privacy-sec li { font-size: 15px; line-height: 1.65; color: var(--color-text-muted); }
+.privacy-sec p { margin: 0 0 10px; }
+.privacy-sec ul { margin: 0 0 10px; padding-left: 20px; list-style: disc; }
+.privacy-sec li { margin-bottom: 6px; }
+.privacy-sec b { color: var(--color-text-primary); font-weight: 600; }
+.privacy-sec a { color: var(--color-light-amber); text-decoration: underline; }

@@ -8,6 +8,7 @@ import NewGroupModal, { SUPER_ADMIN_ID } from './components/NewGroupModal'
 import type { Group } from './lib/types'
 import { pushSupported, enablePush } from './lib/push'
 import { IconUser } from './components/icons'
+import PrivacyNotice from './pages/PrivacyNotice'
 
 // cada pantalla se descarga solo cuando el usuario de verdad entra a ella,
 // en vez de que el primer carga tenga que traer el codigo de toda la app junta
@@ -96,6 +97,16 @@ export default function App() {
   const [pendingInviteCode, setPendingInviteCode] = useState<string | null>(() => new URLSearchParams(window.location.search).get('join'))
   const [joining, setJoining] = useState(!!pendingInviteCode)
   const [joinError, setJoinError] = useState<string | null>(null)
+  const [showPrivacy, setShowPrivacy] = useState(() => window.location.hash === '#privacidad')
+  useEffect(() => {
+    const onHash = () => {
+      const on = window.location.hash === '#privacidad'
+      setShowPrivacy(on)
+      window.scrollTo(0, 0)
+    }
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [])
   const [firstName, setFirstName] = useState('')
   useEffect(() => {
     if (!user || bottomTab === 'perfil') return
@@ -201,6 +212,8 @@ export default function App() {
     setActiveGroup(null)
     setBottomTab('quinielas')
   }, [user?.id])
+
+  if (showPrivacy) return <PrivacyNotice />
 
   if (loading) {
     return (

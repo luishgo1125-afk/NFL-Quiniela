@@ -371,6 +371,20 @@ function PlayerStatsModal({ row, onClose }: { row: Row; onClose: () => void }) {
   )
 }
 
+
+// Texto de desempate segun la modalidad de la liga y como se acumulan los puntos
+function tiebreakText(group: Group): string {
+  const weekly = group.scoring_mode === 'weekly'
+  const scope = weekly ? 'de la semana' : group.scoring_mode === 'range' ? 'de las semanas del rango' : 'de todas las semanas'
+  const tail = ' Toca a alguien para ver sus stats.'
+  if (group.pick_mode === 'winner') {
+    return weekly
+      ? 'Desempate: gana quien este mas cerca del total de puntos del ultimo partido de la semana (menor diferencia). Si no lo capturaste, +100 de diferencia.' + tail
+      : `Desempate: se suma la diferencia entre tu total y el total real del ultimo partido de cada semana (${scope}); gana la suma mas baja. Si no lo capturaste en una semana, +100.` + tail
+  }
+  return `Desempate: 1) mas marcadores exactos, 2) menor diferencia de puntos ${scope} (real vs. predicho, ambos equipos); cada partido sin predecir suma +20.` + tail
+}
+
 export default function Leaderboard({ group, weekKey = null, onRowsCount }: { group: Group; weekKey?: string | null; onRowsCount?: (n: number) => void }) {
   const [rows, setRows] = useState<Row[]>([])
   // la semana la controla el header compartido de la quiniela
@@ -384,7 +398,7 @@ export default function Leaderboard({ group, weekKey = null, onRowsCount }: { gr
     async function load() {
       setLoading(true)
 
-      const { data: globalRanks } = await supabase.rpc('global_rankings')
+      const { data: globalRanks } = await supabase.rpc('global_rankings_mode', { p_mode: group.pick_mode ?? 'score' })
       const rankByUser: Record<string, number> = {}
       ;(globalRanks ?? []).forEach((r: any, i: number) => { rankByUser[r.user_id] = i + 1 })
 
@@ -628,9 +642,7 @@ export default function Leaderboard({ group, weekKey = null, onRowsCount }: { gr
       })()}
 
       <p className="text-[10px] text-[var(--color-text-muted)] text-center pt-1">
-        {group.pick_mode === 'winner'
-          ? 'Desempate: menor diferencia entre tu total de puntos y el total real del ultimo partido de la semana. Toca a alguien para ver sus stats.'
-          : 'Desempate: 1) mas marcadores exactos, 2) menor diferencia de puntos (real vs. predicho, ambos equipos). Toca a alguien para ver sus stats.'}
+        {tiebreakText(group)}
       </p>
 
       {selectedPlayer && <PlayerStatsModal row={selectedPlayer} onClose={() => setSelectedPlayer(null)} />}

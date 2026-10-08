@@ -1,6 +1,7 @@
 import { spotlight, HomeNav, Hero, HowToPlay, WhatsAppCta, SiteFooter, SectionTitle } from '../components/HomeSections'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { fetchMyGlobalRank } from '../lib/globalRank'
 import type { Group } from '../lib/types'
 import { weekLabel } from '../lib/types'
 import { getGroupStandings } from '../lib/ranking'
@@ -111,11 +112,8 @@ export default function QuinielasList({ user, onSelect, initialFilter = 'activa'
   // posicion y puntos globales del usuario (misma funcion que usa la pantalla Ranking)
   const [season, setSeason] = useState<{ rank: number; points: number } | null>(null)
   useEffect(() => {
-    supabase.rpc('global_rankings', { p_preseason_only: false }).then(({ data, error }) => {
-      if (error || !data) return
-      const rows = data as { user_id: string; total_points: number }[]
-      const idx = rows.findIndex((r) => r.user_id === user.id)
-      if (idx >= 0) setSeason({ rank: idx + 1, points: rows[idx].total_points })
+    fetchMyGlobalRank(user.id).then((res) => {
+      if (res) setSeason({ rank: res.index + 1, points: res.list[res.index].total_points })
     })
   }, [user.id])
 

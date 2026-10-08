@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { fetchMyGlobalRank } from '../lib/globalRank'
 import { NFL_TEAMS } from '../lib/types'
 import { teamLogoUrl } from '../lib/teamLogos'
 import {
@@ -262,9 +263,9 @@ export default function Profile({
       const { count } = await supabase.from('group_members').select('group_id', { count: 'exact', head: true }).eq('user_id', user.id)
       setGroupCount(count ?? 0)
 
-      const { data: ranks } = await supabase.rpc('global_rankings')
-      const list = ranks ?? []
-      const idx = list.findIndex((r: any) => r.user_id === user.id)
+      const myRank = await fetchMyGlobalRank(user.id)
+      const list = myRank?.list ?? []
+      const idx = myRank ? myRank.index : -1
       const mine = idx >= 0 ? list[idx] : null
       const topPoints = list[0]?.total_points ?? 0
 

@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { teamLogoUrl } from '../lib/teamLogos'
 import { IconGlobe, IconStar, IconTarget, IconPercent, IconShare, IconHash, IconUser } from '../components/icons'
 import type { User } from '@supabase/supabase-js'
+import { fetchGlobalRanking, type RankMode } from '../lib/globalRank'
 
 interface RankRow {
   user_id: string
@@ -197,17 +198,17 @@ export default function GlobalRanking({ user }: { user: User }) {
   const [rows, setRows] = useState<RankRow[]>([])
   const [loading, setLoading] = useState(true)
   const [sharing, setSharing] = useState(false)
-  const [preseason, setPreseason] = useState(false)
+  const [mode, setMode] = useState<RankMode>('score')
 
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const { data } = await supabase.rpc('global_rankings', { p_preseason_only: preseason })
-      setRows((data ?? []) as RankRow[])
+      const data = await fetchGlobalRanking(mode)
+      setRows(data as RankRow[])
       setLoading(false)
     }
     load()
-  }, [preseason])
+  }, [mode])
 
   async function handleShare() {
     if (rows.length === 0 || sharing) return
@@ -235,28 +236,28 @@ export default function GlobalRanking({ user }: { user: User }) {
           </button>
         )}
       </div>
-      <p className="text-[var(--color-text-muted)] text-sm mb-4">Puntos, marcadores exactos y % de aciertos en todas tus quinielas</p>
+      <p className="text-[var(--color-text-muted)] text-sm mb-4">Cada partido cuenta una sola vez, aunque lo hayas predicho en varias ligas. Un ranking por modalidad.</p>
 
       <div className="grid grid-cols-2 gap-2 mb-6">
         <button
-          onClick={() => setPreseason(false)}
+          onClick={() => setMode('score')}
           className={`text-xs font-semibold py-2 rounded-md border transition ${
-            !preseason
+            mode === 'score'
               ? 'border-[var(--color-light-amber)] bg-[rgba(242,183,5,0.12)] text-[var(--color-light-amber)]'
               : 'border-[var(--color-field-line)] text-[var(--color-text-muted)] hover:border-[var(--color-light-amber)]'
           }`}
         >
-          Temporada
+          Marcador exacto
         </button>
         <button
-          onClick={() => setPreseason(true)}
+          onClick={() => setMode('winner')}
           className={`text-xs font-semibold py-2 rounded-md border transition ${
-            preseason
+            mode === 'winner'
               ? 'border-[var(--color-light-amber)] bg-[rgba(242,183,5,0.12)] text-[var(--color-light-amber)]'
               : 'border-[var(--color-field-line)] text-[var(--color-text-muted)] hover:border-[var(--color-light-amber)]'
           }`}
         >
-          Pretemporada
+          Solo ganador
         </button>
       </div>
 
@@ -266,7 +267,7 @@ export default function GlobalRanking({ user }: { user: User }) {
         <EmptyState
           icon={<IconGlobe size={32} />}
           title="Aún sin resultados"
-          text={preseason ? 'No hay resultados de pretemporada registrados.' : 'Cuando terminen los primeros partidos, el ranking aparecerá aquí.'}
+          text={mode === 'winner' ? 'Aún no hay resultados en ligas de solo ganador.' : 'Cuando terminen los primeros partidos, el ranking aparecerá aquí.'}
         />
       ) : (
         <>

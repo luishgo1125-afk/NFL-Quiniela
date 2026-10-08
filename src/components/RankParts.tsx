@@ -23,9 +23,10 @@ export interface PodiumItem {
 // Podio: 2do - 1ro - 3ro (el 1ro mas grande y al centro)
 export function Podium({ items }: { items: PodiumItem[] }) {
   const byPos = (p: number) => items.find((i) => i.pos === p)
-  const order = [byPos(2), byPos(1), byPos(3)].filter(Boolean) as PodiumItem[]
+  const few = items.length < 3
+  const order = (few ? [byPos(1), byPos(2)] : [byPos(2), byPos(1), byPos(3)]).filter(Boolean) as PodiumItem[]
   return (
-    <div className="rk-podium" style={{ gridTemplateColumns: order.length === 3 ? undefined : `repeat(${order.length}, 1fr)` }}>
+    <div className={`rk-podium${few ? ` few n${order.length}` : ''}`} style={{ gridTemplateColumns: order.length === 3 ? undefined : `repeat(${order.length}, 1fr)` }}>
       {order.map((it) => {
         const Tag: any = it.onClick ? 'button' : 'div'
         return (

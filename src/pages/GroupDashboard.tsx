@@ -304,6 +304,7 @@ export default function GroupDashboard({
   const [confirmingPicks, setConfirmingPicks] = useState(false)
   const [sharingPicks, setSharingPicks] = useState(false)
   const [confirmPicksErr, setConfirmPicksErr] = useState<string | null>(null)
+  const [confirmOpen, setConfirmOpen] = useState<boolean | null>(null) // null = automatico (abierto si falta confirmar, cerrado si ya confirmo)
 
   useEffect(() => {
     if (!confirmMode || !weekKey) { setPickConfirmedBy(new Set()); return }
@@ -321,6 +322,8 @@ export default function GroupDashboard({
   const allConfirmed = confirmMode && members.length > 0 && members.every((m) => pickConfirmedBy.has(m.user_id))
   const openMissing = weekGames.filter((g) => new Date(g.kickoff).getTime() > nowTick && !(pickedBy[g.id] ?? []).includes(user.id)).length
   const openGames = weekGames.filter((g) => new Date(g.kickoff).getTime() > nowTick).length
+
+  const confirmPanelOpen = confirmOpen ?? !myPicksConfirmed
 
   async function confirmMyPicks() {
     if (!weekKey || confirmingPicks) return
@@ -575,41 +578,52 @@ export default function GroupDashboard({
           })()}
 
           {confirmMode && weekGames.length > 0 && (
-            <div className={`rounded-lg border px-4 py-3 mb-4 ${myPicksConfirmed ? 'border-[var(--color-turf-green)]/40 bg-[rgba(61,139,95,0.07)]' : 'border-[var(--color-field-line)] bg-[var(--color-field-surface)]'}`}>
-              <div className="flex items-center gap-3 flex-wrap">
-                <div className="flex-1 min-w-[180px]">
-                  <p className="text-sm font-semibold flex items-center gap-1.5">
-                    {myPicksConfirmed ? <><IconLock size={14} className="text-[var(--color-turf-green)]" /> Predicciones confirmadas</> : 'Confirma tus predicciones'}
-                  </p>
-                  <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5">
-                    {myPicksConfirmed
-                      ? (allConfirmed ? 'Ya no se pueden cambiar. Todos confirmaron: ya puedes compartir los pronosticos.' : 'Ya no se pueden cambiar. Los pronosticos se revelan cuando todos hayan confirmado.')
-                      : openGames === 0
-                      ? 'Ya no hay partidos abiertos esta semana.'
-                      : openMissing > 0
-                      ? `Llena los ${openMissing} partido${openMissing !== 1 ? 's' : ''} que te faltan para poder confirmar.`
-                      : 'Al confirmar ya no podras cambiar ninguna prediccion de la semana.'}
-                  </p>
+            <div className={`rounded-lg border mb-4 ${myPicksConfirmed ? 'border-[var(--color-turf-green)]/40 bg-[rgba(61,139,95,0.07)]' : 'border-[var(--color-field-line)] bg-[var(--color-field-surface)]'}`}>
+              <button
+                type="button"
+                onClick={() => setConfirmOpen(!confirmPanelOpen)}
+                aria-expanded={confirmPanelOpen}
+                className="w-full flex items-center gap-3 px-4 py-3 text-left"
+              >
+                <span className="flex-1 min-w-0 text-sm font-semibold flex items-center gap-1.5">
+                  {myPicksConfirmed ? <><IconLock size={14} className="text-[var(--color-turf-green)] shrink-0" /> Predicciones confirmadas</> : 'Confirma tus predicciones'}
+                </span>
+                <span className="text-[11px] font-mono-score text-[var(--color-text-muted)] shrink-0">{pickConfirmedBy.size}/{members.length}</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-[var(--color-text-muted)] transition-transform" style={{ transform: confirmPanelOpen ? 'rotate(180deg)' : 'none' }}>
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+              {confirmPanelOpen && (
+                <div className="px-4 pb-3 -mt-1">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <p className="flex-1 min-w-[180px] text-[11px] text-[var(--color-text-muted)]">
+                      {myPicksConfirmed
+                        ? (allConfirmed ? 'Ya no se pueden cambiar. Todos confirmaron: ya puedes compartir los pronosticos.' : 'Ya no se pueden cambiar. Los pronosticos se revelan cuando todos hayan confirmado.')
+                        : openGames === 0
+                        ? 'Ya no hay partidos abiertos esta semana.'
+                        : openMissing > 0
+                        ? `Llena los ${openMissing} partido${openMissing !== 1 ? 's' : ''} que te faltan para poder confirmar.`
+                        : 'Al confirmar ya no podras cambiar ninguna prediccion de la semana.'}
+                    </p>
+                    {!myPicksConfirmed && openGames > 0 && (
+                      <button
+                        onClick={confirmMyPicks}
+                        disabled={openMissing > 0 || confirmingPicks}
+                        className="home-btn amber sm disabled:opacity-40"
+                        style={{ cursor: openMissing > 0 ? 'not-allowed' : 'pointer' }}
+                      >
+                        {confirmingPicks ? 'Confirmando...' : 'Confirmar'}
+                      </button>
+                    )}
+                    {allConfirmed && (
+                      <button onClick={shareWeekPicks} disabled={sharingPicks} className="home-btn ghost sm disabled:opacity-50">
+                        <IconShare size={13} /> {sharingPicks ? 'Generando...' : 'Compartir pronosticos'}
+                      </button>
+                    )}
+                  </div>
+                  {confirmPicksErr && <p className="text-[11px] text-[var(--color-scoreboard-red)] mt-2">{confirmPicksErr}</p>}
+                  <p className="text-[10px] text-[var(--color-text-muted)] mt-2">{pickConfirmedBy.size}/{members.length} jugadores han confirmado</p>
                 </div>
-                {!myPicksConfirmed && openGames > 0 && (
-                  <button
-                    onClick={confirmMyPicks}
-                    disabled={openMissing > 0 || confirmingPicks}
-                    className="home-btn amber sm disabled:opacity-40"
-                    style={{ cursor: openMissing > 0 ? 'not-allowed' : 'pointer' }}
-                  >
-                    {confirmingPicks ? 'Confirmando...' : 'Confirmar'}
-                  </button>
-                )}
-                {allConfirmed && (
-                  <button onClick={shareWeekPicks} disabled={sharingPicks} className="home-btn ghost sm disabled:opacity-50">
-                    <IconShare size={13} /> {sharingPicks ? 'Generando...' : 'Compartir pronosticos'}
-                  </button>
-                )}
-              </div>
-              {confirmPicksErr && <p className="text-[11px] text-[var(--color-scoreboard-red)] mt-2">{confirmPicksErr}</p>}
-              {members.length > 0 && (
-                <p className="text-[10px] text-[var(--color-text-muted)] mt-2">{pickConfirmedBy.size}/{members.length} jugadores han confirmado</p>
               )}
             </div>
           )}

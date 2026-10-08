@@ -1,10 +1,11 @@
+import { spotlight, HomeNav, Hero, HowToPlay, WhatsAppCta, SiteFooter, SectionTitle } from '../components/HomeSections'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Group } from '../lib/types'
 import { weekLabel } from '../lib/types'
 import { getGroupStandings } from '../lib/ranking'
 import {
-  IconClipboard, IconCalendar, IconUsers, IconCopy, IconWhatsapp,
+  IconClipboard, IconCalendar, IconUsers,
   IconSearch, IconFilter, IconSort, IconChevronRight, IconTrophy,
 } from '../components/icons'
 import type { User } from '@supabase/supabase-js'
@@ -98,15 +99,42 @@ async function loadStats(group: Group, userId: string): Promise<GroupStats> {
   return { weekLabelText, membersCount: memberIds.length, picksDone, picksTotal, closesAt, myRank, liveCount, status }
 }
 
-export default function QuinielasList({ user, onSelect }: { user: User; onSelect: (g: Group) => void }) {
+export default function QuinielasList({ user, onSelect, initialFilter = 'activa', onOpenRanking, navRight }: { navRight?: import("react").ReactNode; user: User; onSelect: (g: Group) => void; initialFilter?: 'todas' | Status; onOpenRanking?: () => void }) {
   const [groups, setGroups] = useState<Group[]>([])
   const [stats, setStats] = useState<Record<string, GroupStats>>({})
   const [membersByGroup, setMembersByGroup] = useState<Record<string, Member[]>>({})
   const [loading, setLoading] = useState(true)
-  const [copiedId, setCopiedId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<'todas' | Status>('activa')
+  const [filter, setFilter] = useState<'todas' | Status>(initialFilter)
   const [sort, setSort] = useState<'reciente' | 'nombre'>('reciente')
+  const [publicGroups, setPublicGroups] = useState<{ id: string; name: string; logo_url: string | null; status: Status; members_count: number }[]>([])
+  // posicion y puntos globales del usuario (misma funcion que usa la pantalla Ranking)
+  const [season, setSeason] = useState<{ rank: number; points: number } | null>(null)
+  useEffect(() => {
+    supabase.rpc('global_rankings', { p_preseason_only: false }).then(({ data, error }) => {
+      if (error || !data) return
+      const rows = data as { user_id: string; total_points: number }[]
+      const idx = rows.findIndex((r) => r.user_id === user.id)
+      if (idx >= 0) setSeason({ rank: idx + 1, points: rows[idx].total_points })
+    })
+  }, [user.id])
+
+  const [joiningId, setJoiningId] = useState<string | null>(null)
+  const [joinErr, setJoinErr] = useState<string | null>(null)
+
+  useEffect(() => {
+    supabase.rpc('public_groups').then(({ data, error }) => { if (!error) setPublicGroups((data ?? []) as any) })
+  }, [user.id])
+
+  async function joinPublic(id: string) {
+    setJoiningId(id)
+    setJoinErr(null)
+    const { error } = await supabase.rpc('join_public_group', { p_group_id: id })
+    if (error) { setJoiningId(null); setJoinErr(error.message); return }
+    const { data } = await supabase.from('groups').select('*').eq('id', id).maybeSingle()
+    setJoiningId(null)
+    if (data) onSelect(data as Group)
+  }
 
   useEffect(() => {
     async function load() {
@@ -134,20 +162,6 @@ export default function QuinielasList({ user, onSelect }: { user: User; onSelect
     load()
   }, [user.id])
 
-  function inviteLink(g: Group) {
-    return `${window.location.origin}${window.location.pathname}?join=${g.invite_code}`
-  }
-
-  async function copyCode(g: Group) {
-    try {
-      await navigator.clipboard.writeText(inviteLink(g))
-      setCopiedId(g.id)
-      setTimeout(() => setCopiedId(null), 1500)
-    } catch {
-      // algunos navegadores bloquean el clipboard, sin drama
-    }
-  }
-
   const visibleGroups = useMemo(() => {
     let list = groups
     if (search.trim()) {
@@ -174,9 +188,27 @@ export default function QuinielasList({ user, onSelect }: { user: User; onSelect
   }, [groups, stats])
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-10">
-      <h1 className="font-display text-4xl font-800">QUINIELAS</h1>
-      <p className="text-[var(--color-text-muted)] text-sm mb-6">En las que participas ahora mismo</p>
+    <>
+    <HomeNav top={0} brand right={navRight} />
+    <div className="home-wrap">
+      <Hero
+        badge="EN JUEGO ESTA SEMANA"
+        chips={['NFL', 'Pronósticos']}
+        season={season}
+        stats={[
+          { value: counts.activa, label: 'Activas' },
+          { value: groups.length, label: 'Mis ligas' },
+          { value: Object.values(stats).reduce((a, s) => a + (s.liveCount ?? 0), 0), label: 'En vivo' },
+        ]}
+        actions={
+          <>
+            <button onClick={() => { setFilter('activa'); spotlight('jornadas') }} className="home-btn amber">Jugar ahora</button>
+            <button onClick={() => (onOpenRanking ? onOpenRanking() : (setFilter('todas'), spotlight('jornadas')))} className="home-btn secondary">Ver ranking</button>
+          </>
+        }
+      />
+      <div id="jornadas" data-spot="jornadas" style={{ marginTop: 40, scrollMarginTop: 120 }}>
+        <SectionTitle eyebrow="TUS LIGAS" title="JORNADAS ACTIVAS" />
 
       <div className="flex gap-2 mb-4">
         <div className="flex-1 relative">
@@ -249,7 +281,7 @@ export default function QuinielasList({ user, onSelect }: { user: User; onSelect
       ) : visibleGroups.length === 0 ? (
         <p className="text-[var(--color-text-muted)] text-sm">Ninguna quiniela coincide con esa busqueda/filtro.</p>
       ) : (
-        <div className="space-y-4">
+        <div className="home-leagues">
           {visibleGroups.map((g) => {
             const s = stats[g.id]
             const members = membersByGroup[g.id] ?? []
@@ -258,103 +290,89 @@ export default function QuinielasList({ user, onSelect }: { user: User; onSelect
               : null
             const statusMeta = STATUS_META[s?.status ?? 'proxima']
             const isLive = (s?.liveCount ?? 0) > 0
+            const pct = s && s.picksTotal > 0 ? Math.round((s.picksDone / s.picksTotal) * 100) : 0
+            const playersText = members.length > 0 ? members.length : (s?.membersCount ?? 0)
             return (
-              <div
-                key={g.id}
-                className="relative rounded-2xl overflow-hidden border transition-shadow"
-                style={{
-                  borderColor: isLive ? 'var(--color-scoreboard-red)' : 'var(--color-field-line)',
-                  boxShadow: isLive ? '0 0 24px -10px rgba(228,70,43,0.5)' : 'none',
-                }}
-              >
-                {g.logo_url && (
-                  <>
-                    <img src={g.logo_url} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30" />
-                    <div
-                      className="absolute inset-0"
-                      style={{ background: 'linear-gradient(180deg, rgba(10,14,19,0.35) 0%, var(--color-field-surface) 78%)' }}
-                    />
-                  </>
-                )}
-                {!g.logo_url && <div className="absolute inset-0 bg-[var(--color-field-surface)]" />}
-
-                <button onClick={() => onSelect(g)} className="relative z-10 w-full text-left block">
-                  <div className="flex items-start gap-3 px-4 pt-4">
-                    {g.logo_url ? (
-                      <img src={g.logo_url} alt={g.name} className="w-11 h-11 rounded-full object-cover border-2 border-[var(--color-field-surface)] shrink-0" />
-                    ) : (
-                      <div className="w-11 h-11 rounded-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] flex items-center justify-center text-lg shrink-0">🏈</div>
-                    )}
-                    <div className="flex-1 min-w-0 pt-0.5">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold truncate">{g.name}</span>
-                        {s?.weekLabelText && (
-                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border border-[var(--color-light-amber)] text-[var(--color-light-amber)] shrink-0">
-                            {s.weekLabelText}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-[var(--color-text-muted)] mt-0.5 flex items-center gap-1">
-                        <IconUsers size={11} /> {members.length > 0 ? `${members.length} jugador${members.length !== 1 ? 'es' : ''}` : `${s?.membersCount ?? 0} miembros`}
-                        {isLive && (
-                          <span className="ml-2 text-[10px] font-semibold text-[var(--color-scoreboard-red)] flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-scoreboard-red)] animate-pulse" /> EN VIVO
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                    <IconChevronRight size={18} className="text-[var(--color-text-muted)] shrink-0 mt-1" />
-                  </div>
-
-                  {s && (s.picksTotal > 0 || closesLabel || s.myRank) && (
-                    <div className="mt-3 pt-3 mx-4 border-t border-[var(--color-field-line)] flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--color-text-muted)] pb-3">
-                      {s.picksTotal > 0 && (
-                        <span className="flex items-center gap-1">
-                          <IconClipboard size={12} /> {s.picksDone}/{s.picksTotal} picks realizados
-                        </span>
-                      )}
-                      {closesLabel && (
-                        <span className="flex items-center gap-1">
-                          <IconCalendar size={12} /> Cierra: {closesLabel}
-                        </span>
-                      )}
-                      {s.myRank && (
-                        <span className="text-[var(--color-light-amber)] font-semibold flex items-center gap-1">
-                          <IconTrophy size={12} /> Tu posicion: #{s.myRank}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </button>
-
-                <div className="relative z-10 px-4 pb-4 flex flex-wrap items-center gap-2">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); copyCode(g) }}
-                    className="text-xs font-semibold px-3 py-1.5 rounded-md border border-[var(--color-field-line)] text-[var(--color-text-muted)] hover:border-[var(--color-light-amber)] hover:text-[var(--color-light-amber)] transition flex items-center gap-1 bg-[var(--color-field-surface)]"
-                  >
-                    <IconCopy size={11} /> {copiedId === g.id ? 'Copiado ✓' : 'Copiar link'}
-                  </button>
-                  <a
-                    href={`https://wa.me/?text=${encodeURIComponent(`Unete a mi quiniela "${g.name}" en Quiniela NFL: ${inviteLink(g)}`)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="text-xs font-semibold px-3 py-1.5 rounded-md border border-[var(--color-field-line)] text-[var(--color-text-muted)] hover:border-[#25D366] hover:text-[#25D366] transition flex items-center gap-1 bg-[var(--color-field-surface)]"
-                  >
-                    <IconWhatsapp size={11} /> WhatsApp
-                  </a>
-                  <span
-                    className="ml-auto text-[10px] font-bold uppercase tracking-wide px-2.5 py-1.5 rounded-full flex items-center gap-1.5 shrink-0"
-                    style={{ background: statusMeta.bg, color: statusMeta.text, border: `1px solid ${statusMeta.border}` }}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: statusMeta.dot }} /> {statusMeta.label}
+              <article key={g.id} className={`lcard${isLive ? ' live' : ''}`}>
+                <div className="lcard-banner">
+                  {g.logo_url && <img src={g.logo_url} alt="" />}
+                  <span className="lcard-status" style={{ background: statusMeta.bg, color: statusMeta.text, border: `1px solid ${statusMeta.border}` }}>
+                    <i style={{ background: statusMeta.dot }} /> {statusMeta.label}
                   </span>
+                  {isLive && <span className="lcard-live"><i /> EN VIVO</span>}
                 </div>
-              </div>
+
+                <div className="lcard-head">
+                  {g.logo_url
+                    ? <img src={g.logo_url} alt={g.name} className="lcard-avatar" />
+                    : <div className="lcard-avatar">🏈</div>}
+                  <div className="lcard-title">
+                    <h3>{g.name}</h3>
+                    <p>
+                      <IconUsers size={13} /> {playersText} jugador{playersText !== 1 ? 'es' : ''}
+                      {s?.weekLabelText && <span className="lcard-week">{s.weekLabelText}</span>}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="lcard-stats">
+                  <div className="lcard-stat">
+                    <span className="lcard-k"><IconClipboard size={12} /> Picks</span>
+                    <b>{s && s.picksTotal > 0 ? `${s.picksDone}/${s.picksTotal}` : '—'}</b>
+                    <div className="lcard-bar"><div style={{ width: `${pct}%` }} /></div>
+                  </div>
+                  <div className="lcard-stat">
+                    <span className="lcard-k"><IconCalendar size={12} /> Cierra</span>
+                    <b style={{ fontSize: 15, textTransform: 'capitalize' }}>{closesLabel ?? '—'}</b>
+                  </div>
+                  <div className="lcard-stat">
+                    <span className="lcard-k"><IconTrophy size={12} /> Posición</span>
+                    <b style={{ color: s?.myRank ? 'var(--color-light-amber)' : undefined }}>{s?.myRank ? `#${s.myRank}` : '—'}</b>
+                  </div>
+                </div>
+
+                <button onClick={() => onSelect(g)} className={`lcard-btn${s?.status === 'activa' ? ' primary' : ''}`}>
+                  {s?.status === 'finalizada' ? 'Ver quiniela' : 'Jugar ahora'} <IconChevronRight size={16} />
+                </button>
+              </article>
             )
           })}
         </div>
       )}
+      </div>
+      {(() => {
+        const joined = new Set(groups.map((g) => g.id))
+        const available = publicGroups.filter((g) => !joined.has(g.id) && g.status !== 'finalizada')
+        if (available.length === 0) return null
+        return (
+          <div id="publicas" data-spot="publicas" style={{ marginTop: 48, scrollMarginTop: 120 }}>
+            <SectionTitle eyebrow="ABIERTAS PARA TODOS" title="LIGAS PÚBLICAS" />
+            {joinErr && <p className="text-[var(--color-scoreboard-red)] text-xs mb-2">{joinErr}</p>}
+            <div className="home-leagues">
+              {available.map((g) => (
+                <div key={g.id} className="home-card" style={{ alignItems: 'center' }}>
+                  {g.logo_url
+                    ? <img src={g.logo_url} alt="" style={{ width: 52, height: 52, borderRadius: 14, objectFit: 'cover', flex: 'none' }} />
+                    : <span className="home-ico"><IconTrophy size={20} /></span>}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <h3 style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.name}</h3>
+                    <p><span style={{ color: STATUS_META[g.status].text, fontWeight: 700, fontSize: 11 }}>● {STATUS_META[g.status].label}</span> · {g.members_count} jugadores</p>
+                  </div>
+                  <button onClick={() => joinPublic(g.id)} disabled={joiningId === g.id} className="home-btn secondary sm">
+                    {joiningId === g.id ? '...' : 'Unirme'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
+      <div className="home-stack" style={{ marginTop: 48 }}>
+        <HowToPlay />
+        <WhatsAppCta />
+        <SiteFooter />
+      </div>
     </div>
+    </>
   )
 }

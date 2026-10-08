@@ -1,3 +1,5 @@
+import EmptyState from '../components/EmptyState'
+import { RankAvatar, Podium } from '../components/RankParts'
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { teamLogoUrl } from '../lib/teamLogos'
@@ -218,7 +220,7 @@ export default function GlobalRanking({ user }: { user: User }) {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-10">
+    <div className="page-wrap narrow">
       <div className="flex items-start justify-between gap-3 mb-1">
         <h1 className="font-display text-4xl font-800 flex items-center gap-3">
           <IconGlobe size={32} className="text-[var(--color-light-amber)]" /> RANKING GLOBAL
@@ -261,88 +263,55 @@ export default function GlobalRanking({ user }: { user: User }) {
       {loading ? (
         <p className="text-[var(--color-text-muted)] text-sm">Cargando...</p>
       ) : rows.length === 0 ? (
-        <p className="text-[var(--color-text-muted)] text-sm">
-          {preseason ? 'No hay resultados de pretemporada registrados.' : 'Todavia no hay resultados registrados.'}
-        </p>
+        <EmptyState
+          icon={<IconGlobe size={32} />}
+          title="Aún sin resultados"
+          text={preseason ? 'No hay resultados de pretemporada registrados.' : 'Cuando terminen los primeros partidos, el ranking aparecerá aquí.'}
+        />
       ) : (
         <>
-          <div className="grid grid-cols-[2rem_1fr_3.2rem_3.2rem_4rem] items-center gap-2 px-4 py-3 mb-2 rounded-lg bg-[var(--color-field-surface)] border border-[var(--color-field-line)] text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wide">
-            <span className="flex justify-center">
-              <IconHash size={16} className="text-[var(--color-light-amber)]" />
-            </span>
-            <span className="flex items-center justify-center gap-1.5">
-              <IconUser size={16} className="text-[var(--color-light-amber)]" /> Jugador
-            </span>
-            <span className="flex flex-col items-center gap-1">
-              <IconStar size={16} className="text-[var(--color-light-amber)]" /> Pts
-            </span>
-            <span className="flex flex-col items-center gap-1">
-              <IconTarget size={16} className="text-[var(--color-light-amber)]" /> Exactos
-            </span>
-            <span className="flex flex-col items-center gap-1">
-              <IconPercent size={16} className="text-[var(--color-light-amber)]" /> % aciertos
-            </span>
-          </div>
-
-          <div className="space-y-2.5">
-            {rows.map((r, i) => {
-              const style = RANK_STYLES[i]
-              const isMe = r.user_id === user.id
-              return (
-                <div
-                  key={r.user_id}
-                  className="grid grid-cols-[2rem_1fr_3.2rem_3.2rem_4rem] items-center gap-2 px-4 py-3.5 rounded-lg border"
-                  style={{
-                    background: isMe ? 'rgba(242,183,5,0.14)' : style?.bg ?? 'var(--color-field-surface)',
-                    borderColor: isMe ? 'var(--color-light-amber)' : style?.border ?? 'var(--color-field-line)',
-                  }}
-                >
-                  <span
-                    className="w-8 h-8 rounded-full flex items-center justify-center font-mono-score text-sm font-700 shrink-0"
-                    style={{
-                      background: style?.badge ?? 'var(--color-field-surface-raised)',
-                      color: style ? style.text : 'var(--color-text-muted)',
-                      border: style ? 'none' : '1px solid var(--color-field-line)',
-                    }}
-                  >
-                    {i + 1}
-                  </span>
-
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      className="w-9 h-9 rounded-full flex items-center justify-center font-display text-sm font-700 shrink-0 overflow-hidden"
-                      style={{ background: 'var(--color-field-surface-raised)', border: '1px solid var(--color-field-line)' }}
-                    >
-                      {r.favorite_team ? (
-                        <img src={teamLogoUrl(r.favorite_team)} alt={r.favorite_team} className="w-full h-full object-contain p-1" loading="lazy" />
-                      ) : (
-                        r.display_name.charAt(0).toUpperCase()
-                      )}
+          <Podium
+            items={rows.slice(0, 3).map((r, i) => ({
+              pos: (i + 1) as 1 | 2 | 3,
+              name: r.display_name,
+              team: r.favorite_team,
+              isMe: r.user_id === user.id,
+              points: r.total_points,
+              line: `${r.exact_hits} exactos · ${Math.round(r.hit_pct)}%`,
+            }))}
+          />
+          {rows.length > 3 && (
+            <div className="rk-table">
+              <div className="rk-head" style={{ ['--cols' as any]: '36px minmax(0,1fr) 56px 64px 72px' }}>
+                <span className="rk-c">#</span>
+                <span>Jugador</span>
+                <span className="rk-c">Pts</span>
+                <span className="rk-c">Exactos</span>
+                <span className="rk-c">% Aciertos</span>
+              </div>
+              {rows.slice(3).map((r, idx) => {
+                const isMe = r.user_id === user.id
+                return (
+                  <div key={r.user_id} className={`rk-row${isMe ? ' me' : ''}`} style={{ ['--cols' as any]: '36px minmax(0,1fr) 56px 64px 72px' }}>
+                    <span className="rk-pos">{idx + 4}</span>
+                    <div className="rk-player">
+                      <RankAvatar name={r.display_name} team={r.favorite_team} />
+                      <div className="rk-who">
+                        <b><span className="n">{r.display_name}</span>{isMe && <span className="rk-tag">TÚ</span>}</b>
+                        <small>{r.total_hits}/{r.total_played} aciertos · Dif +{r.point_diff}</small>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold truncate flex items-center gap-1.5">
-                        {r.display_name}
-                        {isMe && <span className="text-[9px] text-[var(--color-light-amber)] font-normal shrink-0">(tu)</span>}
-                      </p>
-                      <p className="text-[11px] text-[var(--color-text-muted)] font-mono-score">
-                        {r.total_hits}/{r.total_played} aciertos · Dif +{r.point_diff}
-                      </p>
+                    <span className="rk-num big">{r.total_points}</span>
+                    <span className="rk-num">{r.exact_hits}</span>
+                    <div className="rk-pct">
+                      <span className="rk-num amber" style={{ fontSize: 15 }}>{Math.round(r.hit_pct)}%</span>
+                      <i><s style={{ width: `${Math.min(100, Math.round(r.hit_pct))}%` }} /></i>
                     </div>
                   </div>
-
-                  <div className="text-center">
-                    <div className="font-mono-score text-lg font-800 leading-none">{r.total_points}</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="font-mono-score text-lg font-800 leading-none">{r.exact_hits}</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="font-mono-score text-lg font-800 leading-none text-[var(--color-light-amber)]">{Math.round(r.hit_pct)}%</div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+          )}
         </>
       )}
 

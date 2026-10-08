@@ -1,9 +1,10 @@
+import { RankAvatar, Podium } from './RankParts'
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { teamLogoUrl } from '../lib/teamLogos'
 import { IconGlobe, IconMedal, IconClipboardX, IconCalendar, IconCoin } from './icons'
 import { weekLabel, type Group } from '../lib/types'
-import { getRankedFinalGames, buildStandings, getEligibleUserIds } from '../lib/ranking'
+import { getRankedFinalGames, buildStandings, getEligibleUserIds, standingsOptionsFor } from '../lib/ranking'
 
 interface RecentPick {
   gameLabel: string
@@ -370,10 +371,10 @@ function PlayerStatsModal({ row, onClose }: { row: Row; onClose: () => void }) {
   )
 }
 
-export default function Leaderboard({ group }: { group: Group }) {
+export default function Leaderboard({ group, weekKey = null, onRowsCount }: { group: Group; weekKey?: string | null; onRowsCount?: (n: number) => void }) {
   const [rows, setRows] = useState<Row[]>([])
-  const [weeks, setWeeks] = useState<{ key: string; year: number; seasonType: number; week: number }[]>([])
-  const [selectedWeekKey, setSelectedWeekKey] = useState<string | null>(null)
+  // la semana la controla el header compartido de la quiniela
+  const selectedWeekKey = group.scoring_mode === 'weekly' ? weekKey : null
   const [weekLabelText, setWeekLabelText] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [sharing, setSharing] = useState(false)
@@ -394,21 +395,6 @@ export default function Leaderboard({ group }: { group: Group }) {
 
       const { finalGames, allGames, currentWeekKey, activeWeekEntry } = await getRankedFinalGames(group, selectedWeekKey)
       const gameList = allGames
-
-      // lista de semanas disponibles (para el selector; solo se muestra en modo semanal)
-      const weekMap = new Map<string, { year: number; seasonType: number; week: number }>()
-      gameList.forEach((g) => {
-        const key = `${g.year}:${g.season_type}:${g.week}`
-        if (!weekMap.has(key)) weekMap.set(key, { year: g.year, seasonType: g.season_type, week: g.week })
-      })
-      const weeksList = Array.from(weekMap.entries())
-        .map(([key, v]) => ({ key, ...v }))
-        .sort((a, b) => a.year - b.year || a.seasonType - b.seasonType || a.week - b.week)
-      setWeeks(weeksList)
-
-      if (group.scoring_mode === 'weekly' && selectedWeekKey === null && currentWeekKey) {
-        setSelectedWeekKey(currentWeekKey)
-      }
 
       setWeekLabelText(
         group.scoring_mode === 'weekly'
@@ -431,7 +417,7 @@ export default function Leaderboard({ group }: { group: Group }) {
       if (finalGameIds.length) {
         const { data } = await supabase
           .from('picks')
-          .select('user_id, game_id, points, pred_home_score, pred_away_score')
+          .select('user_id, game_id, points, pred_home_score, pred_away_score, pred_winner, pred_total')
           .in('game_id', finalGameIds)
         picks = data ?? []
       }
@@ -452,7 +438,7 @@ export default function Leaderboard({ group }: { group: Group }) {
       // puntos/exactos/diferencia y el orden final salen de la misma funcion
       // compartida que usa "Tu posicion" en la lista de Quinielas -- si cambia
       // el criterio, solo se cambia en un lugar y nunca se desincronizan
-      const standings = buildStandings(eligibleUserIds, finalGames, picks, group.points_exact)
+      const standings = buildStandings(eligibleUserIds, finalGames, picks, group.points_exact, standingsOptionsFor(group, allGames))
       const standingByUser: Record<string, (typeof standings)[number]> = {}
       standings.forEach((s) => { standingByUser[s.user_id] = s })
 
@@ -485,11 +471,14 @@ export default function Leaderboard({ group }: { group: Group }) {
 
         const playedEntries = userPicks.map((p) => {
           const g = gameById[p.game_id]
-          const diff = g ? Math.abs((g.home_score ?? 0) - (p.pred_home_score ?? 0)) + Math.abs((g.away_score ?? 0) - (p.pred_away_score ?? 0)) : 0
+          const winnerMode = group.pick_mode === 'winner'
+          const diff = winnerMode
+            ? 0
+            : g ? Math.abs((g.home_score ?? 0) - (p.pred_home_score ?? 0)) + Math.abs((g.away_score ?? 0) - (p.pred_away_score ?? 0)) : 0
           return {
             gameLabel: g ? `${g.away_team} @ ${g.home_team}` : 'Partido',
             resultLabel: g ? `${g.away_score}-${g.home_score}` : '',
-            predLabel: `${p.pred_away_score}-${p.pred_home_score}`,
+            predLabel: winnerMode ? (g ? (p.pred_winner === 'home' ? g.home_team : g.away_team) : '') + (p.pred_total != null ? ` · total ${p.pred_total}` : '') : `${p.pred_away_score}-${p.pred_home_score}`,
             points: p.points ?? 0,
             diff,
             weekLabelText: g ? weekLabel(g.season_type, g.week) : '',
@@ -531,6 +520,7 @@ export default function Leaderboard({ group }: { group: Group }) {
       // "Tu posicion"); solo reordenamos result para que calce con standings
       result.sort((a, b) => standings.findIndex((s) => s.user_id === a.user_id) - standings.findIndex((s) => s.user_id === b.user_id))
       setRows(result)
+      onRowsCount?.(result.length)
       setLoading(false)
     }
     load()
@@ -564,39 +554,6 @@ export default function Leaderboard({ group }: { group: Group }) {
 
   return (
     <div className="space-y-2">
-      {group.scoring_mode === 'weekly' && weeks.length > 0 && (
-        <div className="flex gap-2 mb-1 flex-wrap">
-          {weeks.map((w) => (
-            <button
-              key={w.key}
-              onClick={() => setSelectedWeekKey(w.key)}
-              className={`text-xs px-3 py-1.5 rounded-full border flex items-center gap-1.5 transition ${
-                selectedWeekKey === w.key
-                  ? 'border-[var(--color-light-amber)] text-[var(--color-light-amber)]'
-                  : 'border-[var(--color-field-line)] text-[var(--color-text-muted)] hover:border-[var(--color-light-amber)]'
-              }`}
-            >
-              <IconCalendar size={11} />
-              <span className="font-medium">{weekLabel(w.seasonType, w.week).replace(/\s*\d+$/, '')}</span>
-              {w.seasonType !== 3 && (
-                <span
-                  className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold font-mono-score shrink-0"
-                  style={{ background: selectedWeekKey === w.key ? 'var(--color-light-amber)' : 'var(--color-field-line)', color: selectedWeekKey === w.key ? 'var(--color-field-night)' : 'var(--color-text-muted)' }}
-                >
-                  {w.week}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
-      {totalPrize > 0 && (
-        <div className="flex items-center justify-between bg-[rgba(61,139,95,0.08)] border border-[#3D8B5F]/40 rounded-lg px-4 py-2.5 mb-1">
-          <span className="text-sm font-semibold flex items-center gap-1.5">
-            <IconCoin size={15} className="text-[var(--color-turf-green)]" /> Premio total: <span className="font-mono-score text-[var(--color-turf-green)]">${totalPrize.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
-          </span>
-        </div>
-      )}
       <div className="flex items-center justify-end mb-1">
         <button
           onClick={handleShare}
@@ -611,80 +568,68 @@ export default function Leaderboard({ group }: { group: Group }) {
           {sharing ? 'Generando...' : 'Compartir'}
         </button>
       </div>
-      {rows.map((r, i) => {
-        const style = RANK_STYLES[i]
-        const prize = group.bet_amount > 0 && i < 3 ? totalPrize * [group.prize_split_1, group.prize_split_2, group.prize_split_3][i] / 100 : null
-        return (
-          <button
-            key={r.user_id}
-            onClick={() => setSelectedPlayer(r)}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border text-left hover:brightness-110 transition"
-            style={{
-              background: style?.bg ?? 'var(--color-field-surface)',
-              borderColor: style?.border ?? 'var(--color-field-line)',
-            }}
-          >
-            <div
-              className="w-7 h-7 rounded-full flex items-center justify-center font-mono-score text-xs font-700 shrink-0"
-              style={{
-                background: style?.badge ?? 'var(--color-field-surface-raised)',
-                color: style ? style.text : 'var(--color-text-muted)',
-                border: style ? 'none' : '1px solid var(--color-field-line)',
-              }}
-            >
-              {i + 1}
-            </div>
-
-            <div
-              className="w-9 h-9 rounded-full flex items-center justify-center font-display text-sm font-700 shrink-0 overflow-hidden"
-              style={{ background: 'var(--color-field-surface-raised)', border: '1px solid var(--color-field-line)' }}
-            >
-              {r.favorite_team ? (
-                <img src={teamLogoUrl(r.favorite_team)} alt={r.favorite_team} className="w-full h-full object-contain p-1" loading="lazy" />
-              ) : (
-                r.display_name.charAt(0).toUpperCase()
-              )}
-            </div>
-
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium truncate flex items-center gap-1.5">
-                {r.display_name}
-                {r.streak >= 3 && (
-                  <span className="text-[10px] font-mono-score" title={`Racha de ${r.streak}`}>🔥{r.streak}</span>
-                )}
-                {maxExact > 0 && r.exactHits === maxExact && (
-                  <span className="text-[10px]" title="Mas marcadores exactos del grupo">🎯</span>
-                )}
-                {r.globalRank && (
-                  <span
-                    className="inline-flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full shrink-0"
-                    style={{ background: 'rgba(242,183,5,0.12)', color: 'var(--color-light-amber)' }}
-                    title="Posicion en el ranking global"
-                  >
-                    <IconGlobe size={9} /> #{r.globalRank}
-                  </span>
-                )}
-              </div>
-              <div className="text-[11px] text-[var(--color-text-muted)] font-mono-score">
-                {r.hits}/{r.played} Aciertos · Dif +{r.pointDiff}
-              </div>
-            </div>
-
-            <div className="text-right shrink-0">
-              <div className="font-mono-score text-xl font-700 leading-none">{r.points}</div>
-              <div className="text-[10px] text-[var(--color-text-muted)]">pts</div>
-              {prize != null && (
-                <div className="text-[10px] font-semibold text-[var(--color-turf-green)] mt-0.5">
-                  ${prize.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                </div>
-              )}
-            </div>
-          </button>
+      {(() => {
+        const prizeFor = (i: number) => (group.bet_amount > 0 && i < 3 ? totalPrize * [group.prize_split_1, group.prize_split_2, group.prize_split_3][i] / 100 : null)
+        const money = (n: number) => `$${n.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
+        const cols = '36px minmax(0,1fr) 64px 60px 64px'
+        const badgesOf = (r: (typeof rows)[number]) => (
+          <>
+            {r.streak >= 3 && <span title={`Racha de ${r.streak}`}>🔥{r.streak}</span>}
+            {maxExact > 0 && r.exactHits === maxExact && <span title="Mas marcadores exactos del grupo">🎯</span>}
+            {r.globalRank && <span className="rk-tag" title="Posicion en el ranking global"><IconGlobe size={9} /> #{r.globalRank}</span>}
+          </>
         )
-      })}
+        return (
+          <>
+            <Podium
+              items={rows.slice(0, 3).map((r, i) => {
+                const prize = prizeFor(i)
+                return {
+                  pos: (i + 1) as 1 | 2 | 3,
+                  name: r.display_name,
+                  team: r.favorite_team,
+                  isMe: false,
+                  points: r.points,
+                  line: `${r.hits}/${r.played} aciertos`,
+                  extra: prize != null ? money(prize) : undefined,
+                  badges: badgesOf(r),
+                  onClick: () => setSelectedPlayer(r),
+                }
+              })}
+            />
+            {rows.length > 3 && (
+              <div className="rk-table">
+                <div className="rk-head" style={{ ['--cols' as any]: cols }}>
+                  <span className="rk-c">#</span>
+                  <span>Jugador</span>
+                  <span className="rk-c">Aciertos</span>
+                  <span className="rk-c rk-hide-sm">Dif</span>
+                  <span className="rk-c">Pts</span>
+                </div>
+                {rows.slice(3).map((r, idx) => (
+                  <button key={r.user_id} onClick={() => setSelectedPlayer(r)} className="rk-row" style={{ ['--cols' as any]: cols }}>
+                    <span className="rk-pos">{idx + 4}</span>
+                    <div className="rk-player">
+                      <RankAvatar name={r.display_name} team={r.favorite_team} />
+                      <div className="rk-who">
+                        <b><span className="n">{r.display_name}</span>{badgesOf(r)}</b>
+                      </div>
+                    </div>
+                    <span className="rk-num">{r.hits}/{r.played}</span>
+                    <span className="rk-num rk-hide-sm" style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>+{r.pointDiff}</span>
+                    <span className="rk-num big">{r.points}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        )
+      })()}
 
       <p className="text-[10px] text-[var(--color-text-muted)] text-center pt-1">
-        Desempate: 1) mas marcadores exactos, 2) menor diferencia de puntos (real vs. predicho, ambos equipos). Toca a alguien para ver sus stats.
+        {group.pick_mode === 'winner'
+          ? 'Desempate: menor diferencia entre tu total de puntos y el total real del ultimo partido de la semana. Toca a alguien para ver sus stats.'
+          : 'Desempate: 1) mas marcadores exactos, 2) menor diferencia de puntos (real vs. predicho, ambos equipos). Toca a alguien para ver sus stats.'}
       </p>
 
       {selectedPlayer && <PlayerStatsModal row={selectedPlayer} onClose={() => setSelectedPlayer(null)} />}

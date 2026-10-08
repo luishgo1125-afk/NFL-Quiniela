@@ -5,8 +5,9 @@ import type { Game, Group } from '../lib/types'
 import { weekLabel } from '../lib/types'
 import GameCard from '../components/GameCard'
 import Leaderboard from '../components/Leaderboard'
+import LeagueHeader from '../components/LeagueHeader'
 import CopyPicksModal from '../components/CopyPicksModal'
-import { buildStandings, getEligibleUserIds } from '../lib/ranking'
+import { buildStandings, getEligibleUserIds, standingsOptionsFor, getLastGameIds } from '../lib/ranking'
 import { syncGroupWeekFromEspn } from '../lib/syncGames'
 import { IconClipboard, IconBarChart, IconGear, IconCalendar, IconTrophy, IconCopy, IconWhatsapp, IconAlertTriangle, IconRefresh, IconCoin } from '../components/icons'
 import type { User } from '@supabase/supabase-js'
@@ -58,6 +59,7 @@ export default function GroupDashboard({
   const [games, setGames] = useState<Game[]>([])
   const [weekKey, setWeekKey] = useState<string | null>(null)
   const [copiedCode, setCopiedCode] = useState(false)
+  const [boardCount, setBoardCount] = useState<number | null>(null)
   const [members, setMembers] = useState<{ user_id: string; display_name: string; favorite_team: string | null }[]>([])
   const [pickedBy, setPickedBy] = useState<Record<string, string[]>>({})
   const isAdmin = group.created_by === user.id
@@ -294,6 +296,9 @@ export default function GroupDashboard({
     return `${mins}m`
   }
 
+  // ultimo partido (por kickoff) de cada semana: en modo "solo ganador" ahi se pide el total de puntos
+  const lastGameIds = useMemo(() => getLastGameIds(games.filter((g) => !g.deleted_at) as any), [games])
+
   const [weeklyWinners, setWeeklyWinners] = useState<{ names: string[]; points: number } | null>(null)
 
   useEffect(() => {
@@ -305,7 +310,7 @@ export default function GroupDashboard({
       if (!allFinal) { setWeeklyWinners(null); return }
 
       const finalIds = weekGames.map((g) => g.id)
-      const { data } = await supabase.from('picks').select('user_id, game_id, points, pred_home_score, pred_away_score').in('game_id', finalIds)
+      const { data } = await supabase.from('picks').select('user_id, game_id, points, pred_home_score, pred_away_score, pred_total').in('game_id', finalIds)
 
       // quien no confirmo su participacion a tiempo esta semana no cuenta
       // para nada de esto -- ni gana, ni se le penaliza, simplemente no aplica
@@ -316,7 +321,7 @@ export default function GroupDashboard({
 
       // misma funcion que usa la Tabla y "Tu posicion" -- mismo desempate,
       // incluida la penalizacion de +20 por cada partido no predicho
-      const standings = buildStandings(eligibleUserIds, weekGames, data ?? [], group.points_exact)
+      const standings = buildStandings(eligibleUserIds, weekGames, data ?? [], group.points_exact, standingsOptionsFor(group, games as any))
       if (standings.length === 0) { setWeeklyWinners(null); return }
 
       const top = standings[0]
@@ -409,79 +414,25 @@ export default function GroupDashboard({
       : null
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
+    <div className="page-wrap">
       {syncButtonPortal}
-      <div className="flex items-center gap-3 mb-1">
-        {group.logo_url ? (
-          <img src={group.logo_url} alt={group.name} className="w-12 h-12 rounded-full object-cover border border-[var(--color-field-line)]" />
-        ) : (
-          <div className="w-12 h-12 rounded-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] flex items-center justify-center text-xl">🏈</div>
-        )}
-        <div className="flex-1">
-          <h1 className="font-display text-3xl font-800 leading-none flex items-center gap-2 flex-wrap">
-            {group.name}
-            {selectedWeek && (
-              <span className="text-[11px] font-mono-score font-semibold px-2 py-0.5 rounded-full border border-[var(--color-light-amber)] text-[var(--color-light-amber)] tracking-wide">
-                {weekLabel(selectedWeek.seasonType, selectedWeek.week)}
-              </span>
-            )}
-            {liveNow.length > 0 && (
-              <span className="text-[10px] font-semibold text-[var(--color-scoreboard-red)] flex items-center gap-1 font-mono-score">
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-scoreboard-red)] animate-pulse" />
-                EN VIVO
-              </span>
-            )}
-          </h1>
-          {tab !== 'tabla' && (
-          <p className="text-xs text-[var(--color-text-muted)] font-mono-score mt-1 flex items-center gap-1.5 flex-wrap">
-            Codigo: #{group.invite_code}
-            <button
-              onClick={copyCode}
-              aria-label="Copiar codigo de invitacion"
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--color-field-line)] hover:border-[var(--color-light-amber)] text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)] transition"
-            >
-              {copiedCode ? <>✓ Copiado</> : <IconCopy />}
-            </button>
-            <a
-              href={`https://wa.me/?text=${encodeURIComponent(`Unete a mi quiniela "${group.name}" en Quiniela NFL: ${window.location.origin}${window.location.pathname}?join=${group.invite_code}`)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Compartir por WhatsApp"
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--color-field-line)] hover:border-[#25D366] text-[var(--color-text-muted)] hover:text-[#25D366] transition"
-            >
-              <IconWhatsapp />
-            </a>
-            <span className="text-[var(--color-text-muted)]">· {members.length} miembro{members.length !== 1 ? 's' : ''}</span>
-          </p>
-          )}
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          {isAdmin && (
-            <button
-              onClick={() => setTab('admin')}
-              aria-label="Administrar liga"
-              title="Administrar"
-              className={`p-2 rounded-md border transition ${tab === 'admin' ? 'border-[var(--color-light-amber)] text-[var(--color-light-amber)] bg-[rgba(242,183,5,0.1)]' : 'border-[var(--color-field-line)] text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)] hover:border-[var(--color-light-amber)]'}`}
-            >
-              <IconGear size={16} />
-            </button>
-          )}
-        </div>
-      </div>
-      <div className="mb-5" />
-
-      <div className="flex mb-6 rounded-md overflow-hidden border border-[var(--color-field-line)] w-full">
-        {(['picks', 'tabla'] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`flex-1 px-3 py-2 text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${tab === t ? 'bg-[var(--color-light-amber)] text-[var(--color-field-night)]' : 'text-[var(--color-text-muted)]'}`}
-          >
-            {t === 'picks' ? <IconClipboard /> : <IconBarChart />}
-            {t === 'picks' ? 'Predicciones' : 'Tabla'}
-          </button>
-        ))}
-      </div>
+      <LeagueHeader
+        group={group}
+        tab={tab}
+        onTabChange={setTab}
+        weeks={weeks}
+        weekKey={weekKey}
+        onSelectWeek={setWeekKey}
+        multiYear={multiYear}
+        selectedWeek={selectedWeek}
+        liveCount={liveNow.length}
+        memberCount={members.length}
+        copiedCode={copiedCode}
+        onCopyCode={copyCode}
+        isAdmin={isAdmin}
+        onOpenAdmin={() => setTab('admin')}
+        prize={group.bet_amount > 0 ? group.bet_amount * (boardCount ?? members.length) : 0}
+      />
 
       {tab === 'admin' && (
         <button onClick={() => setTab('picks')} className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)] mb-4 flex items-center gap-1">
@@ -494,27 +445,6 @@ export default function GroupDashboard({
         {tab === 'picks' && (
         <>
           <div className="mb-4">
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-              {weeks.map((w) => (
-                <button
-                  key={w.key}
-                  onClick={() => setWeekKey(w.key)}
-                  className={`text-xs px-2 py-2 rounded-md border flex items-center justify-center gap-1.5 ${weekKey === w.key ? 'border-[var(--color-light-amber)] text-[var(--color-light-amber)] bg-[rgba(242,183,5,0.08)]' : 'border-[var(--color-field-line)] text-[var(--color-text-muted)]'}`}
-                >
-                  <IconCalendar size={11} className="shrink-0" />
-                  <span className="font-medium">{weekLabel(w.seasonType, w.week).replace(/\s*\d+$/, '')}</span>
-                  {w.seasonType !== 3 && (
-                    <span
-                      className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold font-mono-score shrink-0"
-                      style={{ background: 'var(--color-light-amber)', color: 'var(--color-field-night)' }}
-                    >
-                      {w.week}
-                    </span>
-                  )}
-                  {multiYear && <span className="text-[10px]">· {w.year}</span>}
-                </button>
-              ))}
-            </div>
             {weekKey && group.allow_copy_picks && (
               <div className="flex justify-end mt-2">
                 <button
@@ -636,7 +566,7 @@ export default function GroupDashboard({
               {isAdmin ? 'Todavia no capturas partidos. Ve a la pestaña Administrar.' : 'El administrador aun no captura partidos para esta semana.'}
             </p>
           ) : (
-            <div className="space-y-3">
+            <div className="games-grid">
               {weekGames.map((g) => (
                 <div
                   key={g.id}
@@ -652,7 +582,9 @@ export default function GroupDashboard({
                     forceLocked={needsConfirmation && weekConfirmed === false}
                     forceLockedReason="Confirma tu participacion arriba para poder predecir"
                     pointsWinner={group.points_winner}
-                    pointsExact={group.points_exact}
+                    pointsExact={group.pick_mode === 'winner' ? undefined : group.points_exact}
+                    pickMode={group.pick_mode ?? 'score'}
+                    requiresTotal={group.pick_mode === 'winner' && lastGameIds.has(g.id)}
                   />
                 </div>
               ))}
@@ -677,7 +609,7 @@ export default function GroupDashboard({
         </>
       )}
 
-      {tab === 'tabla' && <Leaderboard group={group} />}
+      {tab === 'tabla' && <Leaderboard group={group} weekKey={weekKey} onRowsCount={setBoardCount} />}
 
       {tab === 'admin' && isAdmin && (
         <Suspense fallback={<p className="text-[var(--color-text-muted)] text-sm py-8 text-center">Cargando...</p>}>

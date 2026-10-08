@@ -187,6 +187,19 @@ export default function Admin({
   const [rulesMsg, setRulesMsg] = useState<string | null>(null)
   const [rulesErr, setRulesErr] = useState<string | null>(null)
 
+  const [savingPickMode, setSavingPickMode] = useState(false)
+  const [pickModeErr, setPickModeErr] = useState<string | null>(null)
+  async function changePickMode(mode: 'score' | 'winner') {
+    if (mode === (group.pick_mode ?? 'score') || savingPickMode) return
+    setSavingPickMode(true)
+    setPickModeErr(null)
+    const { data, error: err } = await supabase.rpc('set_pick_mode', { p_group_id: groupId, p_pick_mode: mode })
+    setSavingPickMode(false)
+    if (err) { setPickModeErr(err.message); return }
+    onGroupUpdated(data)
+  }
+  const isWinnerMode = (group.pick_mode ?? 'score') === 'winner'
+
   const [savingMode, setSavingMode] = useState(false)
   const [modeErr, setModeErr] = useState<string | null>(null)
 
@@ -400,6 +413,17 @@ export default function Admin({
       p_enabled: !group.allow_copy_picks,
     })
     setSavingCopyToggle(false)
+    if (!err) onGroupUpdated(data)
+  }
+
+  const [savingPublicToggle, setSavingPublicToggle] = useState(false)
+  async function togglePublic() {
+    setSavingPublicToggle(true)
+    const { data, error: err } = await supabase.rpc('set_group_public', {
+      p_group_id: groupId,
+      p_public: !group.is_public,
+    })
+    setSavingPublicToggle(false)
     if (!err) onGroupUpdated(data)
   }
 
@@ -640,6 +664,25 @@ export default function Admin({
           </div>
           <div className="flex items-center gap-3 px-4 py-3.5">
             <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold">{group.is_public ? 'Liga publica' : 'Liga privada'}</p>
+              <p className="text-[10px] text-[var(--color-text-muted)]">
+                {group.is_public
+                  ? 'Cualquiera con cuenta puede verla en la lista y unirse sin codigo'
+                  : 'Solo se entra con el link o codigo de invitacion'}
+              </p>
+            </div>
+            <button
+              onClick={togglePublic}
+              disabled={savingPublicToggle}
+              aria-label="Cambiar liga publica o privada"
+              className="w-11 h-6 rounded-full relative transition shrink-0 disabled:opacity-50"
+              style={{ background: group.is_public ? 'var(--color-turf-green)' : 'var(--color-field-line)' }}
+            >
+              <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all" style={{ left: group.is_public ? '22px' : '2px' }} />
+            </button>
+          </div>
+          <div className="flex items-center gap-3 px-4 py-3.5">
+            <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold">Marcar como finalizada</p>
               <p className="text-[10px] text-[var(--color-text-muted)]">La liga se muestra como FINALIZADA en la lista de quinielas, sin importar los partidos</p>
             </div>
@@ -663,16 +706,46 @@ export default function Admin({
         open={!!openSections.puntuacion}
         onToggle={() => toggleSection('puntuacion')}
       >
+        <div className="space-y-2">
+          <h2 className="text-sm font-semibold">Modalidad de prediccion</h2>
+          <div className="grid grid-cols-2 gap-2">
+            {([
+              { key: 'score', title: 'Marcador exacto', text: 'Cada quien escribe el marcador de cada partido.' },
+              { key: 'winner', title: 'Solo ganador', text: 'Solo se elige al ganador; en el ultimo partido de la semana se predice el total de puntos (desempate).' },
+            ] as const).map((o) => {
+              const active = (group.pick_mode ?? 'score') === o.key
+              return (
+                <button
+                  key={o.key}
+                  type="button"
+                  disabled={savingPickMode}
+                  onClick={() => changePickMode(o.key)}
+                  className={`text-left rounded-lg border p-3 transition ${active ? 'border-[var(--color-light-amber)] bg-[rgba(242,183,5,0.10)]' : 'border-[var(--color-field-line)] hover:border-[var(--color-light-amber)]'}`}
+                >
+                  <span className={`block text-sm font-semibold ${active ? 'text-[var(--color-light-amber)]' : ''}`}>{o.title}</span>
+                  <span className="block text-[11px] text-[var(--color-text-muted)] mt-0.5">{o.text}</span>
+                </button>
+              )
+            })}
+          </div>
+          {pickModeErr && <p className="text-[var(--color-scoreboard-red)] text-xs">{pickModeErr}</p>}
+          <p className="text-[11px] text-[var(--color-text-muted)]">Solo se puede cambiar antes de que alguien haga predicciones en la liga.</p>
+        </div>
+
         <div className="bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-lg p-4 space-y-1 divide-y divide-[var(--color-field-line)]">
-          <div className="pb-3">
+          <div className={isWinnerMode ? '' : 'pb-3'}>
             <Stepper label="Prediccion del ganador" description="Puntos por acertar el equipo ganador" value={pointsWinner} onChange={setPointsWinner} />
           </div>
-          <div className="py-3">
-            <Stepper label="Marcador exacto" description="Puntos por acertar el marcador completo" value={pointsExact} onChange={setPointsExact} />
-          </div>
-          <div className="pt-3">
-            <Stepper label="Puntos de un equipo" description="Por acertar cuanto anota un equipo (no se suma si ya le atinaste al marcador exacto)" value={pointsTeamTotal} onChange={setPointsTeamTotal} />
-          </div>
+          {!isWinnerMode && (
+            <>
+              <div className="py-3">
+                <Stepper label="Marcador exacto" description="Puntos por acertar el marcador completo" value={pointsExact} onChange={setPointsExact} />
+              </div>
+              <div className="pt-3">
+                <Stepper label="Puntos de un equipo" description="Por acertar cuanto anota un equipo (no se suma si ya le atinaste al marcador exacto)" value={pointsTeamTotal} onChange={setPointsTeamTotal} />
+              </div>
+            </>
+          )}
         </div>
         <label className="flex items-start gap-2.5 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-lg px-3 py-2.5 cursor-pointer">
           <input

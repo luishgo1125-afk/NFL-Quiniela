@@ -2,6 +2,7 @@ import { useEffect, useState, lazy, Suspense } from 'react'
 import { useAuth } from './lib/useAuth'
 import { supabase } from './lib/supabase'
 import Login from './pages/Login'
+import Landing from './pages/Landing'
 import BottomNav, { type BottomTab } from './components/BottomNav'
 import NewGroupModal, { SUPER_ADMIN_ID } from './components/NewGroupModal'
 import type { Group } from './lib/types'
@@ -82,14 +83,27 @@ export default function App() {
   const [recovery, setRecovery] = useState(false)
   const [bottomTab, setBottomTab] = useState<BottomTab>('quinielas')
   const [showCreateModal, setShowCreateModal] = useState(false)
+  // al crear/unirse a una quiniela se vuelve a cargar la lista y se muestran "todas"
+  // (una liga nueva aun no tiene partidos, asi que el filtro "activas" la ocultaria)
+  const [listKey, setListKey] = useState(0)
+  const [listFilter, setListFilter] = useState<'activa' | 'todas'>('activa')
   const [hasUnread, setHasUnread] = useState(false)
   const [focusGameId, setFocusGameId] = useState<string | null>(null)
+  const [authView, setAuthView] = useState<null | 'signin' | 'signup'>(() => (new URLSearchParams(window.location.search).get('join') ? 'signup' : null))
 
   // si la URL trae ?join=CODIGO (link directo de invitacion de un admin),
   // lo guardamos para procesarlo en cuanto sepamos si hay sesion o no
   const [pendingInviteCode, setPendingInviteCode] = useState<string | null>(() => new URLSearchParams(window.location.search).get('join'))
   const [joining, setJoining] = useState(!!pendingInviteCode)
   const [joinError, setJoinError] = useState<string | null>(null)
+  const [firstName, setFirstName] = useState('')
+  useEffect(() => {
+    if (!user || bottomTab === 'perfil') return
+    supabase.from('profiles').select('display_name').eq('id', user?.id).single().then(({ data }) => {
+      const n = (data?.display_name ?? '').trim().split(/\s+/)[0]
+      setFirstName(n || (user?.email ?? '').split('@')[0])
+    })
+  }, [user?.id, bottomTab])
 
   // al tocar una notificacion de un partido, brinca a la liga correcta y le
   // pasa el id del partido a GroupDashboard para que se posicione ahi
@@ -198,7 +212,10 @@ export default function App() {
 
   if (recovery) return <ResetPasswordScreen onDone={() => setRecovery(false)} />
 
-  if (!user) return <Login />
+  if (!user) {
+    if (!authView) return <Landing onEnter={setAuthView} />
+    return <Login initialMode={authView} onBack={() => setAuthView(null)} />
+  }
 
   if (joining) {
     return (
@@ -233,25 +250,25 @@ export default function App() {
     setBottomTab(tab)
   }
 
+  const onHome = bottomTab === 'quinielas' && !activeGroup
+  const profileChip = bottomTab !== 'perfil' ? (
+    <button onClick={() => setBottomTab('perfil')} title="Perfil" className="profile-chip">
+      <span className="profile-chip-ico"><IconUser size={14} /></span>
+      {firstName && <span className="profile-chip-name">{firstName}</span>}
+    </button>
+  ) : null
+
   return (
-    <div className="pb-16">
-      <header className="sticky top-0 z-40 border-b border-[var(--color-field-line)] px-4 py-2.5 flex items-center justify-between" style={{ background: 'linear-gradient(180deg, rgba(242,183,5,0.05), var(--color-page-bg)), var(--color-page-bg)' }}>
+    <div className="app-shell">
+      <header className={`sticky top-0 z-40 border-b border-[var(--color-field-line)] px-4 py-2.5 flex items-center justify-between ${onHome ? 'app-header-home' : ''}`} style={{ background: 'linear-gradient(180deg, rgba(242,183,5,0.05), var(--color-page-bg)), var(--color-page-bg)' }}>
         <div className="flex items-center gap-2">
           <div id="header-left-slot" className="flex items-center" />
-          <img src="/logo.png" alt="Quiniela" className="h-10 w-auto logo-dark" />
-          <img src="/logo-light.png" alt="Quiniela" className="h-10 w-auto logo-light" />
+          <img src="/logo.png" alt="Quiniela" className="h-10 w-auto logo-dark app-header-brand" />
+          <img src="/logo-light.png" alt="Quiniela" className="h-10 w-auto logo-light app-header-brand" />
         </div>
         <div className="flex items-center gap-2">
           <div id="header-right-slot" className="flex items-center" />
-          {bottomTab !== 'perfil' && (
-            <button
-              onClick={() => setBottomTab('perfil')}
-              title="Perfil"
-              className="w-8 h-8 rounded-full flex items-center justify-center border border-[var(--color-field-line)] text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)] hover:border-[var(--color-light-amber)] transition"
-            >
-              <IconUser size={16} />
-            </button>
-          )}
+          {profileChip}
         </div>
       </header>
 
@@ -277,11 +294,11 @@ export default function App() {
               onFocusConsumed={() => setFocusGameId(null)}
             />
           ) : (
-            <QuinielasList user={user} onSelect={selectGroup} />
+            <QuinielasList key={listKey} navRight={profileChip} user={user} onSelect={selectGroup} initialFilter={listFilter} onOpenRanking={() => setBottomTab('ranking')} />
           )
         )}
 
-        {bottomTab === 'notificaciones' && <Notifications user={user} onOpenGame={openGameFromNotification} />}
+        {bottomTab === 'notificaciones' && <Notifications user={user} onOpenGame={openGameFromNotification} onGoHome={() => { setActiveGroup(null); setBottomTab('quinielas') }} />}
 
         {bottomTab === 'perfil' && (
           <Profile
@@ -305,7 +322,7 @@ export default function App() {
         <NewGroupModal
           canCreate={canCreate}
           onClose={() => setShowCreateModal(false)}
-          onDone={() => { setShowCreateModal(false); setBottomTab('quinielas') }}
+          onDone={() => { setShowCreateModal(false); setActiveGroup(null); setListFilter('todas'); setListKey((k) => k + 1); setBottomTab('quinielas') }}
         />
       )}
     </div>

@@ -1,3 +1,4 @@
+import EmptyState from '../components/EmptyState'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { IconBell, IconCheck, IconStar, IconTarget, IconClipboardX, IconTrophy, IconUsers, IconClock, IconTrash } from '../components/icons'
@@ -128,7 +129,7 @@ function SwipeableNotifRow({ id, onDelete, children }: { id: string; onDelete: (
   )
 }
 
-export default function Notifications({ user, onOpenGame }: { user: User; onOpenGame?: (gameId: string) => void }) {
+export default function Notifications({ user, onOpenGame, onGoHome }: { user: User; onOpenGame?: (gameId: string) => void; onGoHome?: () => void }) {
   const [notifs, setNotifs] = useState<NotificationItem[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'todas' | Category>('todas')
@@ -246,7 +247,7 @@ export default function Notifications({ user, onOpenGame }: { user: User; onOpen
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-10">
+    <div className="page-wrap narrow">
       <div className="flex items-start justify-between gap-3 mb-1">
         <div>
           <h1 className="font-display text-4xl font-800">NOTIFICACIONES</h1>
@@ -305,10 +306,13 @@ export default function Notifications({ user, onOpenGame }: { user: User; onOpen
       {loading ? (
         <p className="text-[var(--color-text-muted)] text-sm">Cargando...</p>
       ) : notifs.length === 0 ? (
-        <div className="text-center py-10 border border-dashed border-[var(--color-field-line)] rounded-lg">
-          <IconBell size={28} className="text-[var(--color-text-muted)] mx-auto mb-2" />
-          <p className="text-[var(--color-text-muted)] text-sm">Todavia no tienes avisos.</p>
-        </div>
+        <EmptyState
+          icon={<IconBell size={32} />}
+          title="Todo tranquilo"
+          text="No tienes nuevas notificaciones. Cuando ocurra algo importante en tus quinielas aparecerá aquí."
+          actionLabel={onGoHome ? 'Ver jornadas' : undefined}
+          onAction={onGoHome}
+        />
       ) : filtered.length === 0 ? (
         <p className="text-[var(--color-text-muted)] text-sm text-center py-8">No hay notificaciones en esta categoria.</p>
       ) : (

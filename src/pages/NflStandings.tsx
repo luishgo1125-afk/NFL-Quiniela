@@ -27,7 +27,7 @@ export default function NflStandings() {
   }, [])
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-10">
+    <div className="page-wrap">
       <h1 className="font-display text-4xl font-800 flex items-center gap-3 mb-1">
         <IconShield size={32} className="text-[var(--color-light-amber)]" /> POSICIONES NFL
       </h1>

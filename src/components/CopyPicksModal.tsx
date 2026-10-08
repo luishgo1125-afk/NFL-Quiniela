@@ -72,11 +72,11 @@ export default function CopyPicksModal({
     const sourceGameIds = (sourceGames ?? []).map((g) => g.id)
     const { data: sourcePicks } = await supabase
       .from('picks')
-      .select('game_id, pred_home_score, pred_away_score')
+      .select('game_id, pred_home_score, pred_away_score, pred_winner, pred_total')
       .eq('user_id', userId)
       .in('game_id', sourceGameIds.length > 0 ? sourceGameIds : ['00000000-0000-0000-0000-000000000000'])
 
-    const pickByGameId: Record<string, { pred_home_score: number; pred_away_score: number }> = {}
+    const pickByGameId: Record<string, { pred_home_score: number; pred_away_score: number; pred_winner?: string | null; pred_total?: number | null }> = {}
     ;(sourcePicks ?? []).forEach((p: any) => { pickByGameId[p.game_id] = p })
 
     // partidos de la liga destino (esta) en la misma semana, para emparejar por equipo
@@ -100,7 +100,7 @@ export default function CopyPicksModal({
       if (lockTime <= Date.now()) { locked++; continue }
 
       const { error: upErr } = await supabase.from('picks').upsert(
-        { game_id: dest.id, user_id: userId, pred_home_score: theirPick.pred_home_score, pred_away_score: theirPick.pred_away_score },
+        { game_id: dest.id, user_id: userId, pred_home_score: theirPick.pred_home_score, pred_away_score: theirPick.pred_away_score, pred_winner: theirPick.pred_winner ?? null, pred_total: theirPick.pred_total ?? null },
         { onConflict: 'game_id,user_id' }
       )
       if (!upErr) copied++

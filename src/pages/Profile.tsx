@@ -317,7 +317,7 @@ export default function Profile({
   const delta = prevAccuracy != null ? curAccuracy - prevAccuracy : null
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
+    <div className="page-wrap narrow space-y-4">
       {/* Encabezado + ranking */}
       <div className="grid grid-cols-[1.25fr_1fr] gap-3 w-full items-stretch">
         <div className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-4">

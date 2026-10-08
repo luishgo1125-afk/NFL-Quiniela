@@ -51,6 +51,8 @@ export default function GameCard({
   forceLockedReason,
   pointsWinner,
   pointsExact,
+  pickMode = 'score',
+  requiresTotal = false,
 }: {
   game: Game
   userId: string
@@ -60,14 +62,19 @@ export default function GameCard({
   forceLockedReason?: string
   pointsWinner?: number
   pointsExact?: number
+  pickMode?: 'score' | 'winner'
+  requiresTotal?: boolean
 }) {
   const [pick, setPick] = useState<Pick | null>(null)
   const [home, setHome] = useState('')
   const [away, setAway] = useState('')
+  const winnerMode = pickMode === 'winner'
+  const [winner, setWinner] = useState<'home' | 'away' | null>(null)
+  const [total, setTotal] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [showPickers, setShowPickers] = useState(false)
-  const [othersPicks, setOthersPicks] = useState<Record<string, { pred_home_score: number; pred_away_score: number; points: number | null }>>({})
+  const [othersPicks, setOthersPicks] = useState<Record<string, { pred_home_score: number; pred_away_score: number; pred_winner?: string | null; pred_total?: number | null; points: number | null }>>({})
 
   const kickoffTime = new Date(game.kickoff).getTime()
   const lockTime = kickoffTime - LOCK_MINUTES * 60 * 1000
@@ -78,17 +85,19 @@ export default function GameCard({
   // este momento para saber cuando ya se pueden mostrar
   const othersVisible = kickoffTime <= Date.now()
   const closingSoon = !locked && lockTime - WARNING_MINUTES * 60 * 1000 <= Date.now()
-  const confirmed = pick != null && home !== '' && away !== '' && String(pick.pred_home_score) === home && String(pick.pred_away_score) === away
+  const confirmed = winnerMode
+    ? pick != null && winner != null && pick.pred_winner === winner && (!requiresTotal || (total !== '' && String(pick.pred_total ?? '') === total))
+    : pick != null && home !== '' && away !== '' && String(pick.pred_home_score) === home && String(pick.pred_away_score) === away
   const tickingClock = useTickingClock(game.game_clock, game.status === 'live')
 
   // quien va ganando segun lo que se lleva escrito (para resaltar visualmente)
-  const awayLeading = away !== '' && home !== '' && Number(away) > Number(home)
-  const homeLeading = away !== '' && home !== '' && Number(home) > Number(away)
+  const awayLeading = winnerMode ? winner === 'away' : away !== '' && home !== '' && Number(away) > Number(home)
+  const homeLeading = winnerMode ? winner === 'home' : away !== '' && home !== '' && Number(home) > Number(away)
 
   useEffect(() => {
     supabase
       .from('picks')
-      .select('pred_home_score, pred_away_score, points')
+      .select('pred_home_score, pred_away_score, pred_winner, pred_total, points')
       .eq('game_id', game.id)
       .eq('user_id', userId)
       .maybeSingle()
@@ -97,6 +106,8 @@ export default function GameCard({
           setPick(data)
           setHome(String(data.pred_home_score))
           setAway(String(data.pred_away_score))
+          setWinner((data as any).pred_winner ?? null)
+          setTotal((data as any).pred_total != null ? String((data as any).pred_total) : '')
         }
       })
   }, [game.id])
@@ -108,7 +119,7 @@ export default function GameCard({
     if (!othersVisible) return
     supabase
       .from('picks')
-      .select('user_id, pred_home_score, pred_away_score, points')
+      .select('user_id, pred_home_score, pred_away_score, pred_winner, pred_total, points')
       .eq('game_id', game.id)
       .then(({ data }) => {
         const map: typeof othersPicks = {}
@@ -119,14 +130,23 @@ export default function GameCard({
   }, [game.id, othersVisible])
 
   async function save() {
-    if (home === '' || away === '') return
+    if (winnerMode ? winner == null || (requiresTotal && total === '') : home === '' || away === '') return
     setSaving(true)
-    const payload = {
-      game_id: game.id,
-      user_id: userId,
-      pred_home_score: Number(home),
-      pred_away_score: Number(away),
-    }
+    const payload: Record<string, any> = winnerMode
+      ? {
+          game_id: game.id,
+          user_id: userId,
+          pred_home_score: 0,
+          pred_away_score: 0,
+          pred_winner: winner,
+          pred_total: requiresTotal ? Number(total) : null,
+        }
+      : {
+          game_id: game.id,
+          user_id: userId,
+          pred_home_score: Number(home),
+          pred_away_score: Number(away),
+        }
     const { error, data } = await supabase.from('picks').upsert(payload, { onConflict: 'game_id,user_id' }).select().single()
     setSaving(false)
     if (!error && data) {
@@ -147,6 +167,8 @@ export default function GameCard({
       setPick(null)
       setHome('')
       setAway('')
+      setWinner(null)
+      setTotal('')
     } else {
       alert('No se pudo eliminar la predicción. Puede que el partido ya haya cerrado.')
     }
@@ -156,6 +178,7 @@ export default function GameCard({
   // sin tener que escribir el marcador exacto (lo puedes afinar despues)
   function selectWinner(side: 'away' | 'home') {
     if (locked) return
+    if (winnerMode) { setWinner(side); return }
     if (away === '' || home === '') {
       if (side === 'away') { setAway('7'); setHome('0') } else { setHome('7'); setAway('0') }
       return
@@ -313,6 +336,11 @@ export default function GameCard({
             </div>
 
             {/* marcador -- col 3, fila 2 */}
+            {winnerMode ? (
+              <div className="justify-self-center text-center" style={{ gridColumn: '3', gridRow: '2' }}>
+                <span className="font-display text-3xl font-800 text-[var(--color-text-muted)]">VS</span>
+              </div>
+            ) : (
             <div className="flex items-center gap-1.5 justify-self-center" style={{ gridColumn: '3', gridRow: '2' }}>
               <input
                 type="number"
@@ -340,6 +368,7 @@ export default function GameCard({
                 style={homeLeading ? { boxShadow: '0 0 8px 0 rgba(242,183,5,0.5)' } : undefined}
               />
             </div>
+            )}
 
             {/* apodo + pill del visitante -- col 2, fila 3 */}
             <div
@@ -361,7 +390,7 @@ export default function GameCard({
               className="text-[10px] font-bold uppercase tracking-wide text-[var(--color-light-amber)] whitespace-nowrap justify-self-center"
               style={{ gridColumn: '3', gridRow: '3' }}
             >
-              Tu prediccion
+              {winnerMode ? 'Elige al ganador' : 'Tu prediccion'}
             </span>
 
             {/* apodo + pill del local -- col 4, fila 3 */}
@@ -380,7 +409,35 @@ export default function GameCard({
             </div>
           </div>
 
-         
+          {winnerMode && requiresTotal && (
+            <div className="mt-5 rounded-2xl border border-[var(--color-light-amber)]/50 bg-[rgba(242,183,5,0.06)] px-4 py-3 flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-[var(--color-light-amber)] uppercase tracking-wide">Ultimo partido de la semana</p>
+                <p className="text-xs text-[var(--color-text-muted)] mt-0.5">¿Cuantos puntos habra en total (ambos equipos)? Sirve para desempatar.</p>
+              </div>
+              <input
+                type="number"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                min={0}
+                value={total}
+                disabled={locked}
+                placeholder="0"
+                onChange={(e) => setTotal(e.target.value)}
+                className="w-20 h-12 text-center font-mono-score text-2xl font-800 rounded-2xl outline-none bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] focus:border-[var(--color-light-amber)] disabled:opacity-60"
+              />
+            </div>
+          )}
+
+          {(pointsWinner != null || pointsExact != null) && (
+            <div className="flex items-center justify-center gap-4 mt-5 text-xs text-[var(--color-text-muted)]">
+              <span className="flex items-center gap-2">
+                <IconTrophy size={14} className="text-[var(--color-light-amber)]" />
+                {pointsWinner != null && <span>Ganador: <strong className="text-[var(--color-text-primary)]">{pointsWinner} pts</strong></span>}
+              </span>
+              {pointsExact != null && <span>Marcador exacto: <strong className="text-[var(--color-text-primary)]">{pointsExact} pts</strong></span>}
+            </div>
+          )}
         </div>
       )}
 
@@ -400,8 +457,8 @@ export default function GameCard({
           className="flex items-center gap-1.5 mt-4 flex-wrap w-full text-left hover:opacity-80 transition"
         >
           <IconUsers size={13} className="text-[var(--color-text-muted)] shrink-0" />
-          <span className="text-xs text-[var(--color-text-muted)] ">
-            {pickedUserIds.length}/{members.length}
+          <span className="text-xs text-[var(--color-text-muted)] mr-1 underline decoration-dotted">
+            {pickedUserIds.length}/{members.length} han predicho
           </span>
           {members.map((m) => {
             const done = pickedUserIds.includes(m.user_id)
@@ -464,7 +521,9 @@ export default function GameCard({
                     <span className="text-sm flex-1 truncate">{m.display_name}</span>
                     {othersVisible && theirs ? (
                       <span className="text-xs font-mono-score font-semibold flex items-center gap-1.5">
-                        {theirs.pred_away_score}-{theirs.pred_home_score}
+                        {winnerMode
+                          ? <>{theirs.pred_winner === 'home' ? game.home_team : game.away_team}{theirs.pred_total != null && <span className="text-[var(--color-text-muted)]"> · {theirs.pred_total}</span>}</>
+                          : <>{theirs.pred_away_score}-{theirs.pred_home_score}</>}
                         {theirs.points != null && theirs.points > 0 && (
                           <span className="text-[var(--color-light-amber)]">+{theirs.points}</span>
                         )}
@@ -488,7 +547,7 @@ export default function GameCard({
         <div className="flex gap-2 mt-5">
           <button
             onClick={save}
-            disabled={saving || home === '' || away === '' || confirmed}
+            disabled={saving || confirmed || (winnerMode ? winner == null || (requiresTotal && total === '') : home === '' || away === '')}
             className={`flex-1 text-sm font-bold rounded-xl py-2.5 transition disabled:opacity-70 flex items-center justify-center gap-2 ${
               confirmed ? 'bg-[rgba(61,139,95,0.15)] border border-[var(--color-turf-green)] text-[var(--color-turf-green)]' : 'bg-[var(--color-light-amber)] text-[var(--color-field-night)] hover:brightness-110'
             }`}

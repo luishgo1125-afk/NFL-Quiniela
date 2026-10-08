@@ -20,6 +20,7 @@ export interface RankablePick {
   points: number | null
   pred_home_score: number
   pred_away_score: number
+  pred_total?: number | null
 }
 
 export interface WeekEntry {
@@ -88,6 +89,24 @@ export async function getRankedFinalGames(
   return { finalGames, allGames, currentWeekKey, activeWeekEntry }
 }
 
+// El "ultimo partido de la semana" (el de kickoff mas tarde) de cada jornada:
+// en la modalidad "solo ganador" ahi se pide el total de puntos para desempatar.
+export function getLastGameIds(allGames: RankableGame[]): Set<string> {
+  const lastByWeek = new Map<string, RankableGame>()
+  allGames.forEach((g) => {
+    const key = `${g.year}:${g.season_type}:${g.week}`
+    const cur = lastByWeek.get(key)
+    if (!cur || new Date(g.kickoff).getTime() > new Date(cur.kickoff).getTime()) lastByWeek.set(key, g)
+  })
+  return new Set(Array.from(lastByWeek.values()).map((g) => g.id))
+}
+
+export interface StandingsOptions {
+  winnerMode?: boolean
+  lastGameIds?: Set<string>
+}
+
+const MISSED_TOTAL_PENALTY = 100 // modo ganador: no capturar el total del ultimo partido
 const MISSED_GAME_PENALTY = 20 // cada partido finalizado que no predijo suma esto a su diferencia, para el desempate
 
 export interface Standing {
@@ -105,7 +124,7 @@ export interface Standing {
 // cada partido finalizado que un jugador NO predijo, se le suman 20 a su
 // diferencia (penalizacion por no participar), en vez de compararlo solo
 // contra los partidos que si jugo.
-export function buildStandings(userIds: string[], finalGames: RankableGame[], picks: RankablePick[], pointsExact: number): Standing[] {
+export function buildStandings(userIds: string[], finalGames: RankableGame[], picks: RankablePick[], pointsExact: number, opts: StandingsOptions = {}): Standing[] {
   const gameById: Record<string, RankableGame> = {}
   finalGames.forEach((g) => { gameById[g.id] = g })
 
@@ -119,6 +138,24 @@ export function buildStandings(userIds: string[], finalGames: RankableGame[], pi
     const userPicks = byUser[uid] ?? []
     const pickedGameIds = new Set(userPicks.map((p) => p.game_id))
     let points = 0, hits = 0, exactHits = 0, pointDiff = 0
+
+    if (opts.winnerMode) {
+      // Modo "solo ganador": no hay marcadores exactos. Desempate = que tan
+      // cerca estuvo del total de puntos del ultimo partido de cada semana
+      // (suma de diferencias; si no lo capturo, +100 de penalizacion).
+      userPicks.forEach((p) => {
+        points += p.points ?? 0
+        if ((p.points ?? 0) > 0) hits++
+      })
+      finalGames.forEach((g) => {
+        if (!opts.lastGameIds?.has(g.id)) return
+        const p = userPicks.find((x) => x.game_id === g.id)
+        if (p && p.pred_total != null) pointDiff += Math.abs(p.pred_total - ((g.home_score ?? 0) + (g.away_score ?? 0)))
+        else pointDiff += MISSED_TOTAL_PENALTY
+      })
+      return { user_id: uid, points, hits, exactHits: 0, pointDiff, played: userPicks.length }
+    }
+
     userPicks.forEach((p) => {
       points += p.points ?? 0
       if ((p.points ?? 0) > 0) hits++
@@ -194,6 +231,10 @@ export async function getEligibleUserIds(
 // Conveniencia: trae y calcula el ranking completo de una liga de un jalon
 // (usado por pantallas que solo necesitan la posicion, no todo el detalle
 // que si renderiza la Tabla).
+export function standingsOptionsFor(group: Group, allGames: RankableGame[]): StandingsOptions {
+  return group.pick_mode === 'winner' ? { winnerMode: true, lastGameIds: getLastGameIds(allGames) } : {}
+}
+
 export async function getGroupStandings(group: Group, userIds: string[], weekKey?: string | null): Promise<Standing[]> {
   const { finalGames, allGames, activeWeekEntry } = await getRankedFinalGames(group, weekKey)
   const eligibleUserIds = await getEligibleUserIds(group, userIds, allGames, activeWeekEntry)
@@ -202,9 +243,9 @@ export async function getGroupStandings(group: Group, userIds: string[], weekKey
   if (finalGameIds.length > 0) {
     const { data } = await supabase
       .from('picks')
-      .select('user_id, game_id, points, pred_home_score, pred_away_score')
+      .select('user_id, game_id, points, pred_home_score, pred_away_score, pred_total')
       .in('game_id', finalGameIds)
     picks = (data ?? []) as RankablePick[]
   }
-  return buildStandings(eligibleUserIds, finalGames, picks, group.points_exact)
+  return buildStandings(eligibleUserIds, finalGames, picks, group.points_exact, standingsOptionsFor(group, allGames))
 }

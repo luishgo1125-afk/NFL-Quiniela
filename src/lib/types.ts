@@ -11,9 +11,11 @@ export interface Group {
   created_at: string
   logo_url: string | null
   finalized: boolean
+  is_public: boolean
   points_winner: number
   points_exact: number
   points_team_total: number
+  pick_mode: 'score' | 'winner'
   scoring_mode: 'season' | 'weekly' | 'range'
   range_start_year: number | null
   range_start_season_type: number | null
@@ -88,6 +90,8 @@ export interface Pick {
   user_id: string
   pred_home_score: number
   pred_away_score: number
+  pred_winner?: 'home' | 'away' | null
+  pred_total?: number | null
   points: number | null
 }
 

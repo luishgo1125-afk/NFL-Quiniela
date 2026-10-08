@@ -20,15 +20,19 @@ export default function BottomNav({
     { key: 'ranking', label: 'Ranking', icon: (a) => <IconGlobe size={20} className={a ? 'text-[var(--color-light-amber)]' : ''} /> },
     { key: 'crear', label: canCreate ? 'Crear' : 'Unirse', icon: () => <IconPlusCircle size={22} /> },
     { key: 'posiciones', label: 'Posiciones', icon: (a) => <IconShield size={20} className={a ? 'text-[var(--color-light-amber)]' : ''} /> },
-    { key: 'notificaciones', label: 'Notificaciones', icon: (a) => <IconBell size={20} className={a ? 'text-[var(--color-light-amber)]' : ''} /> },
+    { key: 'notificaciones', label: 'Avisos', icon: (a) => <IconBell size={20} className={a ? 'text-[var(--color-light-amber)]' : ''} /> },
   ]
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 border-t z-30"
+      className="app-nav fixed bottom-0 left-0 right-0 border-t z-30"
       style={{ background: 'var(--color-field-surface)', borderColor: 'var(--color-field-line)' }}
     >
-      <div className="max-w-2xl mx-auto grid" style={{ gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' }}>
+      <div className="app-nav-brand">
+        <img src="/logo.png" alt="Quiniela" className="logo-dark" />
+        <img src="/logo-light.png" alt="Quiniela" className="logo-light" />
+      </div>
+      <div className="app-nav-inner mx-auto grid" style={{ gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' }}>
         {items.map((item) => {
           const isActive = item.key !== 'crear' && item.key === active
           const isCreate = item.key === 'crear'
@@ -36,7 +40,7 @@ export default function BottomNav({
             <button
               key={item.key}
               onClick={() => (isCreate ? onCreate() : onChange(item.key as BottomTab))}
-              className="flex flex-col items-center justify-center gap-1 py-2.5 relative"
+              className={`app-nav-btn${isActive ? ' active' : ''} flex flex-col items-center justify-center gap-1 py-2.5 relative`}
             >
               <span
                 className="relative flex items-center justify-center"
@@ -48,7 +52,7 @@ export default function BottomNav({
                 )}
               </span>
               <span
-                className="text-[9px] font-medium leading-none text-center px-0.5"
+                className="app-nav-label text-[9px] font-medium leading-none text-center px-0.5"
                 style={{ color: isCreate ? 'var(--color-light-amber)' : isActive ? 'var(--color-light-amber)' : 'var(--color-text-muted)' }}
               >
                 {item.label}

@@ -3,8 +3,8 @@ import { supabase } from '../lib/supabase'
 import { NFL_TEAMS } from '../lib/types'
 import { teamLogoUrl } from '../lib/teamLogos'
 
-export default function Login() {
-  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>('signin')
+export default function Login({ initialMode = 'signin', onBack }: { initialMode?: 'signin' | 'signup'; onBack?: () => void }) {
+  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>(initialMode)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
@@ -67,6 +67,9 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
+        {onBack && (
+          <button onClick={onBack} className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)] mb-4">← Inicio</button>
+        )}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-3">
             <span className="font-mono-score text-[var(--color-light-amber)] text-sm tracking-widest"></span>

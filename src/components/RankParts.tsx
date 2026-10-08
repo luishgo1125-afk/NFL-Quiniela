@@ -43,3 +43,8 @@ export function Podium({ items }: { items: PodiumItem[] }) {
     </div>
   )
 }
+
+// solo el primer nombre (para que quepa en pantallas chicas)
+export function firstName(full: string) {
+  return (full ?? '').trim().split(/\s+/)[0] || full
+}

@@ -431,7 +431,7 @@ export default function GroupDashboard({
         onCopyCode={copyCode}
         isAdmin={isAdmin}
         onOpenAdmin={() => setTab('admin')}
-        prize={group.bet_amount > 0 ? group.bet_amount * (boardCount ?? members.length) : 0}
+        prize={group.bet_amount > 0 ? group.bet_amount * (needsConfirmation ? (confirmedUserIds ? confirmedUserIds.size : 0) : members.length) : 0}
       />
 
       {tab === 'admin' && (

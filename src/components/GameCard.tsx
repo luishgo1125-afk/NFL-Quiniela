@@ -281,7 +281,7 @@ export default function GameCard({
             {/* escudo + abreviatura del visitante, encerrados juntos -- fila 2, columnas 1-2 */}
             <div
               onClick={() => selectWinner('away')}
-              className={`flex items-center gap-3 rounded-3xl px-3 py-2 transition-shadow ${!locked ? 'cursor-pointer' : ''}`}
+              className={`flex items-center gap-3 rounded-3xl px-2 py-2 sm:px-3 transition-shadow ${!locked ? 'cursor-pointer' : ''}`}
               style={{
                 gridColumn: '1 / span 2',
                 gridRow: '2',
@@ -290,7 +290,7 @@ export default function GameCard({
                 background: awayLeading ? 'rgba(242,183,5,0.08)' : undefined,
               }}
             >
-              <img src={teamLogoUrl(game.away_team)} alt={game.away_team} className="w-20 h-20 object-contain shrink-0" loading="lazy" />
+              <img src={teamLogoUrl(game.away_team)} alt={game.away_team} className="object-contain shrink-0" style={{ width: 'clamp(48px, 16vw, 80px)', height: 'clamp(48px, 16vw, 80px)' }} loading="lazy" />
             </div>
 
             {/* ciudad del visitante -- col 2, fila 1 */}
@@ -323,7 +323,7 @@ export default function GameCard({
             {/* escudo + abreviatura del local, encerrados juntos -- fila 2, columnas 4-5 */}
             <div
               onClick={() => selectWinner('home')}
-              className={`flex items-center justify-end gap-3 rounded-3xl px-3 py-2 transition-shadow ${!locked ? 'cursor-pointer' : ''}`}
+              className={`flex items-center justify-end gap-3 rounded-3xl px-2 py-2 sm:px-3 transition-shadow ${!locked ? 'cursor-pointer' : ''}`}
               style={{
                 gridColumn: '4 / span 2',
                 gridRow: '2',
@@ -332,7 +332,7 @@ export default function GameCard({
                 background: homeLeading ? 'rgba(242,183,5,0.08)' : undefined,
               }}
             >
-              <img src={teamLogoUrl(game.home_team)} alt={game.home_team} className="w-20 h-20 object-contain shrink-0" loading="lazy" />
+              <img src={teamLogoUrl(game.home_team)} alt={game.home_team} className="object-contain shrink-0" style={{ width: 'clamp(48px, 16vw, 80px)', height: 'clamp(48px, 16vw, 80px)' }} loading="lazy" />
             </div>
 
             {/* marcador -- col 3, fila 2 */}
@@ -341,7 +341,7 @@ export default function GameCard({
                 <span className="font-display text-3xl font-800 text-[var(--color-text-muted)]">VS</span>
               </div>
             ) : (
-            <div className="flex items-center gap-1.5 justify-self-center" style={{ gridColumn: '3', gridRow: '2' }}>
+            <div className="flex items-center gap-1 justify-self-center" style={{ gridColumn: '3', gridRow: '2' }}>
               <input
                 type="number"
                 inputMode="numeric"
@@ -351,8 +351,8 @@ export default function GameCard({
                 disabled={locked}
                 onClick={(e) => e.stopPropagation()}
                 onChange={(e) => setAway(e.target.value)}
-                className={`w-16 h-16 text-center font-mono-score text-3xl font-800 rounded-3xl outline-none disabled:opacity-60 transition-colors ${awayScoreInputClass}`}
-                style={awayLeading ? { boxShadow: '0 0 8px 0 rgba(242,183,5,0.5)' } : undefined}
+                className={`text-center font-mono-score font-800 rounded-3xl outline-none disabled:opacity-60 transition-colors ${awayScoreInputClass}`}
+                style={{ width: 'clamp(44px, 14vw, 64px)', height: 'clamp(44px, 14vw, 64px)', fontSize: 'clamp(22px, 7vw, 30px)', ...(awayLeading ? { boxShadow: '0 0 8px 0 rgba(242,183,5,0.5)' } : {}) }}
               />
               <span className="text-[var(--color-text-muted)] text-xl">–</span>
               <input
@@ -364,8 +364,8 @@ export default function GameCard({
                 disabled={locked}
                 onClick={(e) => e.stopPropagation()}
                 onChange={(e) => setHome(e.target.value)}
-                className={`w-16 h-16 text-center font-mono-score text-3xl font-800 rounded-3xl outline-none disabled:opacity-60 transition-colors ${homeScoreInputClass}`}
-                style={homeLeading ? { boxShadow: '0 0 8px 0 rgba(242,183,5,0.5)' } : undefined}
+                className={`text-center font-mono-score font-800 rounded-3xl outline-none disabled:opacity-60 transition-colors ${homeScoreInputClass}`}
+                style={{ width: 'clamp(44px, 14vw, 64px)', height: 'clamp(44px, 14vw, 64px)', fontSize: 'clamp(22px, 7vw, 30px)', ...(homeLeading ? { boxShadow: '0 0 8px 0 rgba(242,183,5,0.5)' } : {}) }}
               />
             </div>
             )}

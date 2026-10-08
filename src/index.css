@@ -448,3 +448,34 @@ button.rk-pod:hover, .rk-pod:hover { transform: translateY(-2px); border-color: 
 .privacy-sec li { margin-bottom: 6px; }
 .privacy-sec b { color: var(--color-text-primary); font-weight: 600; }
 .privacy-sec a { color: var(--color-light-amber); text-decoration: underline; }
+
+/* Rankings en celular: nombre completo visible, insignias en 2da linea */
+.rk-who small.rk-badges { display: flex; align-items: center; gap: 6px; font-family: inherit; margin-top: 3px; overflow: visible; }
+.rk-who small.rk-badges:empty { display: none; }
+.rk-who b { overflow: visible; }
+.rk-who b span.n { overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 560px) {
+  .rk-head, .rk-row { gap: 6px; padding: 0 12px; }
+  .rk-player { gap: 10px; }
+  .rk-row { min-height: 64px; }
+  .rk-who b { font-size: 16px; }
+  .rk-head { font-size: 10px; letter-spacing: .06em; }
+}
+
+/* Ranking global en pantallas chicas: columnas numericas compactas para dar espacio al nombre */
+.rk-sm { display: none; }
+@media (max-width: 520px) {
+  .rk-lg { display: none; }
+  .rk-sm { display: inline; }
+  .rk-global .rk-head, .rk-global .rk-row { grid-template-columns: 22px minmax(0,1fr) 38px 30px 44px !important; gap: 4px; padding: 0 10px; }
+  .rk-global .rk-player { gap: 8px; }
+  .rk-global .rk-player .rk-av { width: 32px; height: 32px; }
+  .rk-global .rk-num.big { font-size: 17px; }
+  .rk-global .rk-num { font-size: 14px; }
+  .rk-global .rk-who b { font-size: 15px; }
+  .rk-global .rk-who small { font-size: 11px; }
+  .rk-global .rk-pct i { display: none; }
+  .rk-global .rk-num.amber { font-size: 13px !important; }
+  .rk-global .rk-head { font-size: 9px; letter-spacing: .02em; }
+  .rk-global .rk-pos { font-size: 12px; }
+}

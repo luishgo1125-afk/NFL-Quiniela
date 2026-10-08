@@ -1,4 +1,4 @@
-import { RankAvatar, Podium } from './RankParts'
+import { RankAvatar, Podium, firstName } from './RankParts'
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { teamLogoUrl } from '../lib/teamLogos'
@@ -571,7 +571,7 @@ export default function Leaderboard({ group, weekKey = null, onRowsCount }: { gr
       {(() => {
         const prizeFor = (i: number) => (group.bet_amount > 0 && i < 3 ? totalPrize * [group.prize_split_1, group.prize_split_2, group.prize_split_3][i] / 100 : null)
         const money = (n: number) => `$${n.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
-        const cols = '36px minmax(0,1fr) 64px 60px 64px'
+        const cols = 'clamp(24px,7vw,36px) minmax(0,1fr) clamp(50px,15vw,64px) clamp(42px,12vw,60px) clamp(40px,12vw,64px)'
         const badgesOf = (r: (typeof rows)[number]) => (
           <>
             {r.streak >= 3 && <span title={`Racha de ${r.streak}`}>🔥{r.streak}</span>}
@@ -586,7 +586,7 @@ export default function Leaderboard({ group, weekKey = null, onRowsCount }: { gr
                 const prize = prizeFor(i)
                 return {
                   pos: (i + 1) as 1 | 2 | 3,
-                  name: r.display_name,
+                  name: firstName(r.display_name),
                   team: r.favorite_team,
                   isMe: false,
                   points: r.points,
@@ -603,7 +603,7 @@ export default function Leaderboard({ group, weekKey = null, onRowsCount }: { gr
                   <span className="rk-c">#</span>
                   <span>Jugador</span>
                   <span className="rk-c">Aciertos</span>
-                  <span className="rk-c rk-hide-sm">Dif</span>
+                  <span className="rk-c">Dif</span>
                   <span className="rk-c">Pts</span>
                 </div>
                 {rows.slice(3).map((r, idx) => (
@@ -612,11 +612,12 @@ export default function Leaderboard({ group, weekKey = null, onRowsCount }: { gr
                     <div className="rk-player">
                       <RankAvatar name={r.display_name} team={r.favorite_team} />
                       <div className="rk-who">
-                        <b><span className="n">{r.display_name}</span>{badgesOf(r)}</b>
+                        <b><span className="n">{firstName(r.display_name)}</span></b>
+                        <small className="rk-badges">{badgesOf(r)}</small>
                       </div>
                     </div>
                     <span className="rk-num">{r.hits}/{r.played}</span>
-                    <span className="rk-num rk-hide-sm" style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>+{r.pointDiff}</span>
+                    <span className="rk-num" style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>+{r.pointDiff}</span>
                     <span className="rk-num big">{r.points}</span>
                   </button>
                 ))}

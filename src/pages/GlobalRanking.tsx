@@ -1,5 +1,5 @@
 import EmptyState from '../components/EmptyState'
-import { RankAvatar, Podium } from '../components/RankParts'
+import { RankAvatar, Podium, firstName } from '../components/RankParts'
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { teamLogoUrl } from '../lib/teamLogos'
@@ -273,7 +273,7 @@ export default function GlobalRanking({ user }: { user: User }) {
           <Podium
             items={rows.slice(0, 3).map((r, i) => ({
               pos: (i + 1) as 1 | 2 | 3,
-              name: r.display_name,
+              name: firstName(r.display_name),
               team: r.favorite_team,
               isMe: r.user_id === user.id,
               points: r.total_points,
@@ -281,13 +281,13 @@ export default function GlobalRanking({ user }: { user: User }) {
             }))}
           />
           {rows.length > 3 && (
-            <div className="rk-table">
+            <div className="rk-table rk-global">
               <div className="rk-head" style={{ ['--cols' as any]: '36px minmax(0,1fr) 56px 64px 72px' }}>
                 <span className="rk-c">#</span>
                 <span>Jugador</span>
                 <span className="rk-c">Pts</span>
-                <span className="rk-c">Exactos</span>
-                <span className="rk-c">% Aciertos</span>
+                <span className="rk-c"><span className="rk-lg">Exactos</span><span className="rk-sm">Ex.</span></span>
+                <span className="rk-c"><span className="rk-lg">% Aciertos</span><span className="rk-sm">%</span></span>
               </div>
               {rows.slice(3).map((r, idx) => {
                 const isMe = r.user_id === user.id
@@ -297,8 +297,8 @@ export default function GlobalRanking({ user }: { user: User }) {
                     <div className="rk-player">
                       <RankAvatar name={r.display_name} team={r.favorite_team} />
                       <div className="rk-who">
-                        <b><span className="n">{r.display_name}</span>{isMe && <span className="rk-tag">TÚ</span>}</b>
-                        <small>{r.total_hits}/{r.total_played} aciertos · Dif +{r.point_diff}</small>
+                        <b><span className="n">{firstName(r.display_name)}</span>{isMe && <span className="rk-tag">TÚ</span>}</b>
+                        <small>{r.total_hits}/{r.total_played} · Dif +{r.point_diff}</small>
                       </div>
                     </div>
                     <span className="rk-num big">{r.total_points}</span>

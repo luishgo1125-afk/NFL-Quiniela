@@ -416,6 +416,15 @@ export default function Admin({
     if (!err) onGroupUpdated(data)
   }
 
+  const [savingConfirmToggle, setSavingConfirmToggle] = useState(false)
+  async function toggleConfirmPicks() {
+    setSavingConfirmToggle(true)
+    const { data, error: err } = await supabase.rpc('set_confirm_picks', { p_group_id: groupId, p_enabled: !group.confirm_picks })
+    setSavingConfirmToggle(false)
+    if (err) { alert(err.message); return }
+    onGroupUpdated(data)
+  }
+
   const [savingPublicToggle, setSavingPublicToggle] = useState(false)
   async function togglePublic() {
     setSavingPublicToggle(true)
@@ -660,6 +669,21 @@ export default function Admin({
               style={{ background: group.allow_copy_picks ? '#F2B705' : 'var(--color-field-line)' }}
             >
               <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all" style={{ left: group.allow_copy_picks ? '22px' : '2px' }} />
+            </button>
+          </div>
+          <div className="flex items-center gap-3 px-4 py-3.5">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold">Confirmar predicciones</p>
+              <p className="text-[10px] text-[var(--color-text-muted)]">Cada jugador confirma sus predicciones de la semana; al confirmar ya no se pueden cambiar y se pueden compartir en una imagen</p>
+            </div>
+            <button
+              onClick={toggleConfirmPicks}
+              disabled={savingConfirmToggle}
+              aria-label="Activar confirmar predicciones"
+              className="w-11 h-6 rounded-full relative transition shrink-0 disabled:opacity-50"
+              style={{ background: group.confirm_picks ? '#F2B705' : 'var(--color-field-line)' }}
+            >
+              <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all" style={{ left: group.confirm_picks ? '22px' : '2px' }} />
             </button>
           </div>
           <div className="flex items-center gap-3 px-4 py-3.5">

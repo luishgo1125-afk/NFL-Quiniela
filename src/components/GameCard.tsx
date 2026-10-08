@@ -49,6 +49,7 @@ export default function GameCard({
   pickedUserIds,
   forceLocked,
   forceLockedReason,
+  confirmLocked,
   pointsWinner,
   pointsExact,
   pickMode = 'score',
@@ -60,6 +61,7 @@ export default function GameCard({
   pickedUserIds: string[]
   forceLocked?: boolean
   forceLockedReason?: string
+  confirmLocked?: boolean
   pointsWinner?: number
   pointsExact?: number
   pickMode?: 'score' | 'winner'
@@ -79,7 +81,7 @@ export default function GameCard({
   const kickoffTime = new Date(game.kickoff).getTime()
   const lockTime = kickoffTime - LOCK_MINUTES * 60 * 1000
   const naturallyLocked = lockTime <= Date.now()
-  const locked = naturallyLocked || !!forceLocked
+  const locked = naturallyLocked || !!forceLocked || !!confirmLocked
   // la base de datos deja ver los pronosticos de los demas justo al kickoff
   // (no desde que se cierra la prediccion, que es un poco antes) -- usamos
   // este momento para saber cuando ya se pueden mostrar

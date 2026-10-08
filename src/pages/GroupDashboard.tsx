@@ -9,7 +9,8 @@ import LeagueHeader from '../components/LeagueHeader'
 import CopyPicksModal from '../components/CopyPicksModal'
 import { buildStandings, getEligibleUserIds, standingsOptionsFor, getLastGameIds } from '../lib/ranking'
 import { syncGroupWeekFromEspn } from '../lib/syncGames'
-import { IconClipboard, IconBarChart, IconGear, IconCalendar, IconTrophy, IconCopy, IconWhatsapp, IconAlertTriangle, IconRefresh, IconCoin } from '../components/icons'
+import { sharePicksImage } from '../lib/sharePicks'
+import { IconClipboard, IconBarChart, IconGear, IconCalendar, IconTrophy, IconCopy, IconWhatsapp, IconAlertTriangle, IconRefresh, IconCoin, IconLock, IconShare } from '../components/icons'
 import type { User } from '@supabase/supabase-js'
 
 // Admin es la pantalla mas pesada (formularios, importador de ESPN, gestor de
@@ -296,6 +297,71 @@ export default function GroupDashboard({
     return `${mins}m`
   }
 
+
+  // ---- modo "Confirmar predicciones" ----
+  const confirmMode = !!group.confirm_picks
+  const [pickConfirmedBy, setPickConfirmedBy] = useState<Set<string>>(new Set())
+  const [confirmingPicks, setConfirmingPicks] = useState(false)
+  const [sharingPicks, setSharingPicks] = useState(false)
+  const [confirmPicksErr, setConfirmPicksErr] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!confirmMode || !weekKey) { setPickConfirmedBy(new Set()); return }
+    const [y, st, w] = weekKey.split(':').map(Number)
+    let cancelled = false
+    supabase
+      .from('pick_confirmations')
+      .select('user_id')
+      .eq('group_id', group.id).eq('year', y).eq('season_type', st).eq('week', w)
+      .then(({ data }) => { if (!cancelled) setPickConfirmedBy(new Set((data ?? []).map((c: any) => c.user_id))) })
+    return () => { cancelled = true }
+  }, [confirmMode, weekKey, group.id, tab])
+
+  const myPicksConfirmed = confirmMode && pickConfirmedBy.has(user.id)
+  const allConfirmed = confirmMode && members.length > 0 && members.every((m) => pickConfirmedBy.has(m.user_id))
+  const openMissing = weekGames.filter((g) => new Date(g.kickoff).getTime() > nowTick && !(pickedBy[g.id] ?? []).includes(user.id)).length
+  const openGames = weekGames.filter((g) => new Date(g.kickoff).getTime() > nowTick).length
+
+  async function confirmMyPicks() {
+    if (!weekKey || confirmingPicks) return
+    if (!window.confirm('Al confirmar ya NO podras cambiar ninguna prediccion de esta semana. ¿Confirmar?')) return
+    setConfirmingPicks(true); setConfirmPicksErr(null)
+    const [y, st, w] = weekKey.split(':').map(Number)
+    const { error: err } = await supabase.rpc('confirm_week_picks', { p_group_id: group.id, p_year: y, p_season_type: st, p_week: w })
+    setConfirmingPicks(false)
+    if (err) { setConfirmPicksErr(err.message); return }
+    setPickConfirmedBy((prev) => new Set([...prev, user.id]))
+  }
+
+  async function shareWeekPicks() {
+    if (sharingPicks || !selectedWeek || !allConfirmed) return
+    setSharingPicks(true)
+    try {
+      const ids = weekGames.map((g) => g.id)
+      const { data } = await supabase
+        .from('picks')
+        .select('user_id, game_id, pred_home_score, pred_away_score, pred_winner, pred_total')
+        .in('game_id', ids)
+      const picks: Record<string, Record<string, any>> = {}
+      ;(data ?? []).forEach((p: any) => { (picks[p.user_id] ??= {})[p.game_id] = p })
+      const sorted = [...weekGames].sort((a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime())
+      const players = members
+        .filter((m) => pickConfirmedBy.has(m.user_id))
+        .map((m) => ({ user_id: m.user_id, name: (m.display_name ?? 'Jugador').trim().split(/\s+/)[0], favorite_team: m.favorite_team }))
+      await sharePicksImage({
+        group,
+        weekLabelText: weekLabel(selectedWeek.seasonType, selectedWeek.week),
+        games: sorted as any,
+        players,
+        picks,
+        winnerMode: group.pick_mode === 'winner',
+        lastGameId: sorted.length ? sorted[sorted.length - 1].id : null,
+      })
+    } finally {
+      setSharingPicks(false)
+    }
+  }
+
   // ultimo partido (por kickoff) de cada semana: en modo "solo ganador" ahi se pide el total de puntos
   const lastGameIds = useMemo(() => getLastGameIds(games.filter((g) => !g.deleted_at) as any), [games])
 
@@ -508,6 +574,46 @@ export default function GroupDashboard({
             )
           })()}
 
+          {confirmMode && weekGames.length > 0 && (
+            <div className={`rounded-lg border px-4 py-3 mb-4 ${myPicksConfirmed ? 'border-[var(--color-turf-green)]/40 bg-[rgba(61,139,95,0.07)]' : 'border-[var(--color-field-line)] bg-[var(--color-field-surface)]'}`}>
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex-1 min-w-[180px]">
+                  <p className="text-sm font-semibold flex items-center gap-1.5">
+                    {myPicksConfirmed ? <><IconLock size={14} className="text-[var(--color-turf-green)]" /> Predicciones confirmadas</> : 'Confirma tus predicciones'}
+                  </p>
+                  <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5">
+                    {myPicksConfirmed
+                      ? (allConfirmed ? 'Ya no se pueden cambiar. Todos confirmaron: ya puedes compartir los pronosticos.' : 'Ya no se pueden cambiar. Los pronosticos se revelan cuando todos hayan confirmado.')
+                      : openGames === 0
+                      ? 'Ya no hay partidos abiertos esta semana.'
+                      : openMissing > 0
+                      ? `Llena los ${openMissing} partido${openMissing !== 1 ? 's' : ''} que te faltan para poder confirmar.`
+                      : 'Al confirmar ya no podras cambiar ninguna prediccion de la semana.'}
+                  </p>
+                </div>
+                {!myPicksConfirmed && openGames > 0 && (
+                  <button
+                    onClick={confirmMyPicks}
+                    disabled={openMissing > 0 || confirmingPicks}
+                    className="home-btn amber sm disabled:opacity-40"
+                    style={{ cursor: openMissing > 0 ? 'not-allowed' : 'pointer' }}
+                  >
+                    {confirmingPicks ? 'Confirmando...' : 'Confirmar'}
+                  </button>
+                )}
+                {allConfirmed && (
+                  <button onClick={shareWeekPicks} disabled={sharingPicks} className="home-btn ghost sm disabled:opacity-50">
+                    <IconShare size={13} /> {sharingPicks ? 'Generando...' : 'Compartir pronosticos'}
+                  </button>
+                )}
+              </div>
+              {confirmPicksErr && <p className="text-[11px] text-[var(--color-scoreboard-red)] mt-2">{confirmPicksErr}</p>}
+              {members.length > 0 && (
+                <p className="text-[10px] text-[var(--color-text-muted)] mt-2">{pickConfirmedBy.size}/{members.length} jugadores han confirmado</p>
+              )}
+            </div>
+          )}
+
           {myPaymentDue > 0 && (
             <div className="flex items-center gap-3 bg-[rgba(228,70,43,0.08)] border border-[var(--color-scoreboard-red)]/40 rounded-lg px-3 py-2.5 mb-4">
               <div className="w-8 h-8 rounded-full bg-[rgba(228,70,43,0.15)] flex items-center justify-center shrink-0 text-[var(--color-scoreboard-red)]">
@@ -581,6 +687,7 @@ export default function GroupDashboard({
                     pickedUserIds={pickedBy[g.id] ?? []}
                     forceLocked={needsConfirmation && weekConfirmed === false}
                     forceLockedReason="Confirma tu participacion arriba para poder predecir"
+                    confirmLocked={myPicksConfirmed}
                     pointsWinner={group.points_winner}
                     pointsExact={group.pick_mode === 'winner' ? undefined : group.points_exact}
                     pickMode={group.pick_mode ?? 'score'}

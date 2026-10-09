@@ -459,8 +459,8 @@ export default function GameCard({
           className="flex items-center gap-1.5 mt-4 flex-wrap w-full text-left hover:opacity-80 transition"
         >
           <IconUsers size={13} className="text-[var(--color-text-muted)] shrink-0" />
-          <span className="text-xs text-[var(--color-text-muted)] mr-1 underline decoration-dotted">
-            {pickedUserIds.length}/{members.length} han predicho
+          <span className="text-xs text-[var(--color-text-muted)]">
+            {pickedUserIds.length}/{members.length}
           </span>
           {members.map((m) => {
             const done = pickedUserIds.includes(m.user_id)

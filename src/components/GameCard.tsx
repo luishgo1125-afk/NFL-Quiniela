@@ -4,6 +4,7 @@ import type { Game, Pick } from '../lib/types'
 import { TEAM_NAMES, TEAM_CITIES } from '../lib/types'
 import { teamLogoUrl } from '../lib/teamLogos'
 import { IconCalendar, IconClock, IconLock, IconCheck, IconBookmark, IconHourglass, IconTrash, IconUsers, IconTrophy } from './icons'
+import { tr, localeTag } from '../i18n'
 import StatusPill from './StatusPill'
 
 // Cuenta hacia atras en pantalla, segundo a segundo, entre cada sincronizacion
@@ -161,7 +162,7 @@ export default function GameCard({
   const [deleting, setDeleting] = useState(false)
   async function deletePick() {
     if (locked || !pick || deleting) return
-    if (!window.confirm('¿Eliminar tu predicción de este partido?')) return
+    if (!window.confirm(tr('¿Eliminar tu predicción de este partido?'))) return
     setDeleting(true)
     const { error, data } = await supabase.from('picks').delete().eq('game_id', game.id).eq('user_id', userId).select()
     setDeleting(false)
@@ -172,7 +173,7 @@ export default function GameCard({
       setWinner(null)
       setTotal('')
     } else {
-      alert('No se pudo eliminar la predicción. Puede que el partido ya haya cerrado.')
+      alert(tr('No se pudo eliminar la predicción. Puede que el partido ya haya cerrado.'))
     }
   }
 
@@ -191,7 +192,7 @@ export default function GameCard({
     setHome(away)
   }
 
-  const kickoffLabel = new Date(game.kickoff).toLocaleString('es-MX', {
+  const kickoffLabel = new Date(game.kickoff).toLocaleString(localeTag(), {
     weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
   })
 
@@ -255,27 +256,27 @@ export default function GameCard({
           {kickoffLabel}
         </span>
         {game.status === 'final' ? (
-          <StatusPill label="FINALIZADO" variant={won ? 'green' : 'red'} icon={<IconCheck size={10} />} />
+          <StatusPill label={tr('FINALIZADO')} variant={won ? 'green' : 'red'} icon={<IconCheck size={10} />} />
         ) : game.status === 'live' ? (
-          <StatusPill label={`EN VIVO${tickingClock ? ` · ${tickingClock}` : ''}`} variant="red" pulse />
+          <StatusPill label={`${tr('EN VIVO')}${tickingClock ? ` · ${tickingClock}` : ''}`} variant="red" pulse />
         ) : forceLocked && !naturallyLocked ? (
-          <StatusPill label="CONFIRMA PARA JUGAR" variant="amber" icon={<IconLock size={10} />} />
+          <StatusPill label={tr('CONFIRMA PARA JUGAR')} variant="amber" icon={<IconLock size={10} />} />
         ) : locked ? (
-          <StatusPill label="CERRADO" variant="muted" icon={<IconLock size={10} />} />
+          <StatusPill label={tr('CERRADO')} variant="muted" icon={<IconLock size={10} />} />
         ) : closingSoon ? (
-          <StatusPill label="CIERRA PRONTO" variant={pendingConfirmed ? 'amber' : 'red'} icon={<IconClock size={10} />} />
+          <StatusPill label={tr('CIERRA PRONTO')} variant={pendingConfirmed ? 'amber' : 'red'} icon={<IconClock size={10} />} />
         ) : (
-          <StatusPill label="ABIERTO" variant={pendingConfirmed ? 'amber' : 'muted'} />
+          <StatusPill label={tr('ABIERTO')} variant={pendingConfirmed ? 'amber' : 'muted'} />
         )}
       </div>
 
       {naturallyLocked && !pick ? (
         <div className="text-center py-3 text-sm text-[var(--color-text-muted)] italic">
-          No participaste en este partido
+          {tr('No participaste en este partido')}
         </div>
       ) : forceLocked ? (
         <div className="text-center py-3 text-sm text-[var(--color-light-amber)] italic">
-          {forceLockedReason ?? 'Confirma tu participacion para poder predecir'}
+          {forceLockedReason ?? tr('Confirma tu participacion para poder predecir')}
         </div>
       ) : (
         <div>
@@ -383,7 +384,7 @@ export default function GameCard({
                 className="mt-1.5 text-[9px] font-bold uppercase tracking-wide px-3 py-1 rounded-full whitespace-nowrap"
                 style={{ background: 'rgba(228,70,43,0.18)', color: '#FF6B52' }}
               >
-                Visitante
+                {tr('Visitante')}
               </span>
             </div>
 
@@ -392,7 +393,7 @@ export default function GameCard({
               className="text-[10px] font-bold uppercase tracking-wide text-[var(--color-light-amber)] whitespace-nowrap justify-self-center"
               style={{ gridColumn: '3', gridRow: '3' }}
             >
-              {winnerMode ? 'Elige al ganador' : 'Tu prediccion'}
+              {winnerMode ? tr('Elige al ganador') : tr('Tu prediccion')}
             </span>
 
             {/* apodo + pill del local -- col 4, fila 3 */}
@@ -406,7 +407,7 @@ export default function GameCard({
                 className="mt-1.5 text-[9px] font-bold uppercase tracking-wide px-3 py-1 rounded-full whitespace-nowrap"
                 style={{ background: 'rgba(61,139,95,0.2)', color: '#4ADE80' }}
               >
-                Local
+                {tr('Local')}
               </span>
             </div>
           </div>
@@ -414,8 +415,8 @@ export default function GameCard({
           {winnerMode && requiresTotal && (
             <div className="mt-5 rounded-2xl border border-[var(--color-light-amber)]/50 bg-[rgba(242,183,5,0.06)] px-4 py-3 flex items-center gap-3">
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-[var(--color-light-amber)] uppercase tracking-wide">Ultimo partido de la semana</p>
-                <p className="text-xs text-[var(--color-text-muted)] mt-0.5">¿Cuantos puntos habra en total (ambos equipos)? Sirve para desempatar.</p>
+                <p className="text-xs font-bold text-[var(--color-light-amber)] uppercase tracking-wide">{tr('Ultimo partido de la semana')}</p>
+                <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{tr('¿Cuantos puntos habra en total (ambos equipos)? Sirve para desempatar.')}</p>
               </div>
               <input
                 type="number"
@@ -435,9 +436,9 @@ export default function GameCard({
             <div className="flex items-center justify-center gap-4 mt-5 text-xs text-[var(--color-text-muted)]">
               <span className="flex items-center gap-2">
                 <IconTrophy size={14} className="text-[var(--color-light-amber)]" />
-                {pointsWinner != null && <span>Ganador: <strong className="text-[var(--color-text-primary)]">{pointsWinner} pts</strong></span>}
+                {pointsWinner != null && <span>{tr('Ganador:')} <strong className="text-[var(--color-text-primary)]">{tr('{n} pts', { n: pointsWinner })}</strong></span>}
               </span>
-              {pointsExact != null && <span>Marcador exacto: <strong className="text-[var(--color-text-primary)]">{pointsExact} pts</strong></span>}
+              {pointsExact != null && <span>{tr('Marcador exacto:')} <strong className="text-[var(--color-text-primary)]">{tr('{n} pts', { n: pointsExact })}</strong></span>}
             </div>
           )}
         </div>
@@ -445,10 +446,10 @@ export default function GameCard({
 
       {(game.status === 'final' || game.status === 'live') && (
         <div className="text-center mt-3 text-xs text-[var(--color-text-muted)]">
-          {game.status === 'live' ? 'Marcador actual: ' : 'Resultado: '}
+          {game.status === 'live' ? tr('Marcador actual:') : tr('Resultado:')}{' '}
           {game.away_team} {game.away_score} – {game.home_score} {game.home_team}
           {pick?.points != null && (
-            <span className="ml-2 font-semibold text-[var(--color-light-amber)]">+{pick.points} pts</span>
+            <span className="ml-2 font-semibold text-[var(--color-light-amber)]">{tr('+{n} pts', { n: pick.points })}</span>
           )}
         </div>
       )}
@@ -459,8 +460,8 @@ export default function GameCard({
           className="flex items-center gap-1.5 mt-4 flex-wrap w-full text-left hover:opacity-80 transition"
         >
           <IconUsers size={13} className="text-[var(--color-text-muted)] shrink-0" />
-          <span className="text-xs text-[var(--color-text-muted)]">
-            {pickedUserIds.length}/{members.length}
+          <span className="text-xs text-[var(--color-text-muted)] ">
+            {tr('{done}/{total}', { done: pickedUserIds.length, total: members.length })}
           </span>
           {members.map((m) => {
             const done = pickedUserIds.includes(m.user_id)
@@ -498,7 +499,7 @@ export default function GameCard({
             </div>
             {locked && !othersVisible && (
               <p className="text-[10px] text-[var(--color-text-muted)] mb-2">
-                Los pronosticos de los demas se muestran en cuanto arranca el partido.
+                {tr('Los pronosticos de los demas se muestran en cuanto arranca el partido.')}
               </p>
             )}
             <div className="space-y-1.5">
@@ -531,11 +532,11 @@ export default function GameCard({
                         )}
                       </span>
                     ) : othersVisible && !done ? (
-                      <span className="text-[10px] text-[var(--color-text-muted)] italic">No participo</span>
+                      <span className="text-[10px] text-[var(--color-text-muted)] italic">{tr('No participo')}</span>
                     ) : done ? (
-                      <span className="text-[10px] font-semibold text-[#3D8B5F] flex items-center gap-1"><IconCheck size={11} /> Ya eligio</span>
+                      <span className="text-[10px] font-semibold text-[#3D8B5F] flex items-center gap-1"><IconCheck size={11} /> {tr('Ya eligio')}</span>
                     ) : (
-                      <span className="text-[10px] text-[var(--color-text-muted)]">Falta</span>
+                      <span className="text-[10px] text-[var(--color-text-muted)]">{tr('Falta')}</span>
                     )}
                   </div>
                 )
@@ -555,20 +556,20 @@ export default function GameCard({
             }`}
           >
             {saved || confirmed ? (
-              <><IconCheck size={16} /> Predicción guardada</>
+              <><IconCheck size={16} /> {tr('Predicción guardada')}</>
             ) : (
-              <><IconBookmark size={16} /> {saving ? 'Guardando...' : 'Guardar predicción'}</>
+              <><IconBookmark size={16} /> {saving ? tr('Guardando...') : tr('Guardar predicción')}</>
             )}
           </button>
           {pick && (
             <button
               onClick={deletePick}
               disabled={deleting}
-              title="Eliminar predicción"
-              aria-label="Eliminar predicción"
+              title={tr('Eliminar predicción')}
+              aria-label={tr('Eliminar predicción')}
               className="flex-1 text-sm font-bold rounded-xl py-2.5 transition disabled:opacity-70 flex items-center justify-center gap-2 bg-[rgba(228,70,43,0.12)] border border-[var(--color-scoreboard-red)] text-[var(--color-scoreboard-red)] hover:bg-[rgba(228,70,43,0.2)]"
             >
-              <IconTrash size={16} /> {deleting ? 'Eliminando...' : 'Eliminar predicción'}
+              <IconTrash size={16} /> {deleting ? tr('Eliminando...') : tr('Eliminar predicción')}
             </button>
           )}
         </div>

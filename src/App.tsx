@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense } from 'react'
+import { Fragment, useEffect, useState, lazy, Suspense } from 'react'
 import { useAuth } from './lib/useAuth'
 import { supabase } from './lib/supabase'
 import Login from './pages/Login'
@@ -9,6 +9,9 @@ import type { Group } from './lib/types'
 import { pushSupported, enablePush } from './lib/push'
 import { IconUser } from './components/icons'
 import PrivacyNotice from './pages/PrivacyNotice'
+import LanguagePrompt from './components/LanguagePrompt'
+import { LangContext, useLang, saveLanguage } from './i18n/LangContext'
+import { getLang, setLang, tr, type Lang } from './i18n'
 
 // cada pantalla se descarga solo cuando el usuario de verdad entra a ella,
 // en vez de que el primer carga tenga que traer el codigo de toda la app junta
@@ -22,7 +25,7 @@ const Profile = lazy(() => import('./pages/Profile'))
 function ScreenLoading() {
   return (
     <div className="flex items-center justify-center py-20">
-      <span className="font-mono-score text-[var(--color-light-amber)] text-sm animate-pulse">CARGANDO...</span>
+      <span className="font-mono-score text-[var(--color-light-amber)] text-sm animate-pulse">{tr('CARGANDO...')}</span>
     </div>
   )
 }
@@ -36,8 +39,8 @@ function ResetPasswordScreen({ onDone }: { onDone: () => void }) {
   async function save(e: React.FormEvent) {
     e.preventDefault()
     setErr(null)
-    if (pw.length < 6) { setErr('La contrasena debe tener al menos 6 caracteres'); return }
-    if (pw !== pw2) { setErr('Las contrasenas no coinciden'); return }
+    if (pw.length < 6) { setErr(tr('La contrasena debe tener al menos 6 caracteres')); return }
+    if (pw !== pw2) { setErr(tr('Las contrasenas no coinciden')); return }
     setSaving(true)
     const { error } = await supabase.auth.updateUser({ password: pw })
     setSaving(false)
@@ -48,18 +51,18 @@ function ResetPasswordScreen({ onDone }: { onDone: () => void }) {
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        <h1 className="font-display text-3xl font-800 text-center mb-6">Nueva contrasena</h1>
+        <h1 className="font-display text-3xl font-800 text-center mb-6">{tr('Nueva contrasena')}</h1>
         <form onSubmit={save} className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-6 space-y-3">
           <input
             type="password"
-            placeholder="Nueva contrasena"
+            placeholder={tr('Nueva contrasena')}
             value={pw}
             onChange={(e) => setPw(e.target.value)}
             className="w-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
           />
           <input
             type="password"
-            placeholder="Confirmar contrasena"
+            placeholder={tr('Confirmar contrasena')}
             value={pw2}
             onChange={(e) => setPw2(e.target.value)}
             className="w-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
@@ -70,7 +73,7 @@ function ResetPasswordScreen({ onDone }: { onDone: () => void }) {
             disabled={saving}
             className="w-full bg-[var(--color-light-amber)] text-[var(--color-field-night)] font-semibold rounded-md py-2 text-sm hover:brightness-110 disabled:opacity-50"
           >
-            {saving ? 'Guardando...' : 'Guardar y entrar'}
+            {saving ? tr('Guardando...') : tr('Guardar y entrar')}
           </button>
         </form>
       </div>
@@ -78,8 +81,18 @@ function ResetPasswordScreen({ onDone }: { onDone: () => void }) {
   )
 }
 
-export default function App() {
+function AppInner() {
   const { user, loading } = useAuth()
+  const { lang, setLanguage } = useLang()
+  const [askLang, setAskLang] = useState(false)
+  useEffect(() => {
+    if (!user) { setAskLang(false); return }
+    supabase.from('profiles').select('language').eq('id', user.id).single().then(({ data }) => {
+      const l = (data as any)?.language as Lang | null | undefined
+      if (l === 'es' || l === 'en') { if (l !== getLang()) setLanguage(l) }
+      else setAskLang(true)
+    })
+  }, [user?.id])
   const [activeGroup, setActiveGroup] = useState<Group | null>(null)
   const [recovery, setRecovery] = useState(false)
   const [bottomTab, setBottomTab] = useState<BottomTab>('quinielas')
@@ -159,7 +172,7 @@ export default function App() {
         setJoining(false)
       } else {
         setJoining(false)
-        setJoinError('No pudimos usar ese link de invitacion. Revisa que el codigo siga siendo valido.')
+        setJoinError(tr('No pudimos usar ese link de invitacion. Revisa que el codigo siga siendo valido.'))
       }
     }
     processInvite()
@@ -218,7 +231,7 @@ export default function App() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <span className="font-mono-score text-[var(--color-light-amber)] text-sm animate-pulse">CARGANDO...</span>
+        <span className="font-mono-score text-[var(--color-light-amber)] text-sm animate-pulse">{tr('CARGANDO...')}</span>
       </div>
     )
   }
@@ -233,7 +246,7 @@ export default function App() {
   if (joining) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <span className="font-mono-score text-[var(--color-light-amber)] text-sm animate-pulse">UNIENDOTE A LA LIGA...</span>
+        <span className="font-mono-score text-[var(--color-light-amber)] text-sm animate-pulse">{tr('UNIENDOTE A LA LIGA...')}</span>
       </div>
     )
   }
@@ -243,7 +256,7 @@ export default function App() {
 
   async function leaveActiveGroup() {
     if (!activeGroup) return
-    if (!confirm(`¿Seguro que quieres salir de "${activeGroup.name}"? Perderas acceso a esta liga.`)) return
+    if (!confirm(tr('¿Seguro que quieres salir de "{name}"? Perderas acceso a esta liga.', { name: activeGroup.name }))) return
     const { error } = await supabase.rpc('leave_group', { p_group_id: activeGroup.id })
     if (error) { alert(error.message); return }
     setActiveGroup(null)
@@ -265,7 +278,7 @@ export default function App() {
 
   const onHome = bottomTab === 'quinielas' && !activeGroup
   const profileChip = bottomTab !== 'perfil' ? (
-    <button onClick={() => setBottomTab('perfil')} title="Perfil" className="profile-chip">
+    <button onClick={() => setBottomTab('perfil')} title={tr('Perfil')} className="profile-chip">
       <span className="profile-chip-ico"><IconUser size={14} /></span>
       {firstName && <span className="profile-chip-name">{firstName}</span>}
     </button>
@@ -323,6 +336,13 @@ export default function App() {
         )}
       </Suspense>
 
+      {askLang && user && (
+        <LanguagePrompt
+          initial={lang}
+          onPick={async (l) => { await saveLanguage(user.id, l); setAskLang(false); if (l !== getLang()) setLanguage(l) }}
+        />
+      )}
+
       <BottomNav
         active={bottomTab}
         onChange={handleBottomTabChange}
@@ -339,5 +359,19 @@ export default function App() {
         />
       )}
     </div>
+  )
+}
+
+export default function App() {
+  const [lang, setL] = useState<Lang>(getLang())
+  const setLanguage = (l: Lang) => { setLang(l); setL(l) }
+  useEffect(() => { document.documentElement.lang = lang }, [])
+  return (
+    <LangContext.Provider value={{ lang, setLanguage }}>
+      {/* al cambiar de idioma se vuelve a montar toda la app con los textos nuevos */}
+      <Fragment key={lang}>
+        <AppInner />
+      </Fragment>
+    </LangContext.Provider>
   )
 }

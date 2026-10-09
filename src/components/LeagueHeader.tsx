@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { Group } from '../lib/types'
 import { weekLabel } from '../lib/types'
+import { tr, localeTag } from '../i18n'
 import { IconClipboard, IconBarChart, IconGear, IconCalendar, IconCopy, IconWhatsapp, IconCoin } from './icons'
 
 export type WeekEntry = { key: string; year: number; seasonType: number; week: number }
@@ -21,7 +22,7 @@ export function LeagueIdentity({
   onOpenAdmin: () => void
 }) {
   const shareUrl = `https://wa.me/?text=${encodeURIComponent(
-    `Unete a mi quiniela "${group.name}" en Quiniela NFL: ${window.location.origin}${window.location.pathname}?join=${group.invite_code}`
+    `${tr('Unete a mi quiniela "{name}" en Quiniela NFL:', { name: group.name })} ${window.location.origin}${window.location.pathname}?join=${group.invite_code}`
   )}`
   return (
     <div className="lh-identity">
@@ -36,18 +37,18 @@ export function LeagueIdentity({
           {selectedWeek && <span className="lh-week-badge">{weekLabel(selectedWeek.seasonType, selectedWeek.week)}</span>}
           {liveCount > 0 && (
             <span className="lh-live">
-              <span className="lh-live-dot" /> EN VIVO
+              <span className="lh-live-dot" /> {tr('EN VIVO')}
             </span>
           )}
         </h1>
         <p className="lh-meta">
           <span>#{group.invite_code}</span>
           <span className="lh-dot">•</span>
-          <span>{memberCount} miembro{memberCount !== 1 ? 's' : ''}</span>
-          <button onClick={onCopyCode} aria-label="Copiar codigo de invitacion" title="Copiar codigo" className="lh-icon-btn">
+          <span>{memberCount === 1 ? tr('{n} miembro', { n: memberCount }) : tr('{n} miembros', { n: memberCount })}</span>
+          <button onClick={onCopyCode} aria-label={tr('Copiar codigo de invitacion')} title={tr('Copiar codigo')} className="lh-icon-btn">
             {copiedCode ? <span className="lh-copied">✓</span> : <IconCopy size={13} />}
           </button>
-          <a href={shareUrl} target="_blank" rel="noopener noreferrer" aria-label="Compartir por WhatsApp" title="Compartir por WhatsApp" className="lh-icon-btn lh-wa">
+          <a href={shareUrl} target="_blank" rel="noopener noreferrer" aria-label={tr('Compartir por WhatsApp')} title={tr('Compartir por WhatsApp')} className="lh-icon-btn lh-wa">
             <IconWhatsapp />
           </a>
         </p>
@@ -55,8 +56,8 @@ export function LeagueIdentity({
       {isAdmin && (
         <button
           onClick={onOpenAdmin}
-          aria-label="Administrar liga"
-          title="Administrar"
+          aria-label={tr('Administrar liga')}
+          title={tr('Administrar')}
           className={`lh-icon-btn lh-gear ${adminActive ? 'active' : ''}`}
         >
           <IconGear size={17} />
@@ -83,7 +84,7 @@ export function LeagueTabs({ tab, onChange }: { tab: LeagueTab; onChange: (t: 'p
           className={`lt-tab ${tab === it.id ? 'active' : ''}`}
         >
           {it.icon}
-          <span>{it.label}</span>
+          <span>{tr(it.label)}</span>
         </button>
       ))}
     </div>
@@ -139,10 +140,10 @@ export function WeekSelector({
 export function PrizeSummary({ amount }: { amount: number }) {
   if (amount <= 0) return null
   return (
-    <div className="prize-badge" title="Premio total">
+    <div className="prize-badge" title={tr('Premio total')}>
       <IconCoin size={14} />
-      <span className="prize-label">Premio total</span>
-      <span className="prize-amount">${amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+      <span className="prize-label">{tr('Premio total')}</span>
+      <span className="prize-amount">${amount.toLocaleString(localeTag(), { minimumFractionDigits: 2 })}</span>
     </div>
   )
 }

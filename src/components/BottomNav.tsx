@@ -1,3 +1,4 @@
+import { tr } from '../i18n'
 import { IconHome, IconGlobe, IconPlusCircle, IconBell, IconShield } from './icons'
 
 export type BottomTab = 'quinielas' | 'ranking' | 'posiciones' | 'notificaciones' | 'perfil'
@@ -16,11 +17,11 @@ export default function BottomNav({
   canCreate: boolean
 }) {
   const items: { key: BottomTab | 'crear'; label: string; icon: (active: boolean) => React.ReactNode }[] = [
-    { key: 'quinielas', label: 'Quinielas', icon: (a) => <IconHome size={20} className={a ? 'text-[var(--color-light-amber)]' : ''} /> },
-    { key: 'ranking', label: 'Ranking', icon: (a) => <IconGlobe size={20} className={a ? 'text-[var(--color-light-amber)]' : ''} /> },
-    { key: 'crear', label: canCreate ? 'Crear' : 'Unirse', icon: () => <IconPlusCircle size={22} /> },
-    { key: 'posiciones', label: 'Posiciones', icon: (a) => <IconShield size={20} className={a ? 'text-[var(--color-light-amber)]' : ''} /> },
-    { key: 'notificaciones', label: 'Avisos', icon: (a) => <IconBell size={20} className={a ? 'text-[var(--color-light-amber)]' : ''} /> },
+    { key: 'quinielas', label: tr('Quinielas'), icon: (a) => <IconHome size={20} className={a ? 'text-[var(--color-light-amber)]' : ''} /> },
+    { key: 'ranking', label: tr('Ranking'), icon: (a) => <IconGlobe size={20} className={a ? 'text-[var(--color-light-amber)]' : ''} /> },
+    { key: 'crear', label: canCreate ? tr('Crear') : tr('Unirse'), icon: () => <IconPlusCircle size={22} /> },
+    { key: 'posiciones', label: tr('Posiciones'), icon: (a) => <IconShield size={20} className={a ? 'text-[var(--color-light-amber)]' : ''} /> },
+    { key: 'notificaciones', label: tr('Avisos'), icon: (a) => <IconBell size={20} className={a ? 'text-[var(--color-light-amber)]' : ''} /> },
   ]
 
   return (

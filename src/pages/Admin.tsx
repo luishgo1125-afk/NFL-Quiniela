@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { tr, localeTag } from '../i18n'
 import { supabase } from '../lib/supabase'
 import { NFL_TEAMS, weekLabel, type Game, type Group } from '../lib/types'
 import { compareWeekEntries } from '../lib/ranking'
@@ -120,7 +121,7 @@ export default function Admin({
       ])
       const paidMap = new Map((paymentsData ?? []).map((p: any) => [p.user_id, p.paid]))
       const list = (membersData ?? [])
-        .map((m: any) => ({ user_id: m.user_id, display_name: m.profiles?.display_name ?? 'Jugador', paid: paidMap.get(m.user_id) ?? false }))
+        .map((m: any) => ({ user_id: m.user_id, display_name: m.profiles?.display_name ?? tr('Jugador'), paid: paidMap.get(m.user_id) ?? false }))
         .sort((a, b) => Number(a.paid) - Number(b.paid))
       setPaymentMembers(list)
       setMemberCount(list.length)
@@ -131,7 +132,7 @@ export default function Admin({
       .select('user_id, paid, profiles(display_name)')
       .eq('group_id', groupId)
       .order('paid', { ascending: true })
-    const list = (data ?? []).map((m: any) => ({ user_id: m.user_id, display_name: m.profiles?.display_name ?? 'Jugador', paid: m.paid }))
+    const list = (data ?? []).map((m: any) => ({ user_id: m.user_id, display_name: m.profiles?.display_name ?? tr('Jugador'), paid: m.paid }))
     setPaymentMembers(list)
     setMemberCount(list.length)
   }
@@ -222,8 +223,9 @@ export default function Admin({
   const gamesInLatestWeek = latestWeek
     ? games.filter((g) => !g.deleted_at && g.year === latestWeek.year && g.season_type === latestWeek.seasonType && g.week === latestWeek.week).length
     : 0
-  const ligaSummary = latestWeek ? `NFL ${latestWeek.year} · ${weekLabel(latestWeek.seasonType, latestWeek.week).replace('WEEK', 'Semana')}` : ''
-  const partidosSummary = latestWeek ? `${gamesInLatestWeek} partidos · ${weekLabel(latestWeek.seasonType, latestWeek.week).replace('WEEK', 'Semana')}` : `${games.filter((g) => !g.deleted_at).length} partidos`
+  const partidosN = (n: number) => (n === 1 ? tr('1 partido') : tr('{n} partidos', { n }))
+  const ligaSummary = latestWeek ? `NFL ${latestWeek.year} · ${weekLabel(latestWeek.seasonType, latestWeek.week).replace('WEEK', tr('Semana'))}` : ''
+  const partidosSummary = latestWeek ? `${partidosN(gamesInLatestWeek)} · ${weekLabel(latestWeek.seasonType, latestWeek.week).replace('WEEK', tr('Semana'))}` : partidosN(games.filter((g) => !g.deleted_at).length)
 
   // por default, al entrar en modo "semana a semana" se muestra la jornada
   // mas reciente (la ultima de la lista)
@@ -276,7 +278,7 @@ export default function Admin({
     const [sy, sst, sw] = rangeStartKey.split(':').map(Number)
     const [ey, est, ew] = rangeEndKey.split(':').map(Number)
     if (compareWeekEntries({ year: sy, seasonType: sst, week: sw }, { year: ey, seasonType: est, week: ew }) > 0) {
-      setModeErr('La semana de inicio debe ser antes (o igual) que la semana final')
+      setModeErr(tr('La semana de inicio debe ser antes (o igual) que la semana final'))
       return
     }
     setSavingRange(true)
@@ -295,7 +297,7 @@ export default function Admin({
     setSavingRange(false)
     if (err) { setModeErr(err.message); return }
     onGroupUpdated(data)
-    setRangeMsg('Rango guardado.')
+    setRangeMsg(tr('Rango guardado.'))
   }
 
   async function saveScoringRules() {
@@ -312,7 +314,7 @@ export default function Admin({
     setSavingRules(false)
     if (err) { setRulesErr(err.message); return }
     onGroupUpdated(data)
-    setRulesMsg(recalcFinal ? 'Guardado — se recalcularon tambien los partidos ya jugados.' : 'Guardado — se aplicara a los partidos que falten por jugar.')
+    setRulesMsg(recalcFinal ? tr('Guardado — se recalcularon tambien los partidos ya jugados.') : tr('Guardado — se aplicara a los partidos que falten por jugar.'))
   }
 
   const [betAmount, setBetAmount] = useState(group.bet_amount ?? 0)
@@ -329,7 +331,7 @@ export default function Admin({
     setPrizeMsg(null)
     setPrizeErr(null)
     if (Math.round(splitTotal * 100) / 100 !== 100) {
-      setPrizeErr(`Los porcentajes deben sumar 100 (ahorita suman ${splitTotal}).`)
+      setPrizeErr(tr('Los porcentajes deben sumar 100 (ahorita suman {total}).', { total: splitTotal }))
       return
     }
     setSavingPrize(true)
@@ -343,7 +345,7 @@ export default function Admin({
     setSavingPrize(false)
     if (err) { setPrizeErr(err.message); return }
     onGroupUpdated(data)
-    setPrizeMsg('Guardado.')
+    setPrizeMsg(tr('Guardado.'))
   }
 
   const guess = guessCurrentWeek()
@@ -397,9 +399,9 @@ export default function Admin({
 
       onGroupUpdated(updated)
       setLogoFile(null)
-      setGroupMsg('Guardado.')
+      setGroupMsg(tr('Guardado.'))
     } catch (err) {
-      setGroupErr((err as any)?.message ?? 'No se pudo guardar')
+      setGroupErr((err as any)?.message ?? tr('No se pudo guardar'))
     } finally {
       setSavingGroup(false)
     }
@@ -455,7 +457,7 @@ export default function Admin({
     try {
       const espnGames = await fetchEspnWeek(syncYear, syncWeek, syncType)
       if (espnGames.length === 0) {
-        setSyncMsg('ESPN no devolvio partidos para esa semana/temporada.')
+        setSyncMsg(tr('ESPN no devolvio partidos para esa semana/temporada.'))
         return
       }
 
@@ -519,11 +521,11 @@ export default function Admin({
         }
       }
 
-      const failedNote = failed > 0 ? ` — ⚠️ ${failed} fallaron (revisa la consola del navegador)` : ''
-      setSyncMsg(`Listo: ${created} agregado(s), ${updated} actualizado(s)${failedNote} — ${new Date().toLocaleTimeString('es-MX')}`)
+      const failedNote = failed > 0 ? tr(' — ⚠️ {failed} fallaron (revisa la consola del navegador)', { failed }) : ''
+      setSyncMsg(tr('Listo: {created} agregado(s), {updated} actualizado(s){note} — {time}', { created, updated, note: failedNote, time: new Date().toLocaleTimeString(localeTag()) }))
       onChange()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo sincronizar con ESPN')
+      setError(err instanceof Error ? err.message : tr('No se pudo sincronizar con ESPN'))
     } finally {
       setSyncing(false)
     }
@@ -539,7 +541,7 @@ export default function Admin({
   async function addGame(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
-    if (!kickoff) { setError('Falta la fecha/hora del partido'); return }
+    if (!kickoff) { setError(tr('Falta la fecha/hora del partido')); return }
     const { error: err } = await supabase.from('games').insert({
       group_id: groupId,
       week,
@@ -561,7 +563,7 @@ export default function Admin({
   }
 
   async function deleteGame(id: string) {
-    if (!confirm('¿Borrar este partido? Podras recuperarlo despues desde la Papelera.')) return
+    if (!confirm(tr('¿Borrar este partido? Podras recuperarlo despues desde la Papelera.'))) return
     await supabase.from('games').update({ deleted_at: new Date().toISOString() }).eq('id', id)
     onChange()
   }
@@ -584,7 +586,7 @@ export default function Admin({
   const deletedGames = useMemo(() => games.filter((g) => g.deleted_at), [games])
 
   async function deleteWeek(seasonType: number, week: number, year: number) {
-    if (!confirm(`¿Borrar toda la ${weekLabel(seasonType, week)}? Podras recuperarla despues desde la Papelera.`)) return
+    if (!confirm(tr('¿Borrar toda la {week}? Podras recuperarla despues desde la Papelera.', { week: weekLabel(seasonType, week) }))) return
     await supabase
       .from('games')
       .update({ deleted_at: new Date().toISOString() })
@@ -609,25 +611,25 @@ export default function Admin({
   return (
     <>
     <div>
-      <h1 className="text-2xl font-extrabold tracking-tight">AJUSTES DE LA LIGA</h1>
-      <p className="text-sm text-[var(--color-text-muted)] mt-1 mb-6">Administra las reglas y configuracion de tu quiniela.</p>
+      <h1 className="text-2xl font-extrabold tracking-tight">{tr('AJUSTES DE LA LIGA')}</h1>
+      <p className="text-sm text-[var(--color-text-muted)] mt-1 mb-6">{tr('Administra las reglas y configuracion de tu quiniela.')}</p>
     </div>
     <div className="space-y-4">
       <SettingsCard
         icon={<IconPencil size={18} />}
-        title="Liga"
-        description="Nombre, temporada y configuracion general"
+        title={tr('Liga')}
+        description={tr('Nombre, temporada y configuracion general')}
         summary={ligaSummary}
         open={!!openSections.liga}
         onToggle={() => toggleSection('liga')}
       >
         <form onSubmit={saveGroupInfo} className="bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-lg p-4 space-y-3">
-          <h2 className="text-sm font-semibold">Nombre y foto de la liga</h2>
+          <h2 className="text-sm font-semibold">{tr('Nombre y foto de la liga')}</h2>
           <div className="flex items-center gap-4">
             <label className="cursor-pointer shrink-0">
               <div className="w-16 h-16 rounded-full overflow-hidden bg-[var(--color-field-surface)] border border-[var(--color-field-line)] flex items-center justify-center">
                 {logoPreview ? (
-                  <img src={logoPreview} alt="Logo de la liga" className="w-full h-full object-cover" />
+                  <img src={logoPreview} alt={tr('Logo de la liga')} className="w-full h-full object-cover" />
                 ) : (
                   <span className="text-2xl">🏈</span>
                 )}
@@ -638,7 +640,7 @@ export default function Admin({
                 className="hidden"
                 onChange={(e) => onPickLogo(e.target.files?.[0] ?? null)}
               />
-              <span className="block text-center text-[10px] text-[var(--color-light-amber)] mt-1">Cambiar</span>
+              <span className="block text-center text-[10px] text-[var(--color-light-amber)] mt-1">{tr('Cambiar')}</span>
             </label>
             <input
               value={editName}
@@ -651,20 +653,20 @@ export default function Admin({
           {groupMsg && <p className="text-[var(--color-turf-green)] text-xs">{groupMsg}</p>}
           <button type="submit" disabled={savingGroup}
             className="w-full bg-[var(--color-light-amber)] text-[var(--color-field-night)] font-semibold rounded-md py-2 text-sm hover:brightness-110 disabled:opacity-50">
-            {savingGroup ? 'Guardando...' : 'Guardar cambios de la liga'}
+            {savingGroup ? tr('Guardando...') : tr('Guardar cambios de la liga')}
           </button>
         </form>
 
         <div className="bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-lg overflow-hidden divide-y divide-[var(--color-field-line)]">
           <div className="flex items-center gap-3 px-4 py-3.5">
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold">Copiar de otra liga</p>
-              <p className="text-[10px] text-[var(--color-text-muted)]">Permite a los jugadores copiar sus predicciones desde otra de sus ligas</p>
+              <p className="text-sm font-semibold">{tr('Copiar de otra liga')}</p>
+              <p className="text-[10px] text-[var(--color-text-muted)]">{tr('Permite a los jugadores copiar sus predicciones desde otra de sus ligas')}</p>
             </div>
             <button
               onClick={toggleCopyPicksEnabled}
               disabled={savingCopyToggle}
-              aria-label="Habilitar copiar de otra liga"
+              aria-label={tr('Habilitar copiar de otra liga')}
               className="w-11 h-6 rounded-full relative transition shrink-0 disabled:opacity-50"
               style={{ background: group.allow_copy_picks ? '#F2B705' : 'var(--color-field-line)' }}
             >
@@ -673,13 +675,13 @@ export default function Admin({
           </div>
           <div className="flex items-center gap-3 px-4 py-3.5">
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold">Confirmar predicciones</p>
-              <p className="text-[10px] text-[var(--color-text-muted)]">Cada jugador confirma sus predicciones de la semana; al confirmar ya no se pueden cambiar y se pueden compartir en una imagen</p>
+              <p className="text-sm font-semibold">{tr('Confirmar predicciones')}</p>
+              <p className="text-[10px] text-[var(--color-text-muted)]">{tr('Cada jugador confirma sus predicciones de la semana; al confirmar ya no se pueden cambiar y se pueden compartir en una imagen')}</p>
             </div>
             <button
               onClick={toggleConfirmPicks}
               disabled={savingConfirmToggle}
-              aria-label="Activar confirmar predicciones"
+              aria-label={tr('Activar confirmar predicciones')}
               className="w-11 h-6 rounded-full relative transition shrink-0 disabled:opacity-50"
               style={{ background: group.confirm_picks ? '#F2B705' : 'var(--color-field-line)' }}
             >
@@ -688,17 +690,17 @@ export default function Admin({
           </div>
           <div className="flex items-center gap-3 px-4 py-3.5">
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold">{group.is_public ? 'Liga publica' : 'Liga privada'}</p>
+              <p className="text-sm font-semibold">{group.is_public ? tr('Liga publica') : tr('Liga privada')}</p>
               <p className="text-[10px] text-[var(--color-text-muted)]">
                 {group.is_public
-                  ? 'Cualquiera con cuenta puede verla en la lista y unirse sin codigo'
-                  : 'Solo se entra con el link o codigo de invitacion'}
+                  ? tr('Cualquiera con cuenta puede verla en la lista y unirse sin codigo')
+                  : tr('Solo se entra con el link o codigo de invitacion')}
               </p>
             </div>
             <button
               onClick={togglePublic}
               disabled={savingPublicToggle}
-              aria-label="Cambiar liga publica o privada"
+              aria-label={tr('Cambiar liga publica o privada')}
               className="w-11 h-6 rounded-full relative transition shrink-0 disabled:opacity-50"
               style={{ background: group.is_public ? 'var(--color-turf-green)' : 'var(--color-field-line)' }}
             >
@@ -707,13 +709,13 @@ export default function Admin({
           </div>
           <div className="flex items-center gap-3 px-4 py-3.5">
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold">Marcar como finalizada</p>
-              <p className="text-[10px] text-[var(--color-text-muted)]">La liga se muestra como FINALIZADA en la lista de quinielas, sin importar los partidos</p>
+              <p className="text-sm font-semibold">{tr('Marcar como finalizada')}</p>
+              <p className="text-[10px] text-[var(--color-text-muted)]">{tr('La liga se muestra como FINALIZADA en la lista de quinielas, sin importar los partidos')}</p>
             </div>
             <button
               onClick={toggleFinalized}
               disabled={savingFinalizedToggle}
-              aria-label="Marcar liga como finalizada"
+              aria-label={tr('Marcar liga como finalizada')}
               className="w-11 h-6 rounded-full relative transition shrink-0 disabled:opacity-50"
               style={{ background: group.finalized ? 'var(--color-scoreboard-red)' : 'var(--color-field-line)' }}
             >
@@ -725,17 +727,17 @@ export default function Admin({
 
       <SettingsCard
         icon={<IconTarget size={18} />}
-        title="Puntuacion"
-        description="Configura los puntos de cada prediccion"
+        title={tr('Puntuacion')}
+        description={tr('Configura los puntos de cada prediccion')}
         open={!!openSections.puntuacion}
         onToggle={() => toggleSection('puntuacion')}
       >
         <div className="space-y-2">
-          <h2 className="text-sm font-semibold">Modalidad de prediccion</h2>
+          <h2 className="text-sm font-semibold">{tr('Modalidad de prediccion')}</h2>
           <div className="grid grid-cols-2 gap-2">
             {([
-              { key: 'score', title: 'Marcador exacto', text: 'Cada quien escribe el marcador de cada partido.' },
-              { key: 'winner', title: 'Solo ganador', text: 'Solo se elige al ganador; en el ultimo partido de la semana se predice el total de puntos (desempate).' },
+              { key: 'score', title: tr('Marcador exacto'), text: tr('Cada quien escribe el marcador de cada partido.') },
+              { key: 'winner', title: tr('Solo ganador'), text: tr('Solo se elige al ganador; en el ultimo partido de la semana se predice el total de puntos (desempate).') },
             ] as const).map((o) => {
               const active = (group.pick_mode ?? 'score') === o.key
               return (
@@ -753,20 +755,20 @@ export default function Admin({
             })}
           </div>
           {pickModeErr && <p className="text-[var(--color-scoreboard-red)] text-xs">{pickModeErr}</p>}
-          <p className="text-[11px] text-[var(--color-text-muted)]">Solo se puede cambiar antes de que alguien haga predicciones en la liga.</p>
+          <p className="text-[11px] text-[var(--color-text-muted)]">{tr('Solo se puede cambiar antes de que alguien haga predicciones en la liga.')}</p>
         </div>
 
         <div className="bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-lg p-4 space-y-1 divide-y divide-[var(--color-field-line)]">
           <div className={isWinnerMode ? '' : 'pb-3'}>
-            <Stepper label="Prediccion del ganador" description="Puntos por acertar el equipo ganador" value={pointsWinner} onChange={setPointsWinner} />
+            <Stepper label={tr('Prediccion del ganador')} description={tr('Puntos por acertar el equipo ganador')} value={pointsWinner} onChange={setPointsWinner} />
           </div>
           {!isWinnerMode && (
             <>
               <div className="py-3">
-                <Stepper label="Marcador exacto" description="Puntos por acertar el marcador completo" value={pointsExact} onChange={setPointsExact} />
+                <Stepper label={tr('Marcador exacto')} description={tr('Puntos por acertar el marcador completo')} value={pointsExact} onChange={setPointsExact} />
               </div>
               <div className="pt-3">
-                <Stepper label="Puntos de un equipo" description="Por acertar cuanto anota un equipo (no se suma si ya le atinaste al marcador exacto)" value={pointsTeamTotal} onChange={setPointsTeamTotal} />
+                <Stepper label={tr('Puntos de un equipo')} description={tr('Por acertar cuanto anota un equipo (no se suma si ya le atinaste al marcador exacto)')} value={pointsTeamTotal} onChange={setPointsTeamTotal} />
               </div>
             </>
           )}
@@ -779,21 +781,21 @@ export default function Admin({
             className="mt-0.5 w-4 h-4 accent-[var(--color-light-amber)] shrink-0"
           />
           <span className="text-xs">
-            <span className="font-semibold block">Aplicar tambien a partidos ya jugados</span>
-            <span className="text-[var(--color-text-muted)]">Si lo activas, se recalculan de una vez todos los partidos en FINAL con las reglas nuevas. Si lo dejas apagado, solo afecta a los que falten por jugar.</span>
+            <span className="font-semibold block">{tr('Aplicar tambien a partidos ya jugados')}</span>
+            <span className="text-[var(--color-text-muted)]">{tr('Si lo activas, se recalculan de una vez todos los partidos en FINAL con las reglas nuevas. Si lo dejas apagado, solo afecta a los que falten por jugar.')}</span>
           </span>
         </label>
         {rulesErr && <p className="text-[var(--color-scoreboard-red)] text-xs">{rulesErr}</p>}
         {rulesMsg && <p className="text-[var(--color-turf-green)] text-xs">{rulesMsg}</p>}
         <button onClick={saveScoringRules} disabled={savingRules}
           className="w-full bg-[var(--color-light-amber)] text-[var(--color-field-night)] font-semibold rounded-md py-2.5 text-sm hover:brightness-110 disabled:opacity-50 flex items-center justify-center gap-2">
-          <IconBookmark size={14} /> {savingRules ? 'Guardando...' : 'Guardar cambios'}
+          <IconBookmark size={14} /> {savingRules ? tr('Guardando...') : tr('Guardar cambios')}
         </button>
 
         <div className="h-px bg-[var(--color-field-line)]" />
 
         <div className="space-y-3">
-            <h2 className="text-sm font-semibold">Modo de puntuacion</h2>
+            <h2 className="text-sm font-semibold">{tr('Modo de puntuacion')}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <button
                 type="button"
@@ -805,8 +807,8 @@ export default function Admin({
                     : 'border-[var(--color-field-line)] hover:border-[var(--color-light-amber)]'
                 }`}
               >
-                <p className="text-xs font-semibold">Temporada completa</p>
-                <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">Los puntos se acumulan durante toda la temporada</p>
+                <p className="text-xs font-semibold">{tr('Temporada completa')}</p>
+                <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">{tr('Los puntos se acumulan durante toda la temporada')}</p>
               </button>
               <button
                 type="button"
@@ -818,8 +820,8 @@ export default function Admin({
                     : 'border-[var(--color-field-line)] hover:border-[var(--color-light-amber)]'
                 }`}
               >
-                <p className="text-xs font-semibold">Semana a semana</p>
-                <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">La tabla se reinicia en 0 cada semana; hay un ganador por semana</p>
+                <p className="text-xs font-semibold">{tr('Semana a semana')}</p>
+                <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">{tr('La tabla se reinicia en 0 cada semana; hay un ganador por semana')}</p>
               </button>
               <button
                 type="button"
@@ -831,42 +833,42 @@ export default function Admin({
                     : 'border-[var(--color-field-line)] hover:border-[var(--color-light-amber)]'
                 }`}
               >
-                <p className="text-xs font-semibold">Rango de semanas</p>
-                <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">Tu eliges entre que semana y que semana cuentan los puntos</p>
+                <p className="text-xs font-semibold">{tr('Rango de semanas')}</p>
+                <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">{tr('Tu eliges entre que semana y que semana cuentan los puntos')}</p>
               </button>
             </div>
 
             {modeChoice === 'range' && weeks.length === 0 && (
               <p className="text-[10px] text-[var(--color-text-muted)] border border-dashed border-[var(--color-field-line)] rounded-md px-3 py-2.5">
-                Todavia no hay partidos en esta liga. Agrega o sincroniza partidos primero (mas abajo, en "Partidos") para poder elegir el rango de semanas.
+                {tr('Todavia no hay partidos en esta liga. Agrega o sincroniza partidos primero (mas abajo, en "Partidos") para poder elegir el rango de semanas.')}
               </p>
             )}
 
             {modeChoice === 'range' && weeks.length > 0 && (
               <div className="rounded-md border border-[var(--color-field-line)] px-3 py-3 space-y-2.5">
-                <p className="text-[10px] text-[var(--color-text-muted)]">Solo cuentan para la tabla los partidos finalizados entre estas dos semanas (incluidas)</p>
+                <p className="text-[10px] text-[var(--color-text-muted)]">{tr('Solo cuentan para la tabla los partidos finalizados entre estas dos semanas (incluidas)')}</p>
                 <div className="grid grid-cols-2 gap-2">
                   <label className="text-xs text-[var(--color-text-muted)]">
-                    Desde
+                    {tr('Desde')}
                     <select
                       value={rangeStartKey}
                       onChange={(e) => { setRangeStartKey(e.target.value); setRangeMsg(null) }}
                       className="w-full mt-1 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-2 py-2 text-xs outline-none focus:border-[var(--color-light-amber)]"
                     >
-                      <option value="" disabled>Elige semana</option>
+                      <option value="" disabled>{tr('Elige semana')}</option>
                       {weeks.map((w) => (
                         <option key={w.key} value={w.key}>{weekLabel(w.seasonType, w.week)}{multiYear ? ` ${w.year}` : ''}</option>
                       ))}
                     </select>
                   </label>
                   <label className="text-xs text-[var(--color-text-muted)]">
-                    Hasta
+                    {tr('Hasta')}
                     <select
                       value={rangeEndKey}
                       onChange={(e) => { setRangeEndKey(e.target.value); setRangeMsg(null) }}
                       className="w-full mt-1 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-2 py-2 text-xs outline-none focus:border-[var(--color-light-amber)]"
                     >
-                      <option value="" disabled>Elige semana</option>
+                      <option value="" disabled>{tr('Elige semana')}</option>
                       {weeks.map((w) => (
                         <option key={w.key} value={w.key}>{weekLabel(w.seasonType, w.week)}{multiYear ? ` ${w.year}` : ''}</option>
                       ))}
@@ -879,34 +881,34 @@ export default function Admin({
                   disabled={savingRange || !rangeStartKey || !rangeEndKey}
                   className="w-full bg-[var(--color-light-amber)] text-[var(--color-field-night)] font-semibold rounded-md py-2 text-xs hover:brightness-110 disabled:opacity-50"
                 >
-                  {savingRange ? 'Guardando...' : 'Guardar rango'}
+                  {savingRange ? tr('Guardando...') : tr('Guardar rango')}
                 </button>
                 {rangeMsg && <p className="text-[var(--color-turf-green)] text-xs">{rangeMsg}</p>}
               </div>
             )}
 
             {modeErr && <p className="text-[var(--color-scoreboard-red)] text-xs">{modeErr}</p>}
-            <p className="text-[10px] text-[var(--color-text-muted)]">Cambiar esto afecta como todos los miembros ven la tabla desde ahora.</p>
+            <p className="text-[10px] text-[var(--color-text-muted)]">{tr('Cambiar esto afecta como todos los miembros ven la tabla desde ahora.')}</p>
         </div>
       </SettingsCard>
 
       <SettingsCard
         icon={<IconTrophy size={18} />}
-        title="Premio"
-        description="Configura el premio de la quiniela"
-        summary={betAmount > 0 ? `$${betAmount.toLocaleString('es-MX')} por participante` : 'Sin premio configurado'}
+        title={tr('Premio')}
+        description={tr('Configura el premio de la quiniela')}
+        summary={betAmount > 0 ? tr('${amount} por participante', { amount: betAmount.toLocaleString(localeTag()) }) : tr('Sin premio configurado')}
         open={!!openSections.premio}
         onToggle={() => toggleSection('premio')}
       >
         <form onSubmit={savePrizeSettings} className="bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-lg p-4 space-y-4">
           <div>
-            <h2 className="text-sm font-semibold">Monto por participante</h2>
+            <h2 className="text-sm font-semibold">{tr('Monto por participante')}</h2>
             <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">
-              El premio total se calcula solo: este monto x cuantos participantes haya en la liga.
+              {tr('El premio total se calcula solo: este monto x cuantos participantes haya en la liga.')}
             </p>
           </div>
           <label className="text-xs text-[var(--color-text-muted)] block">
-            Monto (por persona)
+            {tr('Monto (por persona)')}
             <input
               type="number"
               inputMode="decimal"
@@ -920,20 +922,20 @@ export default function Admin({
 
           {memberCount != null && Number(betAmount) > 0 && (
             <p className="text-xs text-[var(--color-turf-green)] font-semibold">
-              Premio total ahorita: ${(Number(betAmount) * memberCount).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-              <span className="text-[var(--color-text-muted)] font-normal"> ({memberCount} × ${Number(betAmount).toLocaleString('es-MX')})</span>
+              {tr('Premio total ahorita: ${amount}', { amount: (Number(betAmount) * memberCount).toLocaleString(localeTag(), { minimumFractionDigits: 2 }) })}
+              <span className="text-[var(--color-text-muted)] font-normal"> {tr('({n} × ${amount})', { n: memberCount, amount: Number(betAmount).toLocaleString(localeTag()) })}</span>
             </p>
           )}
 
           <div className="h-px bg-[var(--color-field-line)]" />
 
           <div>
-            <h2 className="text-sm font-semibold">Como se reparte entre los primeros 3</h2>
-            <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">Los porcentajes deben sumar 100.</p>
+            <h2 className="text-sm font-semibold">{tr('Como se reparte entre los primeros 3')}</h2>
+            <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">{tr('Los porcentajes deben sumar 100.')}</p>
           </div>
           <div className="grid grid-cols-3 gap-3">
             <label className="text-xs text-[var(--color-text-muted)]">
-              🥇 1er lugar
+              {tr('🥇 1er lugar')}
               <input
                 type="number" inputMode="decimal" min={0} max={100} step="0.1"
                 value={split1} onChange={(e) => setSplit1(Number(e.target.value))}
@@ -941,7 +943,7 @@ export default function Admin({
               />
             </label>
             <label className="text-xs text-[var(--color-text-muted)]">
-              🥈 2do lugar
+              {tr('🥈 2do lugar')}
               <input
                 type="number" inputMode="decimal" min={0} max={100} step="0.1"
                 value={split2} onChange={(e) => setSplit2(Number(e.target.value))}
@@ -949,7 +951,7 @@ export default function Admin({
               />
             </label>
             <label className="text-xs text-[var(--color-text-muted)]">
-              🥉 3er lugar
+              {tr('🥉 3er lugar')}
               <input
                 type="number" inputMode="decimal" min={0} max={100} step="0.1"
                 value={split3} onChange={(e) => setSplit3(Number(e.target.value))}
@@ -958,35 +960,36 @@ export default function Admin({
             </label>
           </div>
           <p className={`text-xs ${splitTotal === 100 ? 'text-[var(--color-text-muted)]' : 'text-[var(--color-scoreboard-red)] font-semibold'}`}>
-            Suman {splitTotal}{splitTotal !== 100 ? ' — deben ser 100' : ''}
+            {tr('Suman {total}', { total: splitTotal })}{splitTotal !== 100 ? tr(' — deben ser 100') : ''}
           </p>
 
           {prizeErr && <p className="text-[var(--color-scoreboard-red)] text-xs">{prizeErr}</p>}
           {prizeMsg && <p className="text-[var(--color-turf-green)] text-xs">{prizeMsg}</p>}
           <button type="submit" disabled={savingPrize}
             className="w-full bg-[var(--color-light-amber)] text-[var(--color-field-night)] font-semibold rounded-md py-2 text-sm hover:brightness-110 disabled:opacity-50">
-            {savingPrize ? 'Guardando...' : 'Guardar premio'}
+            {savingPrize ? tr('Guardando...') : tr('Guardar premio')}
           </button>
         </form>
 
         {betAmount > 0 && memberCount !== null && memberCount > 0 && (
         <div className="bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-lg p-4 space-y-3">
           <div>
-            <h2 className="text-sm font-semibold">Quien ya pago</h2>
+            <h2 className="text-sm font-semibold">{tr('Quien ya pago')}</h2>
             <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">
-              Solo tu (el admin) puedes ver y marcar esto. {paymentMembers.filter((m) => m.paid).length}/{paymentMembers.length} pagaron
-              {group.scoring_mode === 'weekly' ? ' esta jornada.' : '.'}
+              {group.scoring_mode === 'weekly'
+                ? tr('Solo tu (el admin) puedes ver y marcar esto. {paid}/{total} pagaron esta jornada.', { paid: paymentMembers.filter((m) => m.paid).length, total: paymentMembers.length })
+                : tr('Solo tu (el admin) puedes ver y marcar esto. {paid}/{total} pagaron.', { paid: paymentMembers.filter((m) => m.paid).length, total: paymentMembers.length })}
             </p>
           </div>
 
           {group.scoring_mode === 'weekly' && (
             weeks.length === 0 ? (
               <p className="text-[10px] text-[var(--color-text-muted)] border border-dashed border-[var(--color-field-line)] rounded-md px-3 py-2.5">
-                Todavia no hay partidos/jornadas en esta liga.
+                {tr('Todavia no hay partidos/jornadas en esta liga.')}
               </p>
             ) : (
               <label className="text-xs text-[var(--color-text-muted)] block">
-                Jornada
+                {tr('Jornada')}
                 <select
                   value={paymentWeekKey ?? ''}
                   onChange={(e) => setPaymentWeekKey(e.target.value)}
@@ -1022,7 +1025,7 @@ export default function Admin({
                       : { background: 'var(--color-field-line)', color: 'var(--color-text-muted)' }
                   }
                 >
-                  {m.paid ? <><IconCheck size={11} /> Pago</> : 'Pendiente'}
+                  {m.paid ? <><IconCheck size={11} /> {tr('Pago')}</> : tr('Pendiente')}
                 </span>
               </button>
             ))}
@@ -1034,9 +1037,9 @@ export default function Admin({
 
       <SettingsCard
         icon={<IconUsers size={18} />}
-        title="Miembros"
-        description="Gestiona participantes de la liga"
-        summary={memberCount != null ? `${memberCount} miembro${memberCount !== 1 ? 's' : ''}` : undefined}
+        title={tr('Miembros')}
+        description={tr('Gestiona participantes de la liga')}
+        summary={memberCount != null ? (memberCount === 1 ? tr('1 miembro') : tr('{n} miembros', { n: memberCount })) : undefined}
         open={!!openSections.miembros}
         onToggle={() => toggleSection('miembros')}
       >
@@ -1045,36 +1048,36 @@ export default function Admin({
 
       <SettingsCard
         icon={<IconCalendar size={18} />}
-        title="Partidos"
-        description="Selecciona los partidos disponibles"
+        title={tr('Partidos')}
+        description={tr('Selecciona los partidos disponibles')}
         summary={partidosSummary}
         open={!!openSections.partidos}
         onToggle={() => toggleSection('partidos')}
       >
         <form onSubmit={syncWeekFromEspn} className="bg-[var(--color-field-surface-raised)] border border-[var(--color-light-amber)]/40 rounded-lg p-4 space-y-3">
           <div>
-            <h2 className="text-sm font-semibold">Importar semana automaticamente</h2>
+            <h2 className="text-sm font-semibold">{tr('Importar semana automaticamente')}</h2>
             <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
-              Trae los partidos, horarios y marcadores directo del calendario oficial de la NFL.
+              {tr('Trae los partidos, horarios y marcadores directo del calendario oficial de la NFL.')}
             </p>
           </div>
           <div className="grid grid-cols-3 gap-3">
             <label className="text-xs text-[var(--color-text-muted)]">
-              Temporada
+              {tr('Temporada')}
               <select value={syncType} onChange={(e) => setSyncType(Number(e.target.value) as SeasonType)}
                 className="w-full mt-1 bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]">
-                <option value={2}>Regular</option>
-                <option value={1}>Pretemporada</option>
+                <option value={2}>{tr('Regular')}</option>
+                <option value={1}>{tr('Pretemporada')}</option>
                 <option value={3}>Playoffs</option>
               </select>
             </label>
             <label className="text-xs text-[var(--color-text-muted)]">
-              Año
+              {tr('Año')}
               <input type="number" value={syncYear} onChange={(e) => setSyncYear(Number(e.target.value))}
                 className="w-full mt-1 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]" />
             </label>
             <label className="text-xs text-[var(--color-text-muted)]">
-              Semana
+              {tr('Semana')}
               <input type="number" min={1} max={22} value={syncWeek} onChange={(e) => setSyncWeek(Number(e.target.value))}
                 className="w-full mt-1 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]" />
             </label>
@@ -1082,55 +1085,55 @@ export default function Admin({
           {syncMsg && <p className="text-xs text-[var(--color-turf-green)]">{syncMsg}</p>}
           <button type="submit" disabled={syncing}
             className="w-full bg-[var(--color-light-amber)] text-[var(--color-field-night)] font-semibold rounded-md py-2 text-sm hover:brightness-110 disabled:opacity-50">
-            {syncing ? 'Sincronizando...' : 'Sincronizar con la NFL'}
+            {syncing ? tr('Sincronizando...') : tr('Sincronizar con la NFL')}
           </button>
           <label className="flex items-center gap-2 text-xs text-[var(--color-text-muted)] cursor-pointer">
             <input type="checkbox" checked={autoSync} onChange={(e) => setAutoSync(e.target.checked)} />
-            Actualizar automaticamente cada minuto (incluye partidos en curso, no solo terminados) mientras tengas esta pantalla abierta
+            {tr('Actualizar automaticamente cada minuto (incluye partidos en curso, no solo terminados) mientras tengas esta pantalla abierta')}
           </label>
           {autoSync && (
             <div className="flex items-center gap-2 text-[10px] text-[var(--color-turf-green)] bg-[rgba(61,139,95,0.1)] border border-[var(--color-turf-green)]/40 rounded-md px-2.5 py-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-turf-green)] animate-pulse shrink-0" />
-              Auto-sync activo — sincronizando cada minuto mientras esta pantalla siga abierta
+              {tr('Auto-sync activo — sincronizando cada minuto mientras esta pantalla siga abierta')}
             </div>
           )}
           <p className="text-[10px] text-[var(--color-text-muted)]">
-            Puedes correr esto varias veces: agrega partidos nuevos y actualiza marcadores finales sin duplicar nada.
-            Usa una API publica no oficial de ESPN, asi que ocasionalmente puede fallar.
+            {tr('Puedes correr esto varias veces: agrega partidos nuevos y actualiza marcadores finales sin duplicar nada.')}{' '}
+            {tr('Usa una API publica no oficial de ESPN, asi que ocasionalmente puede fallar.')}
           </p>
         </form>
 
         <form onSubmit={addGame} className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-4 space-y-3">
-          <h2 className="text-sm font-semibold">O agregar un partido manualmente</h2>
+          <h2 className="text-sm font-semibold">{tr('O agregar un partido manualmente')}</h2>
           <div className="grid grid-cols-2 gap-3">
             <label className="text-xs text-[var(--color-text-muted)]">
-              Temporada
+              {tr('Temporada')}
               <select value={manualSeasonType} onChange={(e) => setManualSeasonType(Number(e.target.value) as SeasonType)}
                 className="w-full mt-1 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]">
-                <option value={2}>Regular</option>
-                <option value={1}>Pretemporada</option>
+                <option value={2}>{tr('Regular')}</option>
+                <option value={1}>{tr('Pretemporada')}</option>
                 <option value={3}>Playoffs</option>
               </select>
             </label>
             <label className="text-xs text-[var(--color-text-muted)]">
-              Semana
+              {tr('Semana')}
               <input type="number" min={1} value={week} onChange={(e) => setWeek(Number(e.target.value))}
                 className="w-full mt-1 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]" />
             </label>
             <label className="text-xs text-[var(--color-text-muted)]">
-              Fecha y hora
+              {tr('Fecha y hora')}
               <input type="datetime-local" value={kickoff} onChange={(e) => setKickoff(e.target.value)}
                 className="w-full mt-1 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]" />
             </label>
             <label className="text-xs text-[var(--color-text-muted)]">
-              Visitante
+              {tr('Visitante')}
               <select value={awayTeam} onChange={(e) => setAwayTeam(e.target.value)}
                 className="w-full mt-1 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]">
                 {NFL_TEAMS.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </label>
             <label className="text-xs text-[var(--color-text-muted)]">
-              Local
+              {tr('Local')}
               <select value={homeTeam} onChange={(e) => setHomeTeam(e.target.value)}
                 className="w-full mt-1 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]">
                 {NFL_TEAMS.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -1139,13 +1142,13 @@ export default function Admin({
           </div>
           {error && <p className="text-[var(--color-scoreboard-red)] text-xs">{error}</p>}
           <button type="submit" className="w-full bg-[var(--color-light-amber)] text-[var(--color-field-night)] font-semibold rounded-md py-2 text-sm hover:brightness-110">
-            Agregar partido
+            {tr('Agregar partido')}
           </button>
         </form>
 
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold">Partidos capturados</h2>
-          {games.length === 0 && <p className="text-xs text-[var(--color-text-muted)]">Ninguno todavia.</p>}
+          <h2 className="text-sm font-semibold">{tr('Partidos capturados')}</h2>
+          {games.length === 0 && <p className="text-xs text-[var(--color-text-muted)]">{tr('Ninguno todavia.')}</p>}
           {gamesByWeek.map((wk) => {
             const open = !!expandedWeeks[wk.key]
             return (
@@ -1157,13 +1160,13 @@ export default function Admin({
                   <span className="flex items-center gap-2">
                     <span className={`text-[var(--color-text-muted)] text-xs transition-transform ${open ? 'rotate-90' : ''}`}>▶</span>
                     <span className="font-mono-score text-xs text-[var(--color-light-amber)]">{weekLabel(wk.seasonType, wk.week)} · {wk.year}</span>
-                    <span className="text-[10px] text-[var(--color-text-muted)]">({wk.games.length} partido{wk.games.length !== 1 ? 's' : ''})</span>
+                    <span className="text-[10px] text-[var(--color-text-muted)]">({partidosN(wk.games.length)})</span>
                   </span>
                   <span
                     onClick={(e) => { e.stopPropagation(); deleteWeek(wk.seasonType, wk.week, wk.year) }}
                     className="flex items-center gap-1 text-[10px] font-semibold text-[var(--color-scoreboard-red)] bg-[rgba(228,70,43,0.1)] border border-[var(--color-scoreboard-red)]/40 rounded-md px-2 py-1 hover:bg-[rgba(228,70,43,0.2)] transition"
                   >
-                    <IconTrash size={11} /> Borrar semana
+                    <IconTrash size={11} /> {tr('Borrar semana')}
                   </span>
                 </button>
                 {open && (
@@ -1182,9 +1185,9 @@ export default function Admin({
           <div className="border border-[var(--color-field-line)] rounded-lg overflow-hidden">
             <div className="px-3 py-2.5 bg-[var(--color-field-surface)]">
               <h2 className="text-sm font-semibold flex items-center gap-2">
-                🗑️ Papelera
+                {tr('🗑️ Papelera')}
                 <span className="text-[10px] text-[var(--color-text-muted)] font-normal">
-                  ({deletedGames.length} partido{deletedGames.length !== 1 ? 's' : ''} borrado{deletedGames.length !== 1 ? 's' : ''})
+                  ({deletedGames.length === 1 ? tr('1 partido borrado') : tr('{n} partidos borrados', { n: deletedGames.length })})
                 </span>
               </h2>
             </div>
@@ -1206,7 +1209,7 @@ export default function Admin({
                         onClick={() => restoreWeek(wk.seasonType, wk.week, wk.year)}
                         className="text-xs font-semibold text-[var(--color-turf-green)] hover:underline"
                       >
-                        Restaurar semana completa
+                        {tr('Restaurar semana completa')}
                       </button>
                     </div>
                     <div className="space-y-1">
@@ -1214,7 +1217,7 @@ export default function Admin({
                         <div key={g.id} className="flex items-center justify-between text-xs text-[var(--color-text-muted)] px-2 py-1">
                           <span>{g.away_team} @ {g.home_team}</span>
                           <button onClick={() => restoreGame(g.id)} className="text-[var(--color-turf-green)] hover:underline">
-                            Restaurar
+                            {tr('Restaurar')}
                           </button>
                         </div>
                       ))}
@@ -1229,8 +1232,8 @@ export default function Admin({
 
       <SettingsCard
         icon={<IconTrash size={18} />}
-        title="Zona de peligro"
-        description="Acciones irreversibles para esta liga"
+        title={tr('Zona de peligro')}
+        description={tr('Acciones irreversibles para esta liga')}
         open={true}
         onToggle={() => {}}
         danger
@@ -1241,8 +1244,8 @@ export default function Admin({
           className="w-full flex items-center gap-3 px-4 py-3.5 rounded-lg border border-[var(--color-scoreboard-red)]/40 bg-[rgba(228,70,43,0.06)] hover:bg-[rgba(228,70,43,0.12)] transition text-left"
         >
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold">Eliminar liga</p>
-            <p className="text-[10px] text-[var(--color-text-muted)]">Esta accion no se puede deshacer</p>
+            <p className="text-sm font-semibold">{tr('Eliminar liga')}</p>
+            <p className="text-[10px] text-[var(--color-text-muted)]">{tr('Esta accion no se puede deshacer')}</p>
           </div>
           <IconChevronRight size={16} className={`shrink-0 text-[var(--color-scoreboard-red)] transition-transform ${openSections.peligro ? 'rotate-90' : ''}`} />
         </button>
@@ -1275,7 +1278,7 @@ function AdminGameRow({ game, onFinal, onDelete, onEditPicks }: { game: Game; on
         {game.away_team} @ {game.home_team}
         <img src={teamLogoUrl(game.home_team)} alt={game.home_team} className="w-5 h-5 object-contain" loading="lazy" />
         {game.status === 'final' && <span className="ml-2 text-[var(--color-turf-green)] text-xs font-semibold">FINAL</span>}
-        {game.status === 'live' && <span className="ml-2 text-[var(--color-scoreboard-red)] text-xs font-semibold">EN VIVO</span>}
+        {game.status === 'live' && <span className="ml-2 text-[var(--color-scoreboard-red)] text-xs font-semibold">{tr('EN VIVO')}</span>}
       </div>
       <div className="flex items-center gap-2">
         <input type="number" inputMode="numeric" pattern="[0-9]*" min={0} value={away} onChange={(e) => setAway(e.target.value)}
@@ -1287,19 +1290,19 @@ function AdminGameRow({ game, onFinal, onDelete, onEditPicks }: { game: Game; on
           onClick={() => home !== '' && away !== '' && onFinal(game, Number(home), Number(away))}
           className="text-xs font-semibold bg-[var(--color-turf-green)] text-white rounded-md px-3 py-1.5 hover:brightness-110"
         >
-          Finalizar
+          {tr('Finalizar')}
         </button>
         {game.status === 'final' && (
           <button
             onClick={() => onEditPicks(game)}
-            title="Corregir la prediccion de un jugador"
+            title={tr('Corregir la prediccion de un jugador')}
             className="flex items-center gap-1 text-xs font-semibold text-[var(--color-light-amber)] bg-[rgba(242,183,5,0.1)] border border-[var(--color-light-amber)]/40 rounded-md px-2.5 py-1.5 hover:bg-[rgba(242,183,5,0.2)] transition"
           >
-            <IconPencil size={12} /> Predicciones
+            <IconPencil size={12} /> {tr('Predicciones')}
           </button>
         )}
         <button onClick={() => onDelete(game.id)} className="flex items-center gap-1 text-xs font-semibold text-[var(--color-scoreboard-red)] bg-[rgba(228,70,43,0.1)] border border-[var(--color-scoreboard-red)]/40 rounded-md px-2.5 py-1.5 hover:bg-[rgba(228,70,43,0.2)] transition">
-          <IconTrash size={12} /> Borrar
+          <IconTrash size={12} /> {tr('Borrar')}
         </button>
       </div>
     </div>
@@ -1323,7 +1326,7 @@ function EditGamePicksModal({ game, groupId, onClose }: { game: Game; groupId: s
       const list = (data ?? [])
         .map((p: any) => ({
           user_id: p.user_id,
-          display_name: p.profiles?.display_name ?? 'Jugador',
+          display_name: p.profiles?.display_name ?? tr('Jugador'),
           home: p.pred_home_score?.toString() ?? '',
           away: p.pred_away_score?.toString() ?? '',
           points: p.points,
@@ -1362,24 +1365,24 @@ function EditGamePicksModal({ game, groupId, onClose }: { game: Game; groupId: s
       >
         <div className="flex items-start justify-between gap-2">
           <div>
-            <h2 className="text-sm font-semibold">Corregir predicciones</h2>
+            <h2 className="text-sm font-semibold">{tr('Corregir predicciones')}</h2>
             <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">
-              {game.away_team} @ {game.home_team} · resultado real {game.away_score}-{game.home_score}
+              {game.away_team} @ {game.home_team} · {tr('resultado real {score}', { score: `${game.away_score}-${game.home_score}` })}
             </p>
           </div>
-          <button onClick={onClose} className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)]">Cerrar</button>
+          <button onClick={onClose} className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)]">{tr('Cerrar')}</button>
         </div>
 
         <p className="text-[10px] text-[var(--color-text-muted)]">
-          Cambia el marcador que predijo un jugador y sus puntos de este partido se recalculan solos al guardar. Solo se puede corregir <strong>una vez</strong> por jugador.
+          {tr('Cambia el marcador que predijo un jugador y sus puntos de este partido se recalculan solos al guardar.')} {tr('Solo se puede corregir')} <strong>{tr('una vez')}</strong> {tr('por jugador.')}
         </p>
 
         {err && <p className="text-[var(--color-scoreboard-red)] text-xs">{err}</p>}
 
         {rows === null ? (
-          <p className="text-xs text-[var(--color-text-muted)] text-center py-4">Cargando...</p>
+          <p className="text-xs text-[var(--color-text-muted)] text-center py-4">{tr('Cargando...')}</p>
         ) : rows.length === 0 ? (
-          <p className="text-xs text-[var(--color-text-muted)] text-center py-4">Nadie predijo este partido.</p>
+          <p className="text-xs text-[var(--color-text-muted)] text-center py-4">{tr('Nadie predijo este partido.')}</p>
         ) : (
           <div className="space-y-2">
             {rows.map((r) => (
@@ -1388,8 +1391,8 @@ function EditGamePicksModal({ game, groupId, onClose }: { game: Game; groupId: s
                 {r.corrected ? (
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="font-mono-score text-xs text-[var(--color-text-muted)]">{r.away}–{r.home}</span>
-                    <span className="text-[10px] text-[var(--color-text-muted)]">Ya se corrigio</span>
-                    <span className="text-[10px] text-[var(--color-text-muted)] w-8 text-right shrink-0">{r.points ?? '–'}pt</span>
+                    <span className="text-[10px] text-[var(--color-text-muted)]">{tr('Ya se corrigio')}</span>
+                    <span className="text-[10px] text-[var(--color-text-muted)] w-8 text-right shrink-0">{r.points ?? '–'}{tr('pt')}</span>
                   </div>
                 ) : (
                   <div className="flex items-center gap-1.5 shrink-0">
@@ -1411,9 +1414,9 @@ function EditGamePicksModal({ game, groupId, onClose }: { game: Game; groupId: s
                       disabled={savingId === r.user_id}
                       className="text-[10px] font-semibold bg-[var(--color-light-amber)] text-[var(--color-field-night)] rounded-md px-2 py-1.5 hover:brightness-110 disabled:opacity-50"
                     >
-                      {savingId === r.user_id ? '...' : 'Guardar'}
+                      {savingId === r.user_id ? '...' : tr('Guardar')}
                     </button>
-                    <span className="text-[10px] text-[var(--color-text-muted)] w-8 text-right shrink-0">{r.points ?? '–'}pt</span>
+                    <span className="text-[10px] text-[var(--color-text-muted)] w-8 text-right shrink-0">{r.points ?? '–'}{tr('pt')}</span>
                   </div>
                 )}
               </div>

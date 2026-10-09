@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { weekLabel, type Group } from '../lib/types'
+import { tr } from '../i18n'
 import { IconCopy, IconCheck } from './icons'
 
 const LOCK_MINUTES = 30 // mismo margen que GameCard.tsx: se cierra 30 min antes del kickoff
@@ -115,34 +116,34 @@ export default function CopyPicksModal({
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4" onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-4">
         <div className="flex items-center justify-between mb-1">
-          <h3 className="text-sm font-semibold flex items-center gap-1.5"><IconCopy size={14} /> Copiar predicciones</h3>
+          <h3 className="text-sm font-semibold flex items-center gap-1.5"><IconCopy size={14} /> {tr('Copiar predicciones')}</h3>
           <button onClick={onClose} className="text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)] text-lg leading-none">✕</button>
         </div>
         <p className="text-[10px] text-[var(--color-text-muted)] mb-3">
-          De {weekLabel(seasonType, week)} en otra de tus ligas hacia {currentGroup.name}, emparejando por equipos. Solo copia a partidos que aun no cierran.
+          {tr('De {week} en otra de tus ligas hacia {name}, emparejando por equipos. Solo copia a partidos que aun no cierran.', { week: weekLabel(seasonType, week), name: currentGroup.name })}
         </p>
 
         {result ? (
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm text-[var(--color-turf-green)]">
-              <IconCheck size={16} /> {result.copied} predicci{result.copied === 1 ? 'on copiada' : 'ones copiadas'}
+              <IconCheck size={16} /> {result.copied === 1 ? tr('{n} prediccion copiada', { n: result.copied }) : tr('{n} predicciones copiadas', { n: result.copied })}
             </div>
             <ul className="text-[10px] text-[var(--color-text-muted)] space-y-0.5 pl-1">
-              {result.locked > 0 && <li>{result.locked} ya estaban cerrados en esta liga</li>}
-              {result.noMatch > 0 && <li>{result.noMatch} no existen en esta liga</li>}
-              {result.noPick > 0 && <li>{result.noPick} no tenias prediccion en la liga origen</li>}
+              {result.locked > 0 && <li>{tr('{n} ya estaban cerrados en esta liga', { n: result.locked })}</li>}
+              {result.noMatch > 0 && <li>{tr('{n} no existen en esta liga', { n: result.noMatch })}</li>}
+              {result.noPick > 0 && <li>{tr('{n} no tenias prediccion en la liga origen', { n: result.noPick })}</li>}
             </ul>
             <button
               onClick={onClose}
               className="w-full mt-2 bg-[var(--color-light-amber)] text-[var(--color-field-night)] font-semibold rounded-md py-2 text-sm hover:brightness-110"
             >
-              Listo
+              {tr('Listo')}
             </button>
           </div>
         ) : loadingGroups ? (
-          <p className="text-xs text-[var(--color-text-muted)] py-4 text-center">Cargando tus ligas...</p>
+          <p className="text-xs text-[var(--color-text-muted)] py-4 text-center">{tr('Cargando tus ligas...')}</p>
         ) : otherGroups.length === 0 ? (
-          <p className="text-xs text-[var(--color-text-muted)] py-4 text-center">No perteneces a ninguna otra liga todavia.</p>
+          <p className="text-xs text-[var(--color-text-muted)] py-4 text-center">{tr('No perteneces a ninguna otra liga todavia.')}</p>
         ) : (
           <div className="space-y-2">
             {otherGroups.map((g) => (
@@ -159,7 +160,7 @@ export default function CopyPicksModal({
                 )}
                 <span className="text-sm font-medium flex-1 truncate">{g.name}</span>
                 {copying && sourceGroupId === g.id && (
-                  <span className="text-[10px] text-[var(--color-light-amber)]">Copiando...</span>
+                  <span className="text-[10px] text-[var(--color-light-amber)]">{tr('Copiando...')}</span>
                 )}
               </button>
             ))}

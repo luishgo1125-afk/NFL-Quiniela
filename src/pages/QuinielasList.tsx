@@ -10,6 +10,7 @@ import {
   IconSearch, IconFilter, IconSort, IconChevronRight, IconTrophy,
 } from '../components/icons'
 import type { User } from '@supabase/supabase-js'
+import { tr, localeTag } from '../i18n'
 
 interface Member {
   user_id: string
@@ -151,7 +152,7 @@ export default function QuinielasList({ user, onSelect, initialFilter = 'activa'
             .from('group_members')
             .select('user_id, profiles(display_name)')
             .eq('group_id', g.id)
-          const members = (rows ?? []).map((r: any) => ({ user_id: r.user_id, display_name: r.profiles?.display_name ?? 'Jugador' }))
+          const members = (rows ?? []).map((r: any) => ({ user_id: r.user_id, display_name: r.profiles?.display_name ?? tr('Jugador') }))
           return [g.id, members] as const
         })
       )
@@ -190,23 +191,23 @@ export default function QuinielasList({ user, onSelect, initialFilter = 'activa'
     <HomeNav top={0} brand right={navRight} />
     <div className="home-wrap">
       <Hero
-        badge="EN JUEGO ESTA SEMANA"
-        chips={['NFL', 'Pronósticos']}
+        badge={tr('EN JUEGO ESTA SEMANA')}
+        chips={['NFL', tr('Pronósticos')]}
         season={season}
         stats={[
-          { value: counts.activa, label: 'Activas' },
-          { value: groups.length, label: 'Mis ligas' },
-          { value: Object.values(stats).reduce((a, s) => a + (s.liveCount ?? 0), 0), label: 'En vivo' },
+          { value: counts.activa, label: tr('Activas') },
+          { value: groups.length, label: tr('Mis ligas') },
+          { value: Object.values(stats).reduce((a, s) => a + (s.liveCount ?? 0), 0), label: tr('En vivo') },
         ]}
         actions={
           <>
-            <button onClick={() => { setFilter('activa'); spotlight('jornadas') }} className="home-btn amber">Jugar ahora</button>
-            <button onClick={() => (onOpenRanking ? onOpenRanking() : (setFilter('todas'), spotlight('jornadas')))} className="home-btn secondary">Ver ranking</button>
+            <button onClick={() => { setFilter('activa'); spotlight('jornadas') }} className="home-btn amber">{tr('Jugar ahora')}</button>
+            <button onClick={() => (onOpenRanking ? onOpenRanking() : (setFilter('todas'), spotlight('jornadas')))} className="home-btn secondary">{tr('Ver ranking')}</button>
           </>
         }
       />
       <div id="jornadas" data-spot="jornadas" style={{ marginTop: 40, scrollMarginTop: 120 }}>
-        <SectionTitle eyebrow="TUS LIGAS" title="JORNADAS ACTIVAS" />
+        <SectionTitle eyebrow={tr('TUS LIGAS')} title={tr('JORNADAS ACTIVAS')} />
 
       <div className="flex gap-2 mb-4">
         <div className="flex-1 relative">
@@ -214,7 +215,7 @@ export default function QuinielasList({ user, onSelect, initialFilter = 'activa'
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar quiniela..."
+            placeholder={tr('Buscar quiniela...')}
             className="w-full bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:border-[var(--color-light-amber)]"
           />
         </div>
@@ -224,10 +225,10 @@ export default function QuinielasList({ user, onSelect, initialFilter = 'activa'
             onChange={(e) => setFilter(e.target.value as 'todas' | Status)}
             className="appearance-none bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg pl-9 pr-8 py-2.5 text-sm outline-none focus:border-[var(--color-light-amber)] cursor-pointer"
           >
-            <option value="todas">Todas</option>
-            <option value="activa">Activas</option>
-            <option value="proxima">Proximas</option>
-            <option value="finalizada">Finalizadas</option>
+            <option value="todas">{tr('Todas')}</option>
+            <option value="activa">{tr('Activas')}</option>
+            <option value="proxima">{tr('Proximas')}</option>
+            <option value="finalizada">{tr('Finalizadas')}</option>
           </select>
           <IconFilter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] pointer-events-none" />
           <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] pointer-events-none text-[10px]">▾</span>
@@ -252,7 +253,7 @@ export default function QuinielasList({ user, onSelect, initialFilter = 'activa'
               }`}
             >
               {f.key !== 'todas' && <span className="w-1.5 h-1.5 rounded-full" style={{ background: STATUS_META[f.key as Status].dot }} />}
-              {f.label} {counts[f.key] > 0 && counts[f.key]}
+              {tr(f.label)} {counts[f.key] > 0 && counts[f.key]}
             </button>
           ))}
         </div>
@@ -262,8 +263,8 @@ export default function QuinielasList({ user, onSelect, initialFilter = 'activa'
             onChange={(e) => setSort(e.target.value as 'reciente' | 'nombre')}
             className="appearance-none bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg pl-8 pr-7 py-1.5 text-xs outline-none focus:border-[var(--color-light-amber)] cursor-pointer text-[var(--color-text-muted)]"
           >
-            <option value="reciente">Mas reciente</option>
-            <option value="nombre">Nombre A-Z</option>
+            <option value="reciente">{tr('Mas reciente')}</option>
+            <option value="nombre">{tr('Nombre A-Z')}</option>
           </select>
           <IconSort size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] pointer-events-none" />
           <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] pointer-events-none text-[9px]">▾</span>
@@ -271,20 +272,20 @@ export default function QuinielasList({ user, onSelect, initialFilter = 'activa'
       </div>
 
       {loading ? (
-        <p className="text-[var(--color-text-muted)] text-sm">Cargando...</p>
+        <p className="text-[var(--color-text-muted)] text-sm">{tr('Cargando...')}</p>
       ) : groups.length === 0 ? (
         <p className="text-[var(--color-text-muted)] text-sm">
-          Todavia no perteneces a ninguna quiniela. Ve a "Crear quiniela" abajo para crear una o unirte con un codigo.
+          {tr('Todavia no perteneces a ninguna quiniela. Ve a "Crear quiniela" abajo para crear una o unirte con un codigo.')}
         </p>
       ) : visibleGroups.length === 0 ? (
-        <p className="text-[var(--color-text-muted)] text-sm">Ninguna quiniela coincide con esa busqueda/filtro.</p>
+        <p className="text-[var(--color-text-muted)] text-sm">{tr('Ninguna quiniela coincide con esa busqueda/filtro.')}</p>
       ) : (
         <div className="home-leagues">
           {visibleGroups.map((g) => {
             const s = stats[g.id]
             const members = membersByGroup[g.id] ?? []
             const closesLabel = s?.closesAt
-              ? new Date(s.closesAt).toLocaleString('es-MX', { weekday: 'long', hour: 'numeric', minute: '2-digit' })
+              ? new Date(s.closesAt).toLocaleString(localeTag(), { weekday: 'long', hour: 'numeric', minute: '2-digit' })
               : null
             const statusMeta = STATUS_META[s?.status ?? 'proxima']
             const isLive = (s?.liveCount ?? 0) > 0
@@ -295,9 +296,9 @@ export default function QuinielasList({ user, onSelect, initialFilter = 'activa'
                 <div className="lcard-banner">
                   {g.logo_url && <img src={g.logo_url} alt="" />}
                   <span className="lcard-status" style={{ background: statusMeta.bg, color: statusMeta.text, border: `1px solid ${statusMeta.border}` }}>
-                    <i style={{ background: statusMeta.dot }} /> {statusMeta.label}
+                    <i style={{ background: statusMeta.dot }} /> {tr(statusMeta.label)}
                   </span>
-                  {isLive && <span className="lcard-live"><i /> EN VIVO</span>}
+                  {isLive && <span className="lcard-live"><i /> {tr('EN VIVO')}</span>}
                 </div>
 
                 <div className="lcard-head">
@@ -307,7 +308,7 @@ export default function QuinielasList({ user, onSelect, initialFilter = 'activa'
                   <div className="lcard-title">
                     <h3>{g.name}</h3>
                     <p>
-                      <IconUsers size={13} /> {playersText} jugador{playersText !== 1 ? 'es' : ''}
+                      <IconUsers size={13} /> {playersText === 1 ? tr('1 jugador') : tr('{n} jugadores', { n: playersText })}
                       {s?.weekLabelText && <span className="lcard-week">{s.weekLabelText}</span>}
                     </p>
                   </div>
@@ -315,22 +316,22 @@ export default function QuinielasList({ user, onSelect, initialFilter = 'activa'
 
                 <div className="lcard-stats">
                   <div className="lcard-stat">
-                    <span className="lcard-k"><IconClipboard size={12} /> Picks</span>
+                    <span className="lcard-k"><IconClipboard size={12} /> {tr('Picks')}</span>
                     <b>{s && s.picksTotal > 0 ? `${s.picksDone}/${s.picksTotal}` : '—'}</b>
                     <div className="lcard-bar"><div style={{ width: `${pct}%` }} /></div>
                   </div>
                   <div className="lcard-stat">
-                    <span className="lcard-k"><IconCalendar size={12} /> Cierra</span>
+                    <span className="lcard-k"><IconCalendar size={12} /> {tr('Cierra')}</span>
                     <b style={{ fontSize: 15, textTransform: 'capitalize' }}>{closesLabel ?? '—'}</b>
                   </div>
                   <div className="lcard-stat">
-                    <span className="lcard-k"><IconTrophy size={12} /> Posición</span>
+                    <span className="lcard-k"><IconTrophy size={12} /> {tr('Posición')}</span>
                     <b style={{ color: s?.myRank ? 'var(--color-light-amber)' : undefined }}>{s?.myRank ? `#${s.myRank}` : '—'}</b>
                   </div>
                 </div>
 
                 <button onClick={() => onSelect(g)} className={`lcard-btn${s?.status === 'activa' ? ' primary' : ''}`}>
-                  {s?.status === 'finalizada' ? 'Ver quiniela' : 'Jugar ahora'} <IconChevronRight size={16} />
+                  {s?.status === 'finalizada' ? tr('Ver quiniela') : tr('Jugar ahora')} <IconChevronRight size={16} />
                 </button>
               </article>
             )
@@ -344,7 +345,7 @@ export default function QuinielasList({ user, onSelect, initialFilter = 'activa'
         if (available.length === 0) return null
         return (
           <div id="publicas" data-spot="publicas" style={{ marginTop: 48, scrollMarginTop: 120 }}>
-            <SectionTitle eyebrow="ABIERTAS PARA TODOS" title="LIGAS PÚBLICAS" />
+            <SectionTitle eyebrow={tr('ABIERTAS PARA TODOS')} title={tr('LIGAS PÚBLICAS')} />
             {joinErr && <p className="text-[var(--color-scoreboard-red)] text-xs mb-2">{joinErr}</p>}
             <div className="home-leagues">
               {available.map((g) => (
@@ -354,10 +355,10 @@ export default function QuinielasList({ user, onSelect, initialFilter = 'activa'
                     : <span className="home-ico"><IconTrophy size={20} /></span>}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <h3 style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.name}</h3>
-                    <p><span style={{ color: STATUS_META[g.status].text, fontWeight: 700, fontSize: 11 }}>● {STATUS_META[g.status].label}</span> · {g.members_count} jugadores</p>
+                    <p><span style={{ color: STATUS_META[g.status].text, fontWeight: 700, fontSize: 11 }}>● {tr(STATUS_META[g.status].label)}</span> · {tr('{n} jugadores', { n: g.members_count })}</p>
                   </div>
                   <button onClick={() => joinPublic(g.id)} disabled={joiningId === g.id} className="home-btn secondary sm">
-                    {joiningId === g.id ? '...' : 'Unirme'}
+                    {joiningId === g.id ? '...' : tr('Unirme')}
                   </button>
                 </div>
               ))}

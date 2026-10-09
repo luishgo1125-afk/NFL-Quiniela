@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { tr } from '../i18n'
 import { IconWhatsapp, IconTrophy, IconUsers, IconClipboard } from './icons'
 
 // >>> CAMBIA AQUI el numero de WhatsApp (con codigo de pais, solo digitos).
@@ -7,7 +8,7 @@ export const WHATSAPP_NUMBER = '524613588649'
 export const WHATSAPP_MESSAGE = 'Hola, quiero unirme a la siguiente jornada de la Quiniela NFL'
 
 export function whatsappUrl() {
-  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WHATSAPP_MESSAGE)}`
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(tr(WHATSAPP_MESSAGE))}`
 }
 
 export interface HeroStat { value: string | number; label: string }
@@ -24,18 +25,18 @@ export function Hero({ badge, actions, stats, chips = ['NFL'], season }: {
     <section className="home-hero" data-spot="hero">
       <div>
         <span className="home-badge"><i /> {badge}</span>
-        <h1 className="home-title">PREDICE.<br /><em>COMPITE.</em><br />GANA.</h1>
-        <p className="home-lead">Predice los marcadores de la NFL con tus amigos, suma puntos cada jornada y compite por el primer lugar.</p>
+        <h1 className="home-title">{tr('PREDICE.')}<br /><em>{tr('COMPITE.')}</em><br />{tr('GANA.')}</h1>
+        <p className="home-lead">{tr('Predice los marcadores de la NFL con tus amigos, suma puntos cada jornada y compite por el primer lugar.')}</p>
         <div className="home-actions">{actions}</div>
         <div className="home-chips">{chips.map((c) => <span key={c} className="home-chip">{c}</span>)}</div>
       </div>
       <div className={`home-statcard${season ? ' has-season' : ''}`}>
         {season ? (
           <>
-            <p className="eyebrow">TU TEMPORADA</p>
+            <p className="eyebrow">{tr('TU TEMPORADA')}</p>
             <div className="home-season">
-              <div><b>#{season.rank}</b><span>Posición</span></div>
-              <div><b className="w">{season.points}</b><span>Puntos</span></div>
+              <div><b>#{season.rank}</b><span>{tr('Posición')}</span></div>
+              <div><b className="w">{season.points}</b><span>{tr('Puntos')}</span></div>
             </div>
           </>
         ) : (
@@ -72,7 +73,7 @@ const STEPS = [
 export function HowToPlay() {
   return (
     <section id="como-jugar" data-spot="como-jugar" style={{ scrollMarginTop: 120 }}>
-      <SectionTitle eyebrow="PASO A PASO" title="Cómo jugar" />
+      <SectionTitle eyebrow={tr('PASO A PASO')} title={tr('Cómo jugar')} />
       <div className="how-grid">
         {STEPS.map((s) => (
           <div key={s.n} className="how-step">
@@ -80,8 +81,8 @@ export function HowToPlay() {
               <span className="how-num">{s.n}</span>
               <span className="home-ico">{s.icon}</span>
             </div>
-            <h3>{s.title}</h3>
-            <p>{s.text}</p>
+            <h3>{tr(s.title)}</h3>
+            <p>{tr(s.text)}</p>
           </div>
         ))}
       </div>
@@ -93,11 +94,11 @@ export function WhatsAppCta() {
   return (
     <section id="whatsapp" data-spot="whatsapp" className="home-cta" style={{ scrollMarginTop: 120 }}>
       <IconTrophy size={30} className="mx-auto" />
-      <h2>¿Listo para la<br />siguiente jornada?</h2>
-      <p>Escríbenos y te agregamos a la próxima quiniela.</p>
+      <h2>{tr('¿Listo para la')}<br />{tr('siguiente jornada?')}</h2>
+      <p>{tr('Escríbenos y te agregamos a la próxima quiniela.')}</p>
       {WHATSAPP_NUMBER && (
         <a href={whatsappUrl()} target="_blank" rel="noopener noreferrer" className="home-btn white">
-          <IconWhatsapp size={16} /> Escribir por WhatsApp
+          <IconWhatsapp size={16} /> {tr('Escribir por WhatsApp')}
         </a>
       )}
     </section>
@@ -105,7 +106,7 @@ export function WhatsAppCta() {
 }
 
 export function SiteFooter() {
-  return <footer className="home-footer" data-spot="footer">© {new Date().getFullYear()} Quiniela · Predice. Compite. Gana. · <a href="#privacidad" className="home-footer-link">Aviso de privacidad</a></footer>
+  return <footer className="home-footer" data-spot="footer">© {new Date().getFullYear()} Quiniela · {tr('Predice. Compite. Gana.')} · <a href="#privacidad" className="home-footer-link">{tr('Aviso de privacidad')}</a></footer>
 }
 
 let clearSpot: (() => void) | null = null
@@ -148,8 +149,8 @@ export function HomeNav({ jornadasId = 'jornadas', top = 0, brand = false, right
           </div>
         ) : <span />}
         <div className="home-nav-links">
-          <button onClick={() => spotlight(jornadasId)}>Jornadas</button>
-          <button onClick={() => spotlight('como-jugar')}>Cómo jugar</button>
+          <button onClick={() => spotlight(jornadasId)}>{tr('Jornadas')}</button>
+          <button onClick={() => spotlight('como-jugar')}>{tr('Cómo jugar')}</button>
           {WHATSAPP_NUMBER && (
             <a href={whatsappUrl()} target="_blank" rel="noopener noreferrer">WhatsApp</a>
           )}

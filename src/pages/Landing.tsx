@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { HomeNav, Hero, HowToPlay, WhatsAppCta, SiteFooter, SectionTitle } from '../components/HomeSections'
+import { tr } from '../i18n'
 import { IconTrophy, IconTarget, IconUsers } from '../components/icons'
 
 const FEATURES = [
@@ -27,19 +28,19 @@ export default function Landing({ onEnter }: { onEnter: (mode: 'signin' | 'signu
     <HomeNav brand />
     <div className="home-wrap home-stack">
       <Hero
-        badge="EN JUEGO ESTA SEMANA"
-        chips={['NFL', 'Pronósticos', 'Ligas privadas']}
-        stats={[{ value: 32, label: 'Equipos' }, { value: 18, label: 'Semanas' }, { value: 272, label: 'Partidos' }]}
+        badge={tr('EN JUEGO ESTA SEMANA')}
+        chips={['NFL', tr('Pronósticos'), tr('Ligas privadas')]}
+        stats={[{ value: 32, label: tr('Equipos') }, { value: 18, label: tr('Semanas') }, { value: 272, label: tr('Partidos') }]}
         actions={
           <>
-            <button onClick={() => onEnter('signup')} className="home-btn amber">Jugar ahora</button>
-            <button onClick={() => onEnter('signin')} className="home-btn secondary">Entrar</button>
+            <button onClick={() => onEnter('signup')} className="home-btn amber">{tr('Jugar ahora')}</button>
+            <button onClick={() => onEnter('signin')} className="home-btn secondary">{tr('Entrar')}</button>
           </>
         }
       />
       {groups && groups.length > 0 && (
         <section id="jornadas" data-spot="jornadas" style={{ scrollMarginTop: 120 }}>
-          <SectionTitle eyebrow="QUINIELAS" title="Jornadas activas" />
+          <SectionTitle eyebrow={tr('QUINIELAS')} title={tr('Jornadas activas')} />
           <div className="home-leagues">
             {groups.map((g) => (
               <div key={g.id} className="home-card" style={{ alignItems: 'center', opacity: g.status === 'finalizada' ? 0.7 : 1 }}>
@@ -49,12 +50,12 @@ export default function Landing({ onEnter }: { onEnter: (mode: 'signin' | 'signu
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <h3 style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.name}</h3>
                   <p style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <span style={{ color: PILL[g.status].color, fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em' }}>● {PILL[g.status].label}</span>
-                    <span>{g.members_count} jugadores</span>
+                    <span style={{ color: PILL[g.status].color, fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em' }}>● {tr(PILL[g.status].label)}</span>
+                    <span>{tr('{n} jugadores', { n: g.members_count })}</span>
                   </p>
                 </div>
                 <button onClick={() => onEnter('signin')} className="home-btn amber sm">
-                  {g.status === 'finalizada' ? 'Ver' : 'Jugar'}
+                  {g.status === 'finalizada' ? tr('Ver') : tr('Jugar')}
                 </button>
               </div>
             ))}
@@ -62,12 +63,12 @@ export default function Landing({ onEnter }: { onEnter: (mode: 'signin' | 'signu
         </section>
       )}
       <section id={groups && groups.length > 0 ? undefined : 'jornadas'} data-spot={groups && groups.length > 0 ? 'features' : 'jornadas'} style={{ scrollMarginTop: 120 }}>
-        <SectionTitle eyebrow="POR QUÉ JUGAR" title="Todo en un lugar" />
+        <SectionTitle eyebrow={tr('POR QUÉ JUGAR')} title={tr('Todo en un lugar')} />
         <div className="home-cards cols3">
           {FEATURES.map((f) => (
             <div key={f.title} className="home-card">
               <span className="home-ico">{f.icon}</span>
-              <div><h3>{f.title}</h3><p>{f.text}</p></div>
+              <div><h3>{tr(f.title)}</h3><p>{tr(f.text)}</p></div>
             </div>
           ))}
         </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { tr } from '../i18n'
 import { supabase } from '../lib/supabase'
 
 export const SUPER_ADMIN_ID = '74e0edbd-0c42-41fc-a001-238fbfd1a19f'
@@ -34,7 +35,7 @@ export default function NewGroupModal({ canCreate, onClose, onDone }: { canCreat
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4" onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-5">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-display text-xl font-700">Nueva quiniela</h2>
+          <h2 className="font-display text-xl font-700">{tr('Nueva quiniela')}</h2>
           <button onClick={onClose} className="text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)] text-lg leading-none">✕</button>
         </div>
 
@@ -44,13 +45,13 @@ export default function NewGroupModal({ canCreate, onClose, onDone }: { canCreat
               onClick={() => setTab('crear')}
               className={`px-4 py-1.5 text-sm font-medium transition-colors ${tab === 'crear' ? 'bg-[var(--color-light-amber)] text-[var(--color-field-night)]' : 'text-[var(--color-text-muted)]'}`}
             >
-              Crear
+              {tr('Crear')}
             </button>
             <button
               onClick={() => setTab('unirme')}
               className={`px-4 py-1.5 text-sm font-medium transition-colors ${tab === 'unirme' ? 'bg-[var(--color-light-amber)] text-[var(--color-field-night)]' : 'text-[var(--color-text-muted)]'}`}
             >
-              Unirme
+              {tr('Unirme')}
             </button>
           </div>
         )}
@@ -60,7 +61,7 @@ export default function NewGroupModal({ canCreate, onClose, onDone }: { canCreat
             <input
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder="Nombre del grupo"
+              placeholder={tr('Nombre del grupo')}
               required
               className="w-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
             />
@@ -70,7 +71,7 @@ export default function NewGroupModal({ canCreate, onClose, onDone }: { canCreat
               disabled={busy}
               className="w-full bg-[var(--color-light-amber)] text-[var(--color-field-night)] font-semibold rounded-md py-2 text-sm hover:brightness-110 disabled:opacity-50"
             >
-              {busy ? 'Creando...' : 'Crear'}
+              {busy ? tr('Creando...') : tr('Crear')}
             </button>
           </form>
         ) : (
@@ -78,7 +79,7 @@ export default function NewGroupModal({ canCreate, onClose, onDone }: { canCreat
             <input
               value={joinCode}
               onChange={(e) => setJoinCode(e.target.value)}
-              placeholder="Codigo de invitacion"
+              placeholder={tr('Codigo de invitacion')}
               required
               className="w-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)] font-mono-score"
             />
@@ -88,7 +89,7 @@ export default function NewGroupModal({ canCreate, onClose, onDone }: { canCreat
               disabled={busy}
               className="w-full border border-[var(--color-light-amber)] text-[var(--color-light-amber)] font-semibold rounded-md py-2 text-sm hover:bg-[var(--color-light-amber)] hover:text-[var(--color-field-night)] transition disabled:opacity-50"
             >
-              {busy ? 'Uniendo...' : 'Unirme'}
+              {busy ? tr('Uniendo...') : tr('Unirme')}
             </button>
           </form>
         )}

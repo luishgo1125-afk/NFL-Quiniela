@@ -1,7 +1,15 @@
 import { useState } from 'react'
+import { tr } from '../i18n'
 import { supabase } from '../lib/supabase'
 import { NFL_TEAMS } from '../lib/types'
 import { teamLogoUrl } from '../lib/teamLogos'
+
+// marcador para insertar un nodo (p. ej. <strong>) dentro de una frase traducida
+const MARK = '\u0001'
+function withEmail(text: string, email: string) {
+  const [a, b = ''] = text.split(MARK)
+  return <>{a}<strong>{email}</strong>{b}</>
+}
 
 export default function Login({ initialMode = 'signin', onBack }: { initialMode?: 'signin' | 'signup'; onBack?: () => void }) {
   const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>(initialMode)
@@ -46,7 +54,7 @@ export default function Login({ initialMode = 'signin', onBack }: { initialMode?
         if (signErr) throw signErr
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Algo salio mal')
+      setError(err instanceof Error ? err.message : tr('Algo salio mal'))
     } finally {
       setBusy(false)
     }
@@ -68,14 +76,14 @@ export default function Login({ initialMode = 'signin', onBack }: { initialMode?
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         {onBack && (
-          <button onClick={onBack} className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)] mb-4">← Inicio</button>
+          <button onClick={onBack} className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)] mb-4">{tr('← Inicio')}</button>
         )}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-3">
             <span className="font-mono-score text-[var(--color-light-amber)] text-sm tracking-widest"></span>
           </div>
           <img src="/logo.png" alt="Quiniela" className="h-14 w-auto mx-auto" />
-          <p className="text-[var(--color-text-muted)] text-sm mt-3">Predicciones NFL entre amigos</p>
+          <p className="text-[var(--color-text-muted)] text-sm mt-3">{tr('Predicciones NFL entre amigos')}</p>
         </div>
 
         <div className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-6">
@@ -85,13 +93,13 @@ export default function Login({ initialMode = 'signin', onBack }: { initialMode?
                 onClick={() => setMode('signin')}
                 className={`flex-1 py-2 text-sm font-medium transition-colors ${mode === 'signin' ? 'bg-[var(--color-light-amber)] text-[var(--color-field-night)]' : 'text-[var(--color-text-muted)]'}`}
               >
-                Entrar
+                {tr('Entrar')}
               </button>
               <button
                 onClick={() => setMode('signup')}
                 className={`flex-1 py-2 text-sm font-medium transition-colors ${mode === 'signup' ? 'bg-[var(--color-light-amber)] text-[var(--color-field-night)]' : 'text-[var(--color-text-muted)]'}`}
               >
-                Crear cuenta
+                {tr('Crear cuenta')}
               </button>
             </div>
           )}
@@ -99,17 +107,17 @@ export default function Login({ initialMode = 'signin', onBack }: { initialMode?
           {mode === 'forgot' ? (
             forgotSent ? (
               <div className="text-center space-y-3">
-                <p className="text-sm">Te mandamos un enlace a <strong>{email}</strong> para restablecer tu contrasena.</p>
+                <p className="text-sm">{withEmail(tr('Te mandamos un enlace a {email} para restablecer tu contrasena.', { email: MARK }), email)}</p>
                 <button onClick={() => { setMode('signin'); setForgotSent(false) }} className="text-xs text-[var(--color-light-amber)] hover:underline">
-                  ← Volver a entrar
+                  {tr('← Volver a entrar')}
                 </button>
               </div>
             ) : (
               <form onSubmit={handleForgot} className="space-y-3">
-                <p className="text-xs text-[var(--color-text-muted)] mb-1">Te mandamos un enlace a tu correo para poner una nueva contrasena.</p>
+                <p className="text-xs text-[var(--color-text-muted)] mb-1">{tr('Te mandamos un enlace a tu correo para poner una nueva contrasena.')}</p>
                 <input
                   type="email"
-                  placeholder="Correo"
+                  placeholder={tr('Correo')}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -121,21 +129,21 @@ export default function Login({ initialMode = 'signin', onBack }: { initialMode?
                   disabled={busy}
                   className="w-full bg-[var(--color-light-amber)] text-[var(--color-field-night)] font-semibold rounded-md py-2 text-sm hover:brightness-110 transition disabled:opacity-50"
                 >
-                  {busy ? 'Enviando...' : 'Enviar enlace'}
+                  {busy ? tr('Enviando...') : tr('Enviar enlace')}
                 </button>
                 <button type="button" onClick={() => setMode('signin')} className="w-full text-xs text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)]">
-                  ← Volver
+                  {tr('← Volver')}
                 </button>
               </form>
             )
           ) : mode === 'signup' && signupSent ? (
             <div className="text-center space-y-3">
               <p className="text-sm">
-                Te mandamos un correo a <strong>{email}</strong>. Abre el enlace ahí para confirmar tu cuenta y poder entrar.
+                {withEmail(tr('Te mandamos un correo a {email}. Abre el enlace ahí para confirmar tu cuenta y poder entrar.', { email: MARK }), email)}
               </p>
-              <p className="text-xs text-[var(--color-text-muted)]">Si no lo ves, revisa spam o promociones.</p>
+              <p className="text-xs text-[var(--color-text-muted)]">{tr('Si no lo ves, revisa spam o promociones.')}</p>
               <button onClick={() => { setMode('signin'); setSignupSent(false) }} className="text-xs text-[var(--color-light-amber)] hover:underline">
-                ← Volver a entrar
+                {tr('← Volver a entrar')}
               </button>
             </div>
           ) : (
@@ -144,14 +152,14 @@ export default function Login({ initialMode = 'signin', onBack }: { initialMode?
                 <>
                   <input
                     type="text"
-                    placeholder="Tu nombre"
+                    placeholder={tr('Tu nombre')}
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     required
                     className="w-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
                   />
                   <div>
-                    <label className="text-xs text-[var(--color-text-muted)] block mb-1">Equipo favorito (opcional)</label>
+                    <label className="text-xs text-[var(--color-text-muted)] block mb-1">{tr('Equipo favorito (opcional)')}</label>
                     <div className="flex items-center gap-2">
                       {favoriteTeam && <img src={teamLogoUrl(favoriteTeam)} alt={favoriteTeam} className="w-7 h-7 object-contain shrink-0" />}
                       <select
@@ -159,7 +167,7 @@ export default function Login({ initialMode = 'signin', onBack }: { initialMode?
                         onChange={(e) => setFavoriteTeam(e.target.value)}
                         className="w-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
                       >
-                        <option value="">Sin elegir</option>
+                        <option value="">{tr('Sin elegir')}</option>
                         {NFL_TEAMS.map((t) => <option key={t} value={t}>{t}</option>)}
                       </select>
                     </div>
@@ -168,7 +176,7 @@ export default function Login({ initialMode = 'signin', onBack }: { initialMode?
               )}
               <input
                 type="email"
-                placeholder="Correo"
+                placeholder={tr('Correo')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -176,7 +184,7 @@ export default function Login({ initialMode = 'signin', onBack }: { initialMode?
               />
               <input
                 type="password"
-                placeholder="Contrasena"
+                placeholder={tr('Contrasena')}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -187,8 +195,7 @@ export default function Login({ initialMode = 'signin', onBack }: { initialMode?
                 <label className="flex items-start gap-2 text-xs text-[var(--color-text-muted)] leading-snug cursor-pointer">
                   <input type="checkbox" required className="mt-0.5 accent-[#F2B705]" />
                   <span>
-                    He leído y acepto el{' '}
-                    <a href="#privacidad" target="_blank" rel="noopener noreferrer" className="text-[var(--color-light-amber)] underline">Aviso de privacidad</a>.
+                    {tr('He leído y acepto el {link}.', { link: MARK }).split(MARK).flatMap((part, i) => i === 0 ? [part] : [<a key="pv" href="#privacidad" target="_blank" rel="noopener noreferrer" className="text-[var(--color-light-amber)] underline">{tr('Aviso de privacidad')}</a>, part])}
                   </span>
                 </label>
               )}
@@ -198,11 +205,11 @@ export default function Login({ initialMode = 'signin', onBack }: { initialMode?
                 disabled={busy}
                 className="w-full bg-[var(--color-light-amber)] text-[var(--color-field-night)] font-semibold rounded-md py-2 text-sm hover:brightness-110 transition disabled:opacity-50"
               >
-                {busy ? 'Un momento...' : mode === 'signin' ? 'Entrar' : 'Crear cuenta'}
+                {busy ? tr('Un momento...') : mode === 'signin' ? tr('Entrar') : tr('Crear cuenta')}
               </button>
               {mode === 'signin' && (
                 <button type="button" onClick={() => setMode('forgot')} className="w-full text-xs text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)]">
-                  ¿Olvidaste tu contrasena?
+                  {tr('¿Olvidaste tu contrasena?')}
                 </button>
               )}
             </form>

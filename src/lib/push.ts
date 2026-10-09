@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { tr } from '../i18n'
 
 // Reemplaza con tu Public Key de VAPID (la que generaste con "npx web-push generate-vapid-keys")
 const VAPID_PUBLIC_KEY = 'BL84TjXF2N6hGSFij8hF_mgekl6IXXDAHk84jz9OPhylmH4v4WDOOXf4_vBr5yFKmdgnpvPYKARnLOgHStgBZ0I'
@@ -20,10 +21,10 @@ export async function getPushSubscriptionStatus(): Promise<'granted' | 'denied' 
 }
 
 export async function enablePush(userId: string) {
-  if (!pushSupported()) throw new Error('Este navegador no soporta notificaciones push.')
+  if (!pushSupported()) throw new Error(tr('Este navegador no soporta notificaciones push.'))
 
   const permission = await Notification.requestPermission()
-  if (permission !== 'granted') throw new Error('No diste permiso para las notificaciones.')
+  if (permission !== 'granted') throw new Error(tr('No diste permiso para las notificaciones.'))
 
   const registration = await navigator.serviceWorker.ready
   const subscription = await registration.pushManager.subscribe({

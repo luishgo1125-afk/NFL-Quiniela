@@ -1,5 +1,6 @@
 import { RankAvatar, Podium, firstName } from './RankParts'
 import { useEffect, useState } from 'react'
+import { tr, localeTag } from '../i18n'
 import { supabase } from '../lib/supabase'
 import { teamLogoUrl } from '../lib/teamLogos'
 import { IconGlobe, IconMedal, IconClipboardX, IconCalendar, IconCoin } from './icons'
@@ -119,13 +120,13 @@ async function shareLeaderboardImage(group: Group, weekLabelText: string | null,
   ctx.fillText(group.name.toUpperCase(), 104, 52)
   ctx.fillStyle = '#8A94A3'
   ctx.font = '400 14px Arial'
-  const subtitle = weekLabelText ? `Tabla de posiciones · ${weekLabelText}` : 'Tabla de posiciones'
+  const subtitle = weekLabelText ? tr('Tabla de posiciones · {week}', { week: weekLabelText }) : tr('Tabla de posiciones')
   ctx.fillText(subtitle, 104, 76)
 
   if (totalPrize > 0) {
     ctx.fillStyle = '#3D8B5F'
     ctx.font = '700 16px Arial'
-    ctx.fillText(`Premio total: $${totalPrize.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`, 104, 98)
+    ctx.fillText(tr('Premio total: ${amount}', { amount: totalPrize.toLocaleString(localeTag(), { minimumFractionDigits: 2 }) }), 104, 98)
   }
 
   ctx.strokeStyle = '#2A3542'
@@ -175,7 +176,7 @@ async function shareLeaderboardImage(group: Group, weekLabelText: string | null,
     ctx.fillText(r.display_name, 108, y + rowHeight / 2)
     ctx.fillStyle = '#8A94A3'
     ctx.font = '400 13px Arial'
-    ctx.fillText(`${r.hits}/${r.played} aciertos · Dif +${r.pointDiff}`, 108, y + rowHeight / 2 + 20)
+    ctx.fillText(tr('{hits}/{played} aciertos · Dif +{diff}', { hits: r.hits, played: r.played, diff: r.pointDiff }), 108, y + rowHeight / 2 + 20)
 
     ctx.fillStyle = '#ECEFF3'
     ctx.font = '700 26px Arial'
@@ -183,13 +184,13 @@ async function shareLeaderboardImage(group: Group, weekLabelText: string | null,
     ctx.fillText(String(r.points), width - 28, y + rowHeight / 2 + 5)
     ctx.font = '400 12px Arial'
     ctx.fillStyle = '#8A94A3'
-    ctx.fillText('pts', width - 28, y + rowHeight / 2 + 22)
+    ctx.fillText(tr('pts'), width - 28, y + rowHeight / 2 + 22)
 
     if (totalPrize > 0 && i < 3) {
       const prize = totalPrize * prizeSplits[i] / 100
       ctx.fillStyle = '#3D8B5F'
       ctx.font = '700 22px Arial'
-      ctx.fillText(`$${prize.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`, width - 118, y + rowHeight / 2 + 8)
+      ctx.fillText(`$${prize.toLocaleString(localeTag(), { minimumFractionDigits: 2 })}`, width - 118, y + rowHeight / 2 + 8)
     }
     ctx.textAlign = 'left'
   })
@@ -208,11 +209,11 @@ async function shareLeaderboardImage(group: Group, weekLabelText: string | null,
 
   canvas.toBlob(async (blob) => {
     if (!blob) return
-    const file = new File([blob], `tabla-${group.name.toLowerCase().replace(/\s+/g, '-')}.png`, { type: 'image/png' })
+    const file = new File([blob], `${tr('tabla')}-${group.name.toLowerCase().replace(/\s+/g, '-')}.png`, { type: 'image/png' })
 
     if (navigator.share && navigator.canShare?.({ files: [file] })) {
       try {
-        await navigator.share({ files: [file], title: `Tabla de ${group.name}` })
+        await navigator.share({ files: [file], title: tr('Tabla de {name}', { name: group.name }) })
         return
       } catch {
         // si cancela el share nativo, cae al fallback de descarga
@@ -295,47 +296,47 @@ function PlayerStatsModal({ row, onClose }: { row: Row; onClose: () => void }) {
               className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full mt-2"
               style={{ background: 'rgba(242,183,5,0.15)', color: 'var(--color-light-amber)', border: '1px solid rgba(242,183,5,0.4)' }}
             >
-              <IconMedal size={13} /> #{row.globalRank} en el ranking global
+              <IconMedal size={13} /> {tr('#{rank} en el ranking global', { rank: row.globalRank })}
             </span>
           )}
         </div>
 
-        <p className="text-xs text-[var(--color-text-muted)] text-center mb-4">Estadisticas de todas sus ligas juntas</p>
+        <p className="text-xs text-[var(--color-text-muted)] text-center mb-4">{tr('Estadisticas de todas sus ligas juntas')}</p>
 
         {loadingGlobal || !global ? (
-          <p className="text-xs text-[var(--color-text-muted)] text-center mb-5">Cargando...</p>
+          <p className="text-xs text-[var(--color-text-muted)] text-center mb-5">{tr('Cargando...')}</p>
         ) : (
           <div className="grid grid-cols-2 gap-3 mb-5">
             <div className="bg-[var(--color-field-surface-raised)] rounded-lg p-4 text-center flex flex-col justify-center items-center h-full">
-              <div className="text-[10px] font-semibold text-[var(--color-text-muted)] tracking-wide mb-1">PUNTOS TOTALES</div>
+              <div className="text-[10px] font-semibold text-[var(--color-text-muted)] tracking-wide mb-1">{tr('PUNTOS TOTALES')}</div>
               <div className="font-mono-score text-3xl font-extrabold">{global.points}</div>
             </div>
             <div className="bg-[var(--color-field-surface-raised)] rounded-lg p-4 text-center flex flex-col justify-center items-center h-full">
-              <div className="text-[10px] font-semibold text-[var(--color-text-muted)] tracking-wide mb-1">ACIERTOS</div>
+              <div className="text-[10px] font-semibold text-[var(--color-text-muted)] tracking-wide mb-1">{tr('ACIERTOS')}</div>
               <div className="font-mono-score text-3xl font-extrabold">{winRate}%</div>
               <div className="h-1 rounded-full bg-[var(--color-field-line)] mt-2 mb-1.5 overflow-hidden">
                 <div className="h-full rounded-full" style={{ width: `${winRate}%`, background: '#3D8B5F' }} />
               </div>
-              <div className="text-[10px] text-[var(--color-text-muted)]">{global.hits}/{global.played} pronosticos</div>
+              <div className="text-[10px] text-[var(--color-text-muted)]">{tr('{hits}/{played} pronosticos', { hits: global.hits, played: global.played })}</div>
             </div>
             <div className="bg-[var(--color-field-surface-raised)] rounded-lg p-4 text-center flex flex-col justify-center items-center h-full">
-              <div className="text-[10px] font-semibold text-[var(--color-text-muted)] tracking-wide mb-1">MARCADORES EXACTOS</div>
+              <div className="text-[10px] font-semibold text-[var(--color-text-muted)] tracking-wide mb-1">{tr('MARCADORES EXACTOS')}</div>
               <div className="font-mono-score text-3xl font-extrabold">{global.exactHits}</div>
-              <div className="text-[10px] text-[var(--color-text-muted)] mt-1">de {global.played} registrados</div>
+              <div className="text-[10px] text-[var(--color-text-muted)] mt-1">{tr('de {played} registrados', { played: global.played })}</div>
             </div>
             <div className="bg-[var(--color-field-surface-raised)] rounded-lg p-4 text-center flex flex-col justify-center items-center h-full">
-              <div className="text-[10px] font-semibold text-[var(--color-text-muted)] tracking-wide mb-1">MEJOR RACHA</div>
+              <div className="text-[10px] font-semibold text-[var(--color-text-muted)] tracking-wide mb-1">{tr('MEJOR RACHA')}</div>
               <div className="text-2xl font-700 flex items-center justify-center gap-1">🔥 <span className="font-extrabold">{global.bestStreak}</span></div>
-              <div className="text-[10px] text-[var(--color-text-muted)] mt-1">(actual: {global.streak})</div>
+              <div className="text-[10px] text-[var(--color-text-muted)] mt-1">{tr('(actual: {streak})', { streak: global.streak })}</div>
             </div>
           </div>
         )}
 
-        <h4 className="text-xs font-semibold text-[var(--color-text-muted)] mb-2">Ultimas predicciones en esta liga</h4>
+        <h4 className="text-xs font-semibold text-[var(--color-text-muted)] mb-2">{tr('Ultimas predicciones en esta liga')}</h4>
         {row.recentPicks.length === 0 ? (
           <div className="flex flex-col items-center text-center py-6 text-[var(--color-text-muted)]">
             <IconClipboardX size={32} className="mb-2 opacity-50" />
-            <p className="text-xs">Aun no hay predicciones recientes aqui.</p>
+            <p className="text-xs">{tr('Aun no hay predicciones recientes aqui.')}</p>
           </div>
         ) : (
           <div className="space-y-1.5">
@@ -352,8 +353,8 @@ function PlayerStatsModal({ row, onClose }: { row: Row; onClose: () => void }) {
                   <div className="font-medium">{p.weekLabelText} · {p.gameLabel}</div>
                   <div className="text-[10px] text-[var(--color-text-muted)] font-mono-score">
                     {p.missed
-                      ? <>Final {p.resultLabel} · <span className="text-[var(--color-scoreboard-red)] font-semibold">No participo</span> · Dif +{p.diff}</>
-                      : <>Final {p.resultLabel} · Predijo {p.predLabel} · Dif +{p.diff}</>}
+                      ? <>{tr('Final {result}', { result: p.resultLabel })} · <span className="text-[var(--color-scoreboard-red)] font-semibold">{tr('No participo')}</span> · {tr('Dif +{diff}', { diff: p.diff })}</>
+                      : <>{tr('Final {result}', { result: p.resultLabel })} · {tr('Predijo {pred}', { pred: p.predLabel })} · {tr('Dif +{diff}', { diff: p.diff })}</>}
                   </div>
                 </div>
                 <span
@@ -375,14 +376,14 @@ function PlayerStatsModal({ row, onClose }: { row: Row; onClose: () => void }) {
 // Texto de desempate segun la modalidad de la liga y como se acumulan los puntos
 function tiebreakText(group: Group): string {
   const weekly = group.scoring_mode === 'weekly'
-  const scope = weekly ? 'de la semana' : group.scoring_mode === 'range' ? 'de las semanas del rango' : 'de todas las semanas'
-  const tail = ' Toca a alguien para ver sus stats.'
+  const scope = weekly ? tr('de la semana') : group.scoring_mode === 'range' ? tr('de las semanas del rango') : tr('de todas las semanas')
+  const tail = ' ' + tr('Toca a alguien para ver sus stats.')
   if (group.pick_mode === 'winner') {
     return weekly
-      ? 'Desempate: gana quien este mas cerca del total de puntos del ultimo partido de la semana (menor diferencia). Si no lo capturaste, +100 de diferencia.' + tail
-      : `Desempate: se suma la diferencia entre tu total y el total real del ultimo partido de cada semana (${scope}); gana la suma mas baja. Si no lo capturaste en una semana, +100.` + tail
+      ? tr('Desempate: gana quien este mas cerca del total de puntos del ultimo partido de la semana (menor diferencia). Si no lo capturaste, +100 de diferencia.') + tail
+      : tr('Desempate: se suma la diferencia entre tu total y el total real del ultimo partido de cada semana ({scope}); gana la suma mas baja. Si no lo capturaste en una semana, +100.', { scope }) + tail
   }
-  return `Desempate: 1) mas marcadores exactos, 2) menor diferencia de puntos ${scope} (real vs. predicho, ambos equipos); cada partido sin predecir suma +20.` + tail
+  return tr('Desempate: 1) mas marcadores exactos, 2) menor diferencia de puntos {scope} (real vs. predicho, ambos equipos); cada partido sin predecir suma +20.', { scope }) + tail
 }
 
 export default function Leaderboard({ group, weekKey = null, onRowsCount }: { group: Group; weekKey?: string | null; onRowsCount?: (n: number) => void }) {
@@ -490,9 +491,9 @@ export default function Leaderboard({ group, weekKey = null, onRowsCount }: { gr
             ? 0
             : g ? Math.abs((g.home_score ?? 0) - (p.pred_home_score ?? 0)) + Math.abs((g.away_score ?? 0) - (p.pred_away_score ?? 0)) : 0
           return {
-            gameLabel: g ? `${g.away_team} @ ${g.home_team}` : 'Partido',
+            gameLabel: g ? `${g.away_team} @ ${g.home_team}` : tr('Partido'),
             resultLabel: g ? `${g.away_score}-${g.home_score}` : '',
-            predLabel: winnerMode ? (g ? (p.pred_winner === 'home' ? g.home_team : g.away_team) : '') + (p.pred_total != null ? ` · total ${p.pred_total}` : '') : `${p.pred_away_score}-${p.pred_home_score}`,
+            predLabel: winnerMode ? (g ? (p.pred_winner === 'home' ? g.home_team : g.away_team) : '') + (p.pred_total != null ? ' · ' + tr('total {n}', { n: p.pred_total }) : '') : `${p.pred_away_score}-${p.pred_home_score}`,
             points: p.points ?? 0,
             diff,
             weekLabelText: g ? weekLabel(g.season_type, g.week) : '',
@@ -517,7 +518,7 @@ export default function Leaderboard({ group, weekKey = null, onRowsCount }: { gr
 
         return {
           user_id: m.user_id,
-          display_name: m.profiles?.display_name ?? 'Jugador',
+          display_name: m.profiles?.display_name ?? tr('Jugador'),
           favorite_team: m.profiles?.favorite_team ?? null,
           points: s.points,
           hits: s.hits,
@@ -551,8 +552,8 @@ export default function Leaderboard({ group, weekKey = null, onRowsCount }: { gr
     selectedWeekKey,
   ])
 
-  if (loading) return <p className="text-[var(--color-text-muted)] text-sm">Cargando tabla...</p>
-  if (rows.length === 0) return <p className="text-[var(--color-text-muted)] text-sm">Todavia no hay nadie en este grupo.</p>
+  if (loading) return <p className="text-[var(--color-text-muted)] text-sm">{tr('Cargando tabla...')}</p>
+  if (rows.length === 0) return <p className="text-[var(--color-text-muted)] text-sm">{tr('Todavia no hay nadie en este grupo.')}</p>
 
   const maxExact = Math.max(0, ...rows.map((r) => r.exactHits))
   const totalPrize = group.bet_amount > 0 ? group.bet_amount * rows.length : 0
@@ -579,18 +580,18 @@ export default function Leaderboard({ group, weekKey = null, onRowsCount }: { gr
             <polyline points="16 6 12 2 8 6" />
             <line x1="12" y1="2" x2="12" y2="15" />
           </svg>
-          {sharing ? 'Generando...' : 'Compartir'}
+          {sharing ? tr('Generando...') : tr('Compartir')}
         </button>
       </div>
       {(() => {
         const prizeFor = (i: number) => (group.bet_amount > 0 && i < 3 ? totalPrize * [group.prize_split_1, group.prize_split_2, group.prize_split_3][i] / 100 : null)
-        const money = (n: number) => `$${n.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`
+        const money = (n: number) => `$${n.toLocaleString(localeTag(), { minimumFractionDigits: 2 })}`
         const cols = 'clamp(24px,7vw,36px) minmax(0,1fr) clamp(50px,15vw,64px) clamp(42px,12vw,60px) clamp(40px,12vw,64px)'
         const badgesOf = (r: (typeof rows)[number]) => (
           <>
-            {r.streak >= 3 && <span title={`Racha de ${r.streak}`}>🔥{r.streak}</span>}
-            {maxExact > 0 && r.exactHits === maxExact && <span title="Mas marcadores exactos del grupo">🎯</span>}
-            {r.globalRank && <span className="rk-tag" title="Posicion en el ranking global"><IconGlobe size={9} /> #{r.globalRank}</span>}
+            {r.streak >= 3 && <span title={tr('Racha de {n}', { n: r.streak })}>🔥{r.streak}</span>}
+            {maxExact > 0 && r.exactHits === maxExact && <span title={tr('Mas marcadores exactos del grupo')}>🎯</span>}
+            {r.globalRank && <span className="rk-tag" title={tr('Posicion en el ranking global')}><IconGlobe size={9} /> #{r.globalRank}</span>}
           </>
         )
         return (
@@ -604,7 +605,7 @@ export default function Leaderboard({ group, weekKey = null, onRowsCount }: { gr
                   team: r.favorite_team,
                   isMe: false,
                   points: r.points,
-                  line: `${r.hits}/${r.played} aciertos`,
+                  line: tr('{hits}/{played} aciertos', { hits: r.hits, played: r.played }),
                   extra: prize != null ? money(prize) : undefined,
                   badges: badgesOf(r),
                   onClick: () => setSelectedPlayer(r),
@@ -615,10 +616,10 @@ export default function Leaderboard({ group, weekKey = null, onRowsCount }: { gr
               <div className="rk-table">
                 <div className="rk-head" style={{ ['--cols' as any]: cols }}>
                   <span className="rk-c">#</span>
-                  <span>Jugador</span>
-                  <span className="rk-c">Aciertos</span>
-                  <span className="rk-c">Dif</span>
-                  <span className="rk-c">Pts</span>
+                  <span>{tr('Jugador')}</span>
+                  <span className="rk-c">{tr('Aciertos')}</span>
+                  <span className="rk-c">{tr('Dif')}</span>
+                  <span className="rk-c">{tr('Pts')}</span>
                 </div>
                 {rows.slice(3).map((r, idx) => (
                   <button key={r.user_id} onClick={() => setSelectedPlayer(r)} className="rk-row" style={{ ['--cols' as any]: cols }}>

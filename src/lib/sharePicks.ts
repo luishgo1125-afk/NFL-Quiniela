@@ -1,4 +1,5 @@
 import { teamLogoUrl } from './teamLogos'
+import { tr } from '../i18n'
 import type { Group } from './types'
 
 export interface SharePlayer { user_id: string; name: string; favorite_team: string | null }
@@ -98,11 +99,11 @@ export async function sharePicksImage(opts: {
   ctx.fillText(fit(ctx, group.name.toUpperCase(), width - pad * 2 - 200), lx + 44, ly + 4)
   ctx.fillStyle = '#F2B705'
   ctx.font = `700 22px ${display}`
-  ctx.fillText(`${weekLabelText}  ·  PRONÓSTICOS`, lx + 44, ly + 32)
+  ctx.fillText(`${weekLabelText}  ·  ${tr('PRONÓSTICOS')}`, lx + 44, ly + 32)
   ctx.textAlign = 'right'
   ctx.fillStyle = '#8D96A5'
   ctx.font = `600 12px 'Space Grotesk', Arial`
-  ctx.fillText(`${players.length} jugador${players.length !== 1 ? 'es' : ''} confirmado${players.length !== 1 ? 's' : ''}`, width - pad, ly + 4)
+  ctx.fillText(players.length === 1 ? tr('1 jugador confirmado') : tr('{n} jugadores confirmados', { n: players.length }), width - pad, ly + 4)
   ctx.textAlign = 'left'
 
   const top = headerH
@@ -168,7 +169,7 @@ export async function sharePicksImage(opts: {
       const ls = showScore ? 28 : 32
       const iy = showScore ? by + 3 : by + (bh - ls) / 2
       if (img) ctx.drawImage(img, cx - ls / 2, iy, ls, ls)
-      else { ctx.fillStyle = team ? '#F5F7FA' : '#8D96A5'; ctx.font = `700 11px 'Space Grotesk', Arial`; ctx.textAlign = 'center'; ctx.fillText(team ?? 'EMP', cx, showScore ? by + 22 : my + 4); ctx.textAlign = 'left' }
+      else { ctx.fillStyle = team ? '#F5F7FA' : '#8D96A5'; ctx.font = `700 11px 'Space Grotesk', Arial`; ctx.textAlign = 'center'; ctx.fillText(team ?? tr('EMP'), cx, showScore ? by + 22 : my + 4); ctx.textAlign = 'left' }
       if (showScore) {
         ctx.fillStyle = '#F5F7FA'; ctx.font = `700 11px 'JetBrains Mono', monospace`; ctx.textAlign = 'center'
         ctx.fillText(`${pk!.pred_away_score}-${pk!.pred_home_score}`, cx, by + bh - 4)
@@ -181,7 +182,7 @@ export async function sharePicksImage(opts: {
   let endY = bodyTop + games.length * rowH
   if (winnerMode && lastGameId) {
     ctx.fillStyle = '#F2B705'; ctx.font = `700 11px 'Space Grotesk', Arial`; ctx.letterSpacing = '1px'
-    ctx.fillText('TOTAL ÚLT. JUEGO', pad + 12, endY + totalRowH / 2 + 4)
+    ctx.fillText(tr('TOTAL ÚLT. JUEGO'), pad + 12, endY + totalRowH / 2 + 4)
     ctx.letterSpacing = '0px'
     players.forEach((p, i) => {
       const cx = gridX + i * colW + colW / 2
@@ -201,15 +202,15 @@ export async function sharePicksImage(opts: {
     ctx.drawImage(appLogo, width / 2 - w / 2, endY + 8 + (footerH - 8) / 2 - h / 2, w, h)
   } else {
     ctx.fillStyle = '#8D96A5'; ctx.font = '600 12px Arial'; ctx.textAlign = 'center'
-    ctx.fillText('QUINIELA · PREDICE. COMPITE. GANA.', width / 2, endY + 40); ctx.textAlign = 'left'
+    ctx.fillText(tr('QUINIELA · PREDICE. COMPITE. GANA.'), width / 2, endY + 40); ctx.textAlign = 'left'
   }
 
   await new Promise<void>((resolve) => {
     canvas.toBlob(async (blob) => {
       if (!blob) return resolve()
-      const file = new File([blob], `pronosticos-${group.name.toLowerCase().replace(/\s+/g, '-')}.png`, { type: 'image/png' })
+      const file = new File([blob], `${tr('pronosticos')}-${group.name.toLowerCase().replace(/\s+/g, '-')}.png`, { type: 'image/png' })
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        try { await navigator.share({ files: [file], title: `Pronósticos de ${group.name}` }); return resolve() } catch { /* cae a descarga */ }
+        try { await navigator.share({ files: [file], title: tr('Pronósticos de {name}', { name: group.name }) }); return resolve() } catch { /* cae a descarga */ }
       }
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a'); a.href = url; a.download = file.name; a.click(); URL.revokeObjectURL(url)

@@ -11,6 +11,7 @@ import { buildStandings, getEligibleUserIds, standingsOptionsFor, getLastGameIds
 import { syncGroupWeekFromEspn } from '../lib/syncGames'
 import { sharePicksImage } from '../lib/sharePicks'
 import { IconClipboard, IconBarChart, IconGear, IconCalendar, IconTrophy, IconCopy, IconWhatsapp, IconAlertTriangle, IconRefresh, IconCoin, IconLock, IconShare } from '../components/icons'
+import { tr, localeTag } from '../i18n'
 import type { User } from '@supabase/supabase-js'
 
 // Admin es la pantalla mas pesada (formularios, importador de ESPN, gestor de
@@ -49,9 +50,9 @@ export default function GroupDashboard({
       const [y, st, w] = weekKey.split(':').map(Number)
       const result = await syncGroupWeekFromEspn(group.id, games, y, st as 1 | 2 | 3, w)
       await loadGames()
-      setSyncWeekMsg(`${result.created} agregado(s), ${result.updated} actualizado(s)`)
+      setSyncWeekMsg(tr('{created} agregado(s), {updated} actualizado(s)', { created: result.created, updated: result.updated }))
     } catch (err) {
-      setSyncWeekMsg(err instanceof Error ? err.message : 'No se pudo sincronizar')
+      setSyncWeekMsg(err instanceof Error ? err.message : tr('No se pudo sincronizar'))
     } finally {
       setSyncingWeek(false)
       setTimeout(() => setSyncWeekMsg(null), 4000)
@@ -90,7 +91,7 @@ export default function GroupDashboard({
       .eq('group_id', group.id)
     setMembers((data ?? []).map((row: any) => ({
       user_id: row.user_id,
-      display_name: row.profiles?.display_name ?? 'Jugador',
+      display_name: row.profiles?.display_name ?? tr('Jugador'),
       favorite_team: row.profiles?.favorite_team ?? null,
     })))
   }
@@ -116,7 +117,7 @@ export default function GroupDashboard({
       .then(({ data }) => {
         if (cancelled) return
         if (!data) {
-          alert('Ya no perteneces a esta liga.')
+          alert(tr('Ya no perteneces a esta liga.'))
           onBack()
         }
       })
@@ -327,7 +328,7 @@ export default function GroupDashboard({
 
   async function confirmMyPicks() {
     if (!weekKey || confirmingPicks) return
-    if (!window.confirm('Al confirmar ya NO podras cambiar ninguna prediccion de esta semana. ¿Confirmar?')) return
+    if (!window.confirm(tr('Al confirmar ya NO podras cambiar ninguna prediccion de esta semana. ¿Confirmar?'))) return
     setConfirmingPicks(true); setConfirmPicksErr(null)
     const [y, st, w] = weekKey.split(':').map(Number)
     const { error: err } = await supabase.rpc('confirm_week_picks', { p_group_id: group.id, p_year: y, p_season_type: st, p_week: w })
@@ -350,7 +351,7 @@ export default function GroupDashboard({
       const sorted = [...weekGames].sort((a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime())
       const players = members
         .filter((m) => pickConfirmedBy.has(m.user_id))
-        .map((m) => ({ user_id: m.user_id, name: (m.display_name ?? 'Jugador').trim().split(/\s+/)[0], favorite_team: m.favorite_team }))
+        .map((m) => ({ user_id: m.user_id, name: (m.display_name ?? tr('Jugador')).trim().split(/\s+/)[0], favorite_team: m.favorite_team }))
       await sharePicksImage({
         group,
         weekLabelText: weekLabel(selectedWeek.seasonType, selectedWeek.week),
@@ -398,7 +399,7 @@ export default function GroupDashboard({
 
       // si sigue habiendo empate total incluso despues del desempate, son co-ganadores reales
       const tied = standings.filter((s) => s.points === top.points && s.exactHits === top.exactHits && s.pointDiff === top.pointDiff)
-      const names = tied.map((s) => members.find((m) => m.user_id === s.user_id)?.display_name ?? 'Jugador')
+      const names = tied.map((s) => members.find((m) => m.user_id === s.user_id)?.display_name ?? tr('Jugador'))
       setWeeklyWinners({ names, points: top.points })
     }
     computeWinner()
@@ -472,11 +473,11 @@ export default function GroupDashboard({
           <button
             onClick={handleSyncCurrentWeek}
             disabled={syncingWeek}
-            title="Actualizar partidos de esta semana desde la NFL"
+            title={tr('Actualizar partidos de esta semana desde la NFL')}
             className="flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-full border border-[var(--color-light-amber)]/50 text-[var(--color-light-amber)] hover:bg-[rgba(242,183,5,0.1)] transition disabled:opacity-50"
           >
             <IconRefresh size={11} className={syncingWeek ? 'animate-spin' : ''} />
-            {syncingWeek ? 'Actualizando...' : 'Actualizar'}
+            {syncingWeek ? tr('Actualizando...') : tr('Actualizar')}
           </button>,
           headerSlot
         )
@@ -505,7 +506,7 @@ export default function GroupDashboard({
 
       {tab === 'admin' && (
         <button onClick={() => setTab('picks')} className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)] mb-4 flex items-center gap-1">
-          ← Volver a predicciones
+          ← {tr('Volver a predicciones')}
         </button>
       )}
 
@@ -518,10 +519,10 @@ export default function GroupDashboard({
               <div className="flex justify-end mt-2">
                 <button
                   onClick={() => setShowCopyModal(true)}
-                  title="Copiar predicciones de otra liga"
+                  title={tr('Copiar predicciones de otra liga')}
                   className="flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-full border border-dashed border-[var(--color-field-line)] text-[var(--color-text-muted)] hover:border-[var(--color-light-amber)] hover:text-[var(--color-light-amber)] transition"
                 >
-                  <IconCopy size={11} /> Copiar de otra liga
+                  <IconCopy size={11} /> {tr('Copiar de otra liga')}
                 </button>
               </div>
             )}
@@ -538,7 +539,7 @@ export default function GroupDashboard({
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold flex items-center gap-1.5">
                     <IconClipboard size={14} className="text-[var(--color-text-muted)]" />
-                    {weekPicksDone}/{weekPicksTotal} predicciones
+                    {tr('{done}/{total} predicciones', { done: weekPicksDone, total: weekPicksTotal })}
                   </span>
                   <span className="text-sm font-bold font-mono-score text-[var(--color-turf-green)]">{weekPicksPct}%</span>
                 </div>
@@ -551,14 +552,14 @@ export default function GroupDashboard({
                 <div className="flex items-center justify-between pt-1">
                   {weekPicksMissing > 0 ? (
                     <p className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-light-amber)]">
-                      <IconAlertTriangle size={13} /> Te faltan {weekPicksMissing}
+                      <IconAlertTriangle size={13} /> {tr('Te faltan {n}', { n: weekPicksMissing })}
                     </p>
                   ) : (
                     <span />
                   )}
                   {nextLock && (
                     <span className="text-xs flex items-center gap-1">
-                      Cierra en <span className="font-bold text-[var(--color-light-amber)] font-mono-score">{formatCountdown(nextLock - nowTick)}</span>
+                      {tr('Cierra en {time}', { time: '' })}<span className="font-bold text-[var(--color-light-amber)] font-mono-score">{formatCountdown(nextLock - nowTick)}</span>
                     </span>
                   )}
                 </div>
@@ -566,12 +567,12 @@ export default function GroupDashboard({
             ) : (
               <div className="flex items-center justify-between text-xs text-[var(--color-text-muted)] px-1 mb-4">
                 <span className="flex items-center gap-1.5">
-                  <IconClipboard size={12} className="text-[var(--color-turf-green)]" /> Todo predicho
+                  <IconClipboard size={12} className="text-[var(--color-turf-green)]" /> {tr('Todo predicho')}
                 </span>
                 {nextLock ? (
-                  <span>Cierra en {formatCountdown(nextLock - nowTick)}</span>
+                  <span>{tr('Cierra en {time}', { time: formatCountdown(nextLock - nowTick) })}</span>
                 ) : (
-                  <span>No hay predicciones abiertas esta semana</span>
+                  <span>{tr('No hay predicciones abiertas esta semana')}</span>
                 )}
               </div>
             )
@@ -586,7 +587,7 @@ export default function GroupDashboard({
                 className="w-full flex items-center gap-3 px-4 py-3 text-left"
               >
                 <span className="flex-1 min-w-0 text-sm font-semibold flex items-center gap-1.5">
-                  {myPicksConfirmed ? <><IconLock size={14} className="text-[var(--color-turf-green)] shrink-0" /> Predicciones confirmadas</> : 'Confirma tus predicciones'}
+                  {myPicksConfirmed ? <><IconLock size={14} className="text-[var(--color-turf-green)] shrink-0" /> {tr('Predicciones confirmadas')}</> : tr('Confirma tus predicciones')}
                 </span>
                 <span className="text-[11px] font-mono-score text-[var(--color-text-muted)] shrink-0">{pickConfirmedBy.size}/{members.length}</span>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-[var(--color-text-muted)] transition-transform" style={{ transform: confirmPanelOpen ? 'rotate(180deg)' : 'none' }}>
@@ -598,12 +599,12 @@ export default function GroupDashboard({
                   <div className="flex items-center gap-3 flex-wrap">
                     <p className="flex-1 min-w-[180px] text-[11px] text-[var(--color-text-muted)]">
                       {myPicksConfirmed
-                        ? (allConfirmed ? 'Ya no se pueden cambiar. Todos confirmaron: ya puedes compartir los pronosticos.' : 'Ya no se pueden cambiar. Los pronosticos se revelan cuando todos hayan confirmado.')
+                        ? (allConfirmed ? tr('Ya no se pueden cambiar. Todos confirmaron: ya puedes compartir los pronosticos.') : tr('Ya no se pueden cambiar. Los pronosticos se revelan cuando todos hayan confirmado.'))
                         : openGames === 0
-                        ? 'Ya no hay partidos abiertos esta semana.'
+                        ? tr('Ya no hay partidos abiertos esta semana.')
                         : openMissing > 0
-                        ? `Llena los ${openMissing} partido${openMissing !== 1 ? 's' : ''} que te faltan para poder confirmar.`
-                        : 'Al confirmar ya no podras cambiar ninguna prediccion de la semana.'}
+                        ? (openMissing === 1 ? tr('Llena el partido que te falta para poder confirmar.') : tr('Llena los {n} partidos que te faltan para poder confirmar.', { n: openMissing }))
+                        : tr('Al confirmar ya no podras cambiar ninguna prediccion de la semana.')}
                     </p>
                     {!myPicksConfirmed && openGames > 0 && (
                       <button
@@ -612,17 +613,17 @@ export default function GroupDashboard({
                         className="home-btn amber sm disabled:opacity-40"
                         style={{ cursor: openMissing > 0 ? 'not-allowed' : 'pointer' }}
                       >
-                        {confirmingPicks ? 'Confirmando...' : 'Confirmar'}
+                        {confirmingPicks ? tr('Confirmando...') : tr('Confirmar')}
                       </button>
                     )}
                     {allConfirmed && (
                       <button onClick={shareWeekPicks} disabled={sharingPicks} className="home-btn ghost sm disabled:opacity-50">
-                        <IconShare size={13} /> {sharingPicks ? 'Generando...' : 'Compartir pronosticos'}
+                        <IconShare size={13} /> {sharingPicks ? tr('Generando...') : tr('Compartir pronosticos')}
                       </button>
                     )}
                   </div>
                   {confirmPicksErr && <p className="text-[11px] text-[var(--color-scoreboard-red)] mt-2">{confirmPicksErr}</p>}
-                  <p className="text-[10px] text-[var(--color-text-muted)] mt-2">{pickConfirmedBy.size}/{members.length} jugadores han confirmado</p>
+                  <p className="text-[10px] text-[var(--color-text-muted)] mt-2">{tr('{done}/{total} jugadores han confirmado', { done: pickConfirmedBy.size, total: members.length })}</p>
                 </div>
               )}
             </div>
@@ -635,12 +636,12 @@ export default function GroupDashboard({
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-scoreboard-red)]">
-                  Tienes pago pendiente
+                  {tr('Tienes pago pendiente')}
                 </p>
                 <p className="text-sm font-semibold truncate">
-                  Debes ${myPaymentDue.toLocaleString('es-MX')}
+                  {tr('Debes {amount}', { amount: '$' + myPaymentDue.toLocaleString(localeTag()) })}
                   {group.scoring_mode === 'weekly' && myPaymentDue > group.bet_amount ? (
-                    <span className="font-normal text-[var(--color-text-muted)]"> · {Math.round(myPaymentDue / group.bet_amount)} jornadas sin pagar</span>
+                    <span className="font-normal text-[var(--color-text-muted)]"> · {tr('{n} jornadas sin pagar', { n: Math.round(myPaymentDue / group.bet_amount) })}</span>
                   ) : null}
                 </p>
               </div>
@@ -654,11 +655,11 @@ export default function GroupDashboard({
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-light-amber)]">
-                  {weeklyWinners.names.length > 1 ? 'Empate en la jornada' : 'Ganador de la jornada'}
+                  {weeklyWinners.names.length > 1 ? tr('Empate en la jornada') : tr('Ganador de la jornada')}
                 </p>
                 <p className="text-sm font-semibold truncate">
-                  {weeklyWinners.names.join(' y ')}
-                  <span className="font-normal text-[var(--color-text-muted)]"> · {weeklyWinners.points} pts</span>
+                  {weeklyWinners.names.join(tr(' y '))}
+                  <span className="font-normal text-[var(--color-text-muted)]"> · {tr('{n} pts', { n: weeklyWinners.points })}</span>
                 </p>
               </div>
             </div>
@@ -667,9 +668,11 @@ export default function GroupDashboard({
           {needsConfirmation && weekConfirmed === false && (
             <div className="flex items-center justify-between gap-3 bg-[rgba(242,183,5,0.08)] border border-[var(--color-light-amber)] rounded-lg px-4 py-3 mb-4">
               <div>
-                <p className="text-sm font-semibold text-[var(--color-light-amber)]">Confirma tu participacion de esta semana</p>
+                <p className="text-sm font-semibold text-[var(--color-light-amber)]">{tr('Confirma tu participacion de esta semana')}</p>
                 <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">
-                  Los puntos se reinician cada semana en esta liga. Confirma que vas a pagar tu apuesta{group.bet_amount > 0 ? ` ($${group.bet_amount.toLocaleString('es-MX')})` : ''} para poder predecir.
+                  {group.bet_amount > 0
+                    ? tr('Los puntos se reinician cada semana en esta liga. Confirma que vas a pagar tu apuesta (${amount}) para poder predecir.', { amount: group.bet_amount.toLocaleString(localeTag()) })
+                    : tr('Los puntos se reinician cada semana en esta liga. Confirma que vas a pagar tu apuesta para poder predecir.')}
                 </p>
               </div>
               <button
@@ -677,13 +680,13 @@ export default function GroupDashboard({
                 disabled={confirming}
                 className="shrink-0 bg-[var(--color-light-amber)] text-[var(--color-field-night)] font-semibold rounded-md px-4 py-2 text-xs hover:brightness-110 disabled:opacity-50"
               >
-                {confirming ? 'Confirmando...' : 'Confirmar'}
+                {confirming ? tr('Confirmando...') : tr('Confirmar')}
               </button>
             </div>
           )}
           {weekGames.length === 0 ? (
             <p className="text-sm text-[var(--color-text-muted)]">
-              {isAdmin ? 'Todavia no capturas partidos. Ve a la pestaña Administrar.' : 'El administrador aun no captura partidos para esta semana.'}
+              {isAdmin ? tr('Todavia no capturas partidos. Ve a la pestaña Administrar.') : tr('El administrador aun no captura partidos para esta semana.')}
             </p>
           ) : (
             <div className="games-grid">
@@ -700,7 +703,7 @@ export default function GroupDashboard({
                     members={visibleMembers}
                     pickedUserIds={pickedBy[g.id] ?? []}
                     forceLocked={needsConfirmation && weekConfirmed === false}
-                    forceLockedReason="Confirma tu participacion arriba para poder predecir"
+                    forceLockedReason={tr('Confirma tu participacion arriba para poder predecir')}
                     confirmLocked={myPicksConfirmed}
                     pointsWinner={group.points_winner}
                     pointsExact={group.pick_mode === 'winner' ? undefined : group.points_exact}
@@ -715,14 +718,14 @@ export default function GroupDashboard({
                   <IconTrophy size={18} />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-semibold">¡Que empiecen los picks!</p>
-                  <p className="text-xs text-[var(--color-text-muted)]">Haz tus predicciones y compite con tu grupo.</p>
+                  <p className="text-sm font-semibold">{tr('¡Que empiecen los picks!')}</p>
+                  <p className="text-xs text-[var(--color-text-muted)]">{tr('Haz tus predicciones y compite con tu grupo.')}</p>
                 </div>
                 <button
                   onClick={() => setTab('tabla')}
                   className="shrink-0 flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-md border border-[var(--color-light-amber)] text-[var(--color-light-amber)] hover:bg-[var(--color-light-amber)] hover:text-[var(--color-field-night)] transition"
                 >
-                  <IconBarChart size={12} /> Ver tabla
+                  <IconBarChart size={12} /> {tr('Ver tabla')}
                 </button>
               </div>
             </div>
@@ -733,7 +736,7 @@ export default function GroupDashboard({
       {tab === 'tabla' && <Leaderboard group={group} weekKey={weekKey} onRowsCount={setBoardCount} />}
 
       {tab === 'admin' && isAdmin && (
-        <Suspense fallback={<p className="text-[var(--color-text-muted)] text-sm py-8 text-center">Cargando...</p>}>
+        <Suspense fallback={<p className="text-[var(--color-text-muted)] text-sm py-8 text-center">{tr('Cargando...')}</p>}>
           <Admin group={group} games={games} onChange={loadGames} onGroupUpdated={setGroup} onBack={onBack} onLeftAdmin={() => setTab('picks')} />
         </Suspense>
       )}

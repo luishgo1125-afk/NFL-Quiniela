@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { tr } from '../i18n'
 import { NFL_TEAMS } from '../lib/types'
 import { teamLogoUrl } from '../lib/teamLogos'
 import type { User } from '@supabase/supabase-js'
@@ -41,20 +42,20 @@ function ProfileModal({ user, onClose }: { user: User; onClose: () => void }) {
       .update({ display_name: name, favorite_team: team || null })
       .eq('id', user.id)
     setSaving(false)
-    setMsg(error ? error.message : 'Guardado.')
+    setMsg(error ? error.message : tr('Guardado.'))
   }
 
   return (
-    <ModalShell title="Mis datos" onClose={onClose}>
+    <ModalShell title={tr('Mis datos')} onClose={onClose}>
       <div className="space-y-3">
         <div>
-          <label className="text-xs text-[var(--color-text-muted)]">Correo</label>
+          <label className="text-xs text-[var(--color-text-muted)]">{tr('Correo')}</label>
           <p className="text-sm">{user.email}</p>
         </div>
         <div>
-          <label className="text-xs text-[var(--color-text-muted)]">Nombre</label>
+          <label className="text-xs text-[var(--color-text-muted)]">{tr('Nombre')}</label>
           {loading ? (
-            <p className="text-sm text-[var(--color-text-muted)]">Cargando...</p>
+            <p className="text-sm text-[var(--color-text-muted)]">{tr('Cargando...')}</p>
           ) : (
             <input
               value={name}
@@ -64,9 +65,9 @@ function ProfileModal({ user, onClose }: { user: User; onClose: () => void }) {
           )}
         </div>
         <div>
-          <label className="text-xs text-[var(--color-text-muted)]">Equipo favorito</label>
+          <label className="text-xs text-[var(--color-text-muted)]">{tr('Equipo favorito')}</label>
           {loading ? (
-            <p className="text-sm text-[var(--color-text-muted)]">Cargando...</p>
+            <p className="text-sm text-[var(--color-text-muted)]">{tr('Cargando...')}</p>
           ) : (
             <div className="flex items-center gap-2 mt-1">
               {team && <img src={teamLogoUrl(team)} alt={team} className="w-8 h-8 object-contain shrink-0" />}
@@ -75,7 +76,7 @@ function ProfileModal({ user, onClose }: { user: User; onClose: () => void }) {
                 onChange={(e) => setTeam(e.target.value)}
                 className="w-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
               >
-                <option value="">Sin elegir</option>
+                <option value="">{tr('Sin elegir')}</option>
                 {NFL_TEAMS.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
@@ -87,7 +88,7 @@ function ProfileModal({ user, onClose }: { user: User; onClose: () => void }) {
           disabled={saving}
           className="w-full bg-[var(--color-light-amber)] text-[var(--color-field-night)] font-semibold rounded-md py-2 text-sm hover:brightness-110 disabled:opacity-50"
         >
-          {saving ? 'Guardando...' : 'Guardar'}
+          {saving ? tr('Guardando...') : tr('Guardar')}
         </button>
       </div>
     </ModalShell>
@@ -104,8 +105,8 @@ function PasswordModal({ onClose }: { onClose: () => void }) {
   async function save(e: React.FormEvent) {
     e.preventDefault()
     setErr(null)
-    if (pw.length < 6) { setErr('La contrasena debe tener al menos 6 caracteres'); return }
-    if (pw !== pw2) { setErr('Las contrasenas no coinciden'); return }
+    if (pw.length < 6) { setErr(tr('La contrasena debe tener al menos 6 caracteres')); return }
+    if (pw !== pw2) { setErr(tr('Las contrasenas no coinciden')); return }
     setSaving(true)
     const { error } = await supabase.auth.updateUser({ password: pw })
     setSaving(false)
@@ -114,21 +115,21 @@ function PasswordModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <ModalShell title="Cambiar contrasena" onClose={onClose}>
+    <ModalShell title={tr('Cambiar contrasena')} onClose={onClose}>
       {ok ? (
-        <p className="text-sm text-[var(--color-turf-green)]">Contrasena actualizada.</p>
+        <p className="text-sm text-[var(--color-turf-green)]">{tr('Contrasena actualizada.')}</p>
       ) : (
         <form onSubmit={save} className="space-y-3">
           <input
             type="password"
-            placeholder="Nueva contrasena"
+            placeholder={tr('Nueva contrasena')}
             value={pw}
             onChange={(e) => setPw(e.target.value)}
             className="w-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
           />
           <input
             type="password"
-            placeholder="Confirmar contrasena"
+            placeholder={tr('Confirmar contrasena')}
             value={pw2}
             onChange={(e) => setPw2(e.target.value)}
             className="w-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
@@ -139,7 +140,7 @@ function PasswordModal({ onClose }: { onClose: () => void }) {
             disabled={saving}
             className="w-full bg-[var(--color-light-amber)] text-[var(--color-field-night)] font-semibold rounded-md py-2 text-sm hover:brightness-110 disabled:opacity-50"
           >
-            {saving ? 'Guardando...' : 'Actualizar contrasena'}
+            {saving ? tr('Guardando...') : tr('Actualizar contrasena')}
           </button>
         </form>
       )}
@@ -174,7 +175,7 @@ export default function ProfileMenu({
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((o) => !o)}
-        aria-label="Menu"
+        aria-label={tr('Menu')}
         className="p-2 text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)] transition"
       >
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -190,27 +191,27 @@ export default function ProfileMenu({
             onClick={() => { setModal('profile'); setOpen(false) }}
             className="w-full text-left px-4 py-2.5 text-sm hover:bg-[var(--color-field-surface-raised)]"
           >
-            Mis datos de perfil
+            {tr('Mis datos de perfil')}
           </button>
           <button
             onClick={() => { setModal('password'); setOpen(false) }}
             className="w-full text-left px-4 py-2.5 text-sm hover:bg-[var(--color-field-surface-raised)]"
           >
-            Cambiar contrasena
+            {tr('Cambiar contrasena')}
           </button>
           {showLeaveGroup && (
             <button
               onClick={() => { setOpen(false); onLeaveGroup?.() }}
               className="w-full text-left px-4 py-2.5 text-sm text-[var(--color-scoreboard-red)] hover:bg-[var(--color-field-surface-raised)]"
             >
-              Salir de {activeGroupName ? `"${activeGroupName}"` : 'esta liga'}
+              {activeGroupName ? tr('Salir de "{name}"', { name: activeGroupName }) : tr('Salir de esta liga')}
             </button>
           )}
           <button
             onClick={() => supabase.auth.signOut()}
             className="w-full text-left px-4 py-2.5 text-sm text-[var(--color-scoreboard-red)] hover:bg-[var(--color-field-surface-raised)]"
           >
-            Cerrar sesion
+            {tr('Cerrar sesion')}
           </button>
         </div>
       )}

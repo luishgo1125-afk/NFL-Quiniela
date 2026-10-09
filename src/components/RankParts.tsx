@@ -1,4 +1,5 @@
 import { teamLogoUrl } from '../lib/teamLogos'
+import { tr } from '../i18n'
 
 export function RankAvatar({ name, team, size = 40 }: { name: string; team: string | null; size?: number }) {
   return (
@@ -33,9 +34,9 @@ export function Podium({ items }: { items: PodiumItem[] }) {
           <Tag key={it.pos} onClick={it.onClick} className={`rk-pod p${it.pos}${it.isMe ? ' me' : ''}`}>
             <span className="rk-medal">{it.pos}</span>
             <RankAvatar name={it.name} team={it.team} size={it.pos === 1 ? 68 : 52} />
-            <span className="rk-pname">{it.name}{it.isMe && <em> (tú)</em>}</span>
+            <span className="rk-pname">{it.name}{it.isMe && <em> {tr('(tú)')}</em>}</span>
             {it.badges && <span className="rk-pbadges">{it.badges}</span>}
-            <span className="rk-ppts">{it.points}<small>pts</small></span>
+            <span className="rk-ppts">{it.points}<small>{tr('pts')}</small></span>
             <span className="rk-pline">{it.line}</span>
             {it.extra && <span className="rk-pextra">{it.extra}</span>}
           </Tag>

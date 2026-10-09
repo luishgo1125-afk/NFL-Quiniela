@@ -4,6 +4,7 @@ import { fetchMyGlobalRank } from '../lib/globalRank'
 import { NFL_TEAMS } from '../lib/types'
 import { teamLogoUrl } from '../lib/teamLogos'
 import {
+  IconGlobe,
   IconUser, IconBell, IconLock, IconEye, IconEyeOff, IconMedal,
   IconPencil, IconMail, IconShield, IconLogout, IconChevronRight, IconStar, IconTarget, IconFlame, IconUsers,
   IconMoon, IconSun,
@@ -11,6 +12,8 @@ import {
 import { pushSupported, isPushEnabled, enablePush, disablePush } from '../lib/push'
 import { getStoredTheme, setTheme, type Theme } from '../lib/theme'
 import type { User } from '@supabase/supabase-js'
+import { tr, getLang, type Lang } from '../i18n'
+import { useLang, saveLanguage } from '../i18n/LangContext'
 
 interface GlobalStats {
   rank: number | null
@@ -34,7 +37,7 @@ function isoWeekKey(dateStr: string) {
 }
 
 function MiniLineChart({ data }: { data: WeekBucket[] }) {
-  if (data.length === 0) return <p className="text-xs text-[var(--color-text-muted)]">Todavia no hay suficientes datos.</p>
+  if (data.length === 0) return <p className="text-xs text-[var(--color-text-muted)]">{tr('Todavia no hay suficientes datos.')}</p>
   const w = 280, h = 90, pad = 8
   const max = 100
   const stepX = data.length > 1 ? (w - pad * 2) / (data.length - 1) : 0
@@ -87,12 +90,12 @@ function EditProfileModal({
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4" onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-5">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-display text-xl font-700">Editar perfil</h3>
+          <h3 className="font-display text-xl font-700">{tr('Editar perfil')}</h3>
           <button onClick={onClose} className="text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)] text-lg leading-none">✕</button>
         </div>
         <div className="space-y-3">
           <div>
-            <label className="text-xs text-[var(--color-text-muted)]">Nombre</label>
+            <label className="text-xs text-[var(--color-text-muted)]">{tr('Nombre')}</label>
             <input
               value={n}
               onChange={(e) => setN(e.target.value)}
@@ -100,7 +103,7 @@ function EditProfileModal({
             />
           </div>
           <div>
-            <label className="text-xs text-[var(--color-text-muted)]">Equipo favorito</label>
+            <label className="text-xs text-[var(--color-text-muted)]">{tr('Equipo favorito')}</label>
             <div className="flex items-center gap-2 mt-1">
               {t && <img src={teamLogoUrl(t)} alt={t} className="w-8 h-8 object-contain shrink-0" />}
               <select
@@ -108,7 +111,7 @@ function EditProfileModal({
                 onChange={(e) => setT(e.target.value)}
                 className="w-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
               >
-                <option value="">Sin elegir</option>
+                <option value="">{tr('Sin elegir')}</option>
                 {NFL_TEAMS.map((tm) => <option key={tm} value={tm}>{tm}</option>)}
               </select>
             </div>
@@ -119,7 +122,7 @@ function EditProfileModal({
             disabled={saving}
             className="w-full bg-[var(--color-light-amber)] text-[var(--color-field-night)] font-semibold rounded-md py-2 text-sm hover:brightness-110 disabled:opacity-50"
           >
-            {saving ? 'Guardando...' : 'Guardar'}
+            {saving ? tr('Guardando...') : tr('Guardar')}
           </button>
         </div>
       </div>
@@ -139,8 +142,8 @@ function SecurityModal({ onClose }: { onClose: () => void }) {
   async function savePassword(e: React.FormEvent) {
     e.preventDefault()
     setPwErr(null)
-    if (pw.length < 6) { setPwErr('La contrasena debe tener al menos 6 caracteres'); return }
-    if (pw !== pw2) { setPwErr('Las contrasenas no coinciden'); return }
+    if (pw.length < 6) { setPwErr(tr('La contrasena debe tener al menos 6 caracteres')); return }
+    if (pw !== pw2) { setPwErr(tr('Las contrasenas no coinciden')); return }
     setSavingPw(true)
     const { error } = await supabase.auth.updateUser({ password: pw })
     setSavingPw(false)
@@ -154,17 +157,17 @@ function SecurityModal({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4" onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-5">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-display text-xl font-700 flex items-center gap-2"><IconShield size={18} /> Seguridad</h3>
+          <h3 className="font-display text-xl font-700 flex items-center gap-2"><IconShield size={18} /> {tr('Seguridad')}</h3>
           <button onClick={onClose} className="text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)] text-lg leading-none">✕</button>
         </div>
         {pwOk ? (
-          <p className="text-sm text-[var(--color-turf-green)]">Contrasena actualizada.</p>
+          <p className="text-sm text-[var(--color-turf-green)]">{tr('Contrasena actualizada.')}</p>
         ) : (
           <form onSubmit={savePassword} className="space-y-3">
             <div className="relative">
               <input
                 type={showPw ? 'text' : 'password'}
-                placeholder="Nueva contrasena"
+                placeholder={tr('Nueva contrasena')}
                 value={pw}
                 onChange={(e) => setPw(e.target.value)}
                 className="w-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md pl-3 pr-9 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
@@ -176,7 +179,7 @@ function SecurityModal({ onClose }: { onClose: () => void }) {
             <div className="relative">
               <input
                 type={showPw2 ? 'text' : 'password'}
-                placeholder="Confirmar contrasena"
+                placeholder={tr('Confirmar contrasena')}
                 value={pw2}
                 onChange={(e) => setPw2(e.target.value)}
                 className="w-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md pl-3 pr-9 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
@@ -191,7 +194,7 @@ function SecurityModal({ onClose }: { onClose: () => void }) {
               disabled={savingPw}
               className="w-full bg-[var(--color-light-amber)] text-[var(--color-field-night)] font-semibold rounded-md py-2 text-sm hover:brightness-110 disabled:opacity-50"
             >
-              {savingPw ? 'Guardando...' : 'Actualizar contrasena'}
+              {savingPw ? tr('Guardando...') : tr('Actualizar contrasena')}
             </button>
           </form>
         )}
@@ -220,6 +223,12 @@ export default function Profile({
   const [pushEnabled, setPushEnabled] = useState(false)
   const [pushBusy, setPushBusy] = useState(false)
   const [theme, setThemeState] = useState<Theme>(() => getStoredTheme())
+  const { setLanguage } = useLang()
+  async function changeLanguage(l: Lang) {
+    if (l === getLang()) return
+    await saveLanguage(user.id, l)
+    setLanguage(l)
+  }
 
   function toggleTheme() {
     const next: Theme = theme === 'dark' ? 'light' : 'dark'
@@ -300,7 +309,7 @@ export default function Profile({
         .sort((a, b) => a[0].localeCompare(b[0]))
         .slice(-6)
         .map(([, v], i, arr) => ({
-          label: i === arr.length - 1 ? 'Actual' : `Sem ${i + 1}`,
+          label: i === arr.length - 1 ? tr('Actual') : tr('Sem {n}', { n: i + 1 }),
           accuracy: v.total > 0 ? Math.round((v.hits / v.total) * 100) : 0,
         }))
       setChartData(buckets)
@@ -329,7 +338,7 @@ export default function Profile({
               </div>
               <button
                 onClick={() => setShowEdit(true)}
-                aria-label="Editar perfil"
+                aria-label={tr('Editar perfil')}
                 className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[var(--color-light-amber)] text-[var(--color-field-night)] flex items-center justify-center border-2 border-[var(--color-field-surface)]"
               >
                 <IconPencil size={11} />
@@ -337,7 +346,7 @@ export default function Profile({
             </div>
             <div className="min-w-0">
               <h1 className="font-display text-2xl font-800 leading-none truncate">{loading ? '...' : (name || user.email?.split('@')[0])}</h1>
-              <p className="text-xs text-[var(--color-text-muted)] mt-1">@{(name || 'jugador').toLowerCase().replace(/\s+/g, '')}</p>
+              <p className="text-xs text-[var(--color-text-muted)] mt-1">@{(name || tr('jugador')).toLowerCase().replace(/\s+/g, '')}</p>
               <p className="text-xs text-[var(--color-text-muted)] mt-1 flex items-center gap-1 truncate">
                 <IconMail size={11} className="shrink-0" /> {user.email}
               </p>
@@ -348,20 +357,20 @@ export default function Profile({
               className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full mt-3 whitespace-nowrap"
               style={{ background: 'rgba(242,183,5,0.15)', color: 'var(--color-light-amber)', border: '1px solid rgba(242,183,5,0.4)' }}
             >
-              <IconMedal size={13} className="shrink-0" /> #{globalStats.rank} en el ranking
+              <IconMedal size={13} className="shrink-0" /> {tr('#{rank} en el ranking', { rank: globalStats.rank })}
             </span>
           )}
         </div>
 
         {globalStats?.rank && (
           <div className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-3 h-full flex flex-col justify-center">
-            <p className="text-[9px] font-semibold text-[var(--color-light-amber)] tracking-wide mb-1 whitespace-nowrap">RANKING GLOBAL</p>
+            <p className="text-[9px] font-semibold text-[var(--color-light-amber)] tracking-wide mb-1 whitespace-nowrap">{tr('RANKING GLOBAL')}</p>
             <div className="flex items-center gap-1.5 mb-1">
               <span className="font-display text-2xl font-800">#{globalStats.rank}</span>
               <IconMedal size={16} className="text-[var(--color-light-amber)]" />
             </div>
             <p className="text-[9px] text-[var(--color-text-muted)] mb-2 leading-tight">
-              {globalStats.rank === 1 ? '¡Vas primero!' : `Estas a ${pointsToFirst} pts del #1`}
+              {globalStats.rank === 1 ? tr('¡Vas primero!') : tr('Estas a {n} pts del #1', { n: pointsToFirst })}
             </p>
             <div className="h-1.5 rounded-full bg-[var(--color-field-line)] overflow-hidden mb-1">
               <div className="h-full rounded-full bg-[var(--color-light-amber)]" style={{ width: `${progressPct}%` }} />
@@ -375,14 +384,14 @@ export default function Profile({
 
       {/* 4 tarjetas */}
       {loadingStats ? (
-        <p className="text-xs text-[var(--color-text-muted)]">Cargando estadisticas...</p>
+        <p className="text-xs text-[var(--color-text-muted)]">{tr('Cargando estadisticas...')}</p>
       ) : (
         <div className="grid grid-cols-4 gap-2 w-full">
           {[
-            { icon: <IconStar size={16} />, value: globalStats?.points ?? 0, label: 'PUNTOS' },
-            { icon: <IconTarget size={16} />, value: `${winRate}%`, label: 'ACIERTOS' },
-            { icon: <IconUsers size={16} />, value: groupCount, label: 'QUINIELAS' },
-            { icon: <IconFlame size={16} />, value: globalStats?.streak ?? 0, label: 'RACHA' },
+            { icon: <IconStar size={16} />, value: globalStats?.points ?? 0, label: tr('PUNTOS') },
+            { icon: <IconTarget size={16} />, value: `${winRate}%`, label: tr('ACIERTOS') },
+            { icon: <IconUsers size={16} />, value: groupCount, label: tr('QUINIELAS') },
+            { icon: <IconFlame size={16} />, value: globalStats?.streak ?? 0, label: tr('RACHA') },
           ].map((c, i) => (
             <div key={i} className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-3 text-center">
               <div className="text-[var(--color-light-amber)] flex items-center justify-center mb-1.5">
@@ -401,20 +410,20 @@ export default function Profile({
           <img src={teamLogoUrl(team)} alt="" className="absolute -right-3 -bottom-3 w-20 h-20 object-contain opacity-[0.06] pointer-events-none select-none z-0" />
         )}
         <div className="relative z-10">
-          <p className="text-[10px] font-semibold text-[var(--color-light-amber)] tracking-wide mb-2">MI EQUIPO FAVORITO</p>
+          <p className="text-[10px] font-semibold text-[var(--color-light-amber)] tracking-wide mb-2">{tr('MI EQUIPO FAVORITO')}</p>
           {team ? (
             <div className="flex items-center gap-3">
               <img src={teamLogoUrl(team)} alt={team} className="w-10 h-10 object-contain shrink-0" />
               <div>
                 <p className="font-semibold text-sm">{team}</p>
                 <button onClick={() => setShowEdit(true)} className="text-[10px] text-[var(--color-text-muted)] hover:text-[var(--color-light-amber)] underline">
-                  Cambiar equipo
+                  {tr('Cambiar equipo')}
                 </button>
               </div>
             </div>
           ) : (
             <button onClick={() => setShowEdit(true)} className="text-sm text-[var(--color-light-amber)] hover:underline">
-              + Elige tu equipo favorito
+              {tr('+ Elige tu equipo favorito')}
             </button>
           )}
         </div>
@@ -422,27 +431,27 @@ export default function Profile({
 
       {/* Mi rendimiento */}
       <div className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-4">
-        <p className="text-[10px] font-semibold text-[var(--color-light-amber)] tracking-wide mb-3">MI RENDIMIENTO</p>
+        <p className="text-[10px] font-semibold text-[var(--color-light-amber)] tracking-wide mb-3">{tr('MI RENDIMIENTO')}</p>
         {loadingStats ? (
-          <p className="text-xs text-[var(--color-text-muted)]">Cargando...</p>
+          <p className="text-xs text-[var(--color-text-muted)]">{tr('Cargando...')}</p>
         ) : chartData.length === 0 ? (
-          <p className="text-xs text-[var(--color-text-muted)]">Haz tus primeras predicciones para ver tu progreso aqui.</p>
+          <p className="text-xs text-[var(--color-text-muted)]">{tr('Haz tus primeras predicciones para ver tu progreso aqui.')}</p>
         ) : chartData.length === 1 ? (
           <div>
-            <p className="text-[10px] text-[var(--color-text-muted)]">% de aciertos esta semana</p>
+            <p className="text-[10px] text-[var(--color-text-muted)]">{tr('% de aciertos esta semana')}</p>
             <p className="font-mono-score text-3xl font-700 text-[var(--color-light-amber)]">{curAccuracy}%</p>
             <p className="text-[10px] text-[var(--color-text-muted)] mt-1">
-              Vuelve la proxima semana para ver como va cambiando tu progreso.
+              {tr('Vuelve la proxima semana para ver como va cambiando tu progreso.')}
             </p>
           </div>
         ) : (
           <div className="flex items-center gap-4">
             <div className="shrink-0">
-              <p className="text-[10px] text-[var(--color-text-muted)]">% de aciertos</p>
+              <p className="text-[10px] text-[var(--color-text-muted)]">{tr('% de aciertos')}</p>
               <p className="font-mono-score text-3xl font-700 text-[var(--color-light-amber)]">{curAccuracy}%</p>
               {delta != null && (
                 <p className="text-[10px] mt-1" style={{ color: delta >= 0 ? '#3D8B5F' : 'var(--color-scoreboard-red)' }}>
-                  {delta >= 0 ? '▲' : '▼'} {Math.abs(delta)}% vs semana anterior
+                  {delta >= 0 ? '▲' : '▼'} {tr('{n}% vs semana anterior', { n: Math.abs(delta) })}
                 </p>
               )}
             </div>
@@ -462,12 +471,12 @@ export default function Profile({
             <IconSun size={18} className="text-[var(--color-light-amber)] shrink-0" />
           )}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold">Apariencia</p>
-            <p className="text-[10px] text-[var(--color-text-muted)]">{theme === 'dark' ? 'Modo noche' : 'Modo dia'}</p>
+            <p className="text-sm font-semibold">{tr('Apariencia')}</p>
+            <p className="text-[10px] text-[var(--color-text-muted)]">{theme === 'dark' ? tr('Modo noche') : tr('Modo dia')}</p>
           </div>
           <button
             onClick={toggleTheme}
-            aria-label="Cambiar entre modo dia y modo noche"
+            aria-label={tr('Cambiar entre modo dia y modo noche')}
             className="w-11 h-6 rounded-full relative transition shrink-0"
             style={{ background: theme === 'light' ? '#F2B705' : 'var(--color-field-line)' }}
           >
@@ -476,15 +485,34 @@ export default function Profile({
         </div>
 
         <div className="flex items-center gap-3 px-4 py-3.5">
+          <IconGlobe size={18} className="text-[var(--color-light-amber)] shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold">{tr('Idioma')}</p>
+            <p className="text-[10px] text-[var(--color-text-muted)]">{getLang() === 'en' ? 'English' : tr('Español')}</p>
+          </div>
+          <div className="flex rounded-md overflow-hidden border border-[var(--color-field-line)] shrink-0">
+            {(['es', 'en'] as Lang[]).map((l) => (
+              <button
+                key={l}
+                onClick={() => changeLanguage(l)}
+                className={`px-3 py-1.5 text-xs font-semibold transition ${getLang() === l ? 'bg-[var(--color-light-amber)] text-[var(--color-field-night)]' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'}`}
+              >
+                {l === 'es' ? 'ES' : 'EN'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 px-4 py-3.5">
           <IconBell size={18} className="text-[var(--color-light-amber)] shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold">Notificaciones</p>
-            <p className="text-[10px] text-[var(--color-text-muted)]">Gestiona los avisos y recordatorios</p>
+            <p className="text-sm font-semibold">{tr('Notificaciones')}</p>
+            <p className="text-[10px] text-[var(--color-text-muted)]">{tr('Gestiona los avisos y recordatorios')}</p>
           </div>
           <button
             onClick={togglePush}
             disabled={pushBusy || !pushSupported()}
-            aria-label="Activar o desactivar notificaciones"
+            aria-label={tr('Activar o desactivar notificaciones')}
             className="w-11 h-6 rounded-full relative transition disabled:opacity-50 shrink-0"
             style={{ background: pushEnabled ? '#3D8B5F' : 'var(--color-field-line)' }}
           >
@@ -495,8 +523,8 @@ export default function Profile({
         <button onClick={() => setShowSecurity(true)} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-[var(--color-field-surface-raised)] transition text-left">
           <IconShield size={18} className="text-[var(--color-light-amber)] shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold">Seguridad</p>
-            <p className="text-[10px] text-[var(--color-text-muted)]">Cambia tu contrasena y administra tu cuenta</p>
+            <p className="text-sm font-semibold">{tr('Seguridad')}</p>
+            <p className="text-[10px] text-[var(--color-text-muted)]">{tr('Cambia tu contrasena y administra tu cuenta')}</p>
           </div>
           <IconChevronRight size={16} className="text-[var(--color-text-muted)] shrink-0" />
         </button>
@@ -507,7 +535,7 @@ export default function Profile({
           onClick={onLeaveGroup}
           className="w-full text-sm font-semibold rounded-md py-2.5 border border-[var(--color-scoreboard-red)]/40 text-[var(--color-scoreboard-red)] hover:bg-[var(--color-scoreboard-red)]/10 transition"
         >
-          Salir de {activeGroupName ? `"${activeGroupName}"` : 'esta liga'}
+          {activeGroupName ? tr('Salir de "{name}"', { name: activeGroupName }) : tr('Salir de esta liga')}
         </button>
       )}
 
@@ -515,7 +543,7 @@ export default function Profile({
         onClick={() => supabase.auth.signOut()}
         className="w-full flex items-center justify-center gap-2 text-sm font-semibold rounded-lg py-3 bg-[rgba(228,70,43,0.1)] border border-[var(--color-scoreboard-red)]/40 text-[var(--color-scoreboard-red)] hover:bg-[rgba(228,70,43,0.18)] transition"
       >
-        <IconLogout size={16} /> Cerrar sesion
+        <IconLogout size={16} /> {tr('Cerrar sesion')}
       </button>
 
       {showEdit && (

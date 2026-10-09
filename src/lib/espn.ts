@@ -1,3 +1,5 @@
+import { tr } from '../i18n'
+
 // Cliente para la API publica (no oficial) de ESPN.
 // No requiere API key. Puede cambiar sin previo aviso por parte de ESPN,
 // pero es ampliamente usada para obtener el calendario y marcadores de la NFL gratis.
@@ -22,7 +24,7 @@ export async function fetchEspnWeek(year: number, week: number, seasonType: Seas
   const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=${seasonType}&week=${week}&year=${year}`
   const res = await fetch(url)
   if (!res.ok) {
-    throw new Error('No se pudo consultar el calendario de la NFL en este momento.')
+    throw new Error(tr('No se pudo consultar el calendario de la NFL en este momento.'))
   }
   const data = await res.json()
   const events = data.events ?? []
@@ -97,7 +99,7 @@ export async function fetchNflStandings(): Promise<StandingsConference[]> {
     'https://site.web.api.espn.com/apis/v2/sports/football/nfl/standings?region=us&lang=en&contentorigin=espn&type=0&level=3&sort=winpercent%3Adesc%2Cplayoffseed%3Aasc'
   const res = await fetch(url)
   if (!res.ok) {
-    throw new Error('No se pudieron consultar las posiciones de la NFL en este momento.')
+    throw new Error(tr('No se pudieron consultar las posiciones de la NFL en este momento.'))
   }
   const data = await res.json()
   const conferences = (data.children ?? []).map((conf: any) => ({

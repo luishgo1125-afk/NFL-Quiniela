@@ -6,6 +6,7 @@ import { teamLogoUrl } from '../lib/teamLogos'
 import { IconGlobe, IconStar, IconTarget, IconPercent, IconShare, IconHash, IconUser } from '../components/icons'
 import type { User } from '@supabase/supabase-js'
 import { fetchGlobalRanking, type RankMode } from '../lib/globalRank'
+import { tr } from '../i18n'
 
 interface RankRow {
   user_id: string
@@ -82,10 +83,10 @@ async function shareGlobalRankingImage(rows: RankRow[]) {
 
   ctx.fillStyle = '#ECEFF3'
   ctx.font = '700 28px Arial'
-  ctx.fillText('RANKING GLOBAL', 28, 44)
+  ctx.fillText(tr('RANKING GLOBAL'), 28, 44)
   ctx.fillStyle = '#8A94A3'
   ctx.font = '400 13px Arial'
-  ctx.fillText('Puntos, marcadores exactos y % de aciertos', 28, 66)
+  ctx.fillText(tr('Puntos, marcadores exactos y % de aciertos'), 28, 66)
 
   ctx.strokeStyle = '#2A3542'
   ctx.lineWidth = 1
@@ -134,7 +135,7 @@ async function shareGlobalRankingImage(rows: RankRow[]) {
     ctx.fillText(r.display_name, 108, y + rowHeight / 2)
     ctx.fillStyle = '#8A94A3'
     ctx.font = '400 13px Arial'
-    ctx.fillText(`${r.total_hits}/${r.total_played} aciertos`, 108, y + rowHeight / 2 + 20)
+    ctx.fillText(tr('{hits}/{played} aciertos', { hits: r.total_hits, played: r.total_played }), 108, y + rowHeight / 2 + 20)
 
     ctx.textAlign = 'center'
     ctx.fillStyle = '#ECEFF3'
@@ -142,21 +143,21 @@ async function shareGlobalRankingImage(rows: RankRow[]) {
     ctx.fillText(String(r.total_points), width - 220, y + rowHeight / 2 - 2)
     ctx.fillStyle = '#8A94A3'
     ctx.font = '400 10px Arial'
-    ctx.fillText('pts', width - 220, y + rowHeight / 2 + 16)
+    ctx.fillText(tr('pts'), width - 220, y + rowHeight / 2 + 16)
 
     ctx.fillStyle = '#ECEFF3'
     ctx.font = '700 20px Arial'
     ctx.fillText(String(r.exact_hits), width - 120, y + rowHeight / 2 - 2)
     ctx.fillStyle = '#8A94A3'
     ctx.font = '400 10px Arial'
-    ctx.fillText('exactos', width - 120, y + rowHeight / 2 + 16)
+    ctx.fillText(tr('exactos'), width - 120, y + rowHeight / 2 + 16)
 
     ctx.fillStyle = '#F2B705'
     ctx.font = '700 20px Arial'
     ctx.fillText(`${Math.round(r.hit_pct)}%`, width - 30, y + rowHeight / 2 - 2)
     ctx.fillStyle = '#8A94A3'
     ctx.font = '400 10px Arial'
-    ctx.fillText('aciertos', width - 30, y + rowHeight / 2 + 16)
+    ctx.fillText(tr('aciertos'), width - 30, y + rowHeight / 2 + 16)
     ctx.textAlign = 'left'
   })
 
@@ -178,7 +179,7 @@ async function shareGlobalRankingImage(rows: RankRow[]) {
 
     if (navigator.share && navigator.canShare?.({ files: [file] })) {
       try {
-        await navigator.share({ files: [file], title: 'Ranking global' })
+        await navigator.share({ files: [file], title: tr('Ranking global') })
         return
       } catch {
         // si cancela el share nativo, cae al fallback de descarga
@@ -224,7 +225,7 @@ export default function GlobalRanking({ user }: { user: User }) {
     <div className="page-wrap narrow">
       <div className="flex items-start justify-between gap-3 mb-1">
         <h1 className="font-display text-4xl font-800 flex items-center gap-3">
-          <IconGlobe size={32} className="text-[var(--color-light-amber)]" /> RANKING GLOBAL
+          <IconGlobe size={32} className="text-[var(--color-light-amber)]" /> {tr('RANKING GLOBAL')}
         </h1>
         {rows.length > 0 && (
           <button
@@ -232,11 +233,11 @@ export default function GlobalRanking({ user }: { user: User }) {
             disabled={sharing}
             className="shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-md border border-[var(--color-light-amber)] text-[var(--color-light-amber)] hover:bg-[var(--color-light-amber)] hover:text-[var(--color-field-night)] transition disabled:opacity-50"
           >
-            <IconShare size={14} /> {sharing ? 'Generando...' : 'Compartir'}
+            <IconShare size={14} /> {sharing ? tr('Generando...') : tr('Compartir')}
           </button>
         )}
       </div>
-      <p className="text-[var(--color-text-muted)] text-sm mb-4">Cada partido cuenta una sola vez, aunque lo hayas predicho en varias ligas. Un ranking por modalidad.</p>
+      <p className="text-[var(--color-text-muted)] text-sm mb-4">{tr('Cada partido cuenta una sola vez, aunque lo hayas predicho en varias ligas. Un ranking por modalidad.')}</p>
 
       <div className="grid grid-cols-2 gap-2 mb-6">
         <button
@@ -247,7 +248,7 @@ export default function GlobalRanking({ user }: { user: User }) {
               : 'border-[var(--color-field-line)] text-[var(--color-text-muted)] hover:border-[var(--color-light-amber)]'
           }`}
         >
-          Marcador exacto
+          {tr('Marcador exacto')}
         </button>
         <button
           onClick={() => setMode('winner')}
@@ -257,17 +258,17 @@ export default function GlobalRanking({ user }: { user: User }) {
               : 'border-[var(--color-field-line)] text-[var(--color-text-muted)] hover:border-[var(--color-light-amber)]'
           }`}
         >
-          Solo ganador
+          {tr('Solo ganador')}
         </button>
       </div>
 
       {loading ? (
-        <p className="text-[var(--color-text-muted)] text-sm">Cargando...</p>
+        <p className="text-[var(--color-text-muted)] text-sm">{tr('Cargando...')}</p>
       ) : rows.length === 0 ? (
         <EmptyState
           icon={<IconGlobe size={32} />}
-          title="Aún sin resultados"
-          text={mode === 'winner' ? 'Aún no hay resultados en ligas de solo ganador.' : 'Cuando terminen los primeros partidos, el ranking aparecerá aquí.'}
+          title={tr('Aún sin resultados')}
+          text={mode === 'winner' ? tr('Aún no hay resultados en ligas de solo ganador.') : tr('Cuando terminen los primeros partidos, el ranking aparecerá aquí.')}
         />
       ) : (
         <>
@@ -278,17 +279,17 @@ export default function GlobalRanking({ user }: { user: User }) {
               team: r.favorite_team,
               isMe: r.user_id === user.id,
               points: r.total_points,
-              line: `${r.exact_hits} exactos · ${Math.round(r.hit_pct)}%`,
+              line: tr('{n} exactos', { n: r.exact_hits }) + ` · ${Math.round(r.hit_pct)}%`,
             }))}
           />
           {rows.length > 3 && (
             <div className="rk-table rk-global">
               <div className="rk-head" style={{ ['--cols' as any]: '36px minmax(0,1fr) 56px 64px 72px' }}>
                 <span className="rk-c">#</span>
-                <span>Jugador</span>
-                <span className="rk-c">Pts</span>
-                <span className="rk-c"><span className="rk-lg">Exactos</span><span className="rk-sm">Ex.</span></span>
-                <span className="rk-c"><span className="rk-lg">% Aciertos</span><span className="rk-sm">%</span></span>
+                <span>{tr('Jugador')}</span>
+                <span className="rk-c">{tr('Pts')}</span>
+                <span className="rk-c"><span className="rk-lg">{tr('Exactos')}</span><span className="rk-sm">{tr('Ex.')}</span></span>
+                <span className="rk-c"><span className="rk-lg">{tr('% Aciertos')}</span><span className="rk-sm">%</span></span>
               </div>
               {rows.slice(3).map((r, idx) => {
                 const isMe = r.user_id === user.id
@@ -298,8 +299,8 @@ export default function GlobalRanking({ user }: { user: User }) {
                     <div className="rk-player">
                       <RankAvatar name={r.display_name} team={r.favorite_team} />
                       <div className="rk-who">
-                        <b><span className="n">{firstName(r.display_name)}</span>{isMe && <span className="rk-tag">TÚ</span>}</b>
-                        <small>{r.total_hits}/{r.total_played} · Dif +{r.point_diff}</small>
+                        <b><span className="n">{firstName(r.display_name)}</span>{isMe && <span className="rk-tag">{tr('TÚ')}</span>}</b>
+                        <small>{r.total_hits}/{r.total_played} · {tr('Dif')} +{r.point_diff}</small>
                       </div>
                     </div>
                     <span className="rk-num big">{r.total_points}</span>
@@ -317,7 +318,7 @@ export default function GlobalRanking({ user }: { user: User }) {
       )}
 
       <p className="text-[10px] text-[var(--color-text-muted)] text-center mt-6">
-        El ranking se actualiza automaticamente despues de cada jornada.
+        {tr('El ranking se actualiza automaticamente despues de cada jornada.')}
       </p>
     </div>
   )

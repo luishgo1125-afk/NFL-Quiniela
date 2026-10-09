@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Group } from '../lib/types'
 import { teamLogoUrl } from '../lib/teamLogos'
+import { tr } from '../i18n'
 
 interface Member {
   user_id: string
@@ -23,7 +24,7 @@ export default function MembersManager({ group }: { group: Group }) {
       .eq('group_id', group.id)
     const list: Member[] = (data ?? []).map((row: any) => ({
       user_id: row.user_id,
-      display_name: row.profiles?.display_name ?? 'Jugador',
+      display_name: row.profiles?.display_name ?? tr('Jugador'),
       favorite_team: row.profiles?.favorite_team ?? null,
     }))
     setMembers(list)
@@ -43,9 +44,9 @@ export default function MembersManager({ group }: { group: Group }) {
 
   return (
     <div className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-4 space-y-3">
-      <h2 className="text-sm font-semibold">Miembros de la liga</h2>
+      <h2 className="text-sm font-semibold">{tr('Miembros de la liga')}</h2>
       {loading ? (
-        <p className="text-xs text-[var(--color-text-muted)]">Cargando...</p>
+        <p className="text-xs text-[var(--color-text-muted)]">{tr('Cargando...')}</p>
       ) : (
         <div className="space-y-1.5">
           {members.map((m) => {
@@ -64,14 +65,14 @@ export default function MembersManager({ group }: { group: Group }) {
                 </div>
                 <span className="text-sm flex-1 truncate">{m.display_name}</span>
                 {isAdmin ? (
-                  <span className="text-[10px] font-semibold text-[var(--color-light-amber)] shrink-0">ADMIN</span>
+                  <span className="text-[10px] font-semibold text-[var(--color-light-amber)] shrink-0">{tr('ADMIN')}</span>
                 ) : (
                   <button
                     onClick={() => removeMember(m.user_id)}
                     disabled={busyId === m.user_id}
                     className="text-xs text-[var(--color-scoreboard-red)] hover:underline shrink-0 disabled:opacity-50"
                   >
-                    {busyId === m.user_id ? 'Quitando...' : 'Quitar'}
+                    {busyId === m.user_id ? tr('Quitando...') : tr('Quitar')}
                   </button>
                 )}
               </div>

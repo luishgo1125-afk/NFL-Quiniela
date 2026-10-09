@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { IconBell, IconCheck, IconStar, IconTarget, IconClipboardX, IconTrophy, IconUsers, IconClock, IconTrash } from '../components/icons'
 import type { User } from '@supabase/supabase-js'
+import { tr } from '../i18n'
 
 interface NotificationItem {
   id: string
@@ -19,12 +20,12 @@ type IconKind = 'star' | 'target' | 'miss' | 'trophy' | 'users' | 'clock' | 'bel
 function timeAgo(iso: string) {
   const diffMs = Date.now() - new Date(iso).getTime()
   const mins = Math.floor(diffMs / 60000)
-  if (mins < 1) return 'ahora'
-  if (mins < 60) return `hace ${mins} min`
+  if (mins < 1) return tr('ahora')
+  if (mins < 60) return tr('hace {n} min', { n: mins })
   const hours = Math.floor(mins / 60)
-  if (hours < 24) return `hace ${hours}h`
+  if (hours < 24) return tr('hace {n}h', { n: hours })
   const days = Math.floor(hours / 24)
-  return `hace ${days}d`
+  return tr('hace {n}d', { n: days })
 }
 
 function NotifIcon({ kind, size = 16 }: { kind: IconKind; size?: number }) {
@@ -202,7 +203,7 @@ export default function Notifications({ user, onOpenGame, onGoHome }: { user: Us
 
   async function deleteAllNotifs() {
     if (notifs.length === 0) return
-    if (!confirm('¿Eliminar todas tus notificaciones? Esto no se puede deshacer.')) return
+    if (!confirm(tr('¿Eliminar todas tus notificaciones? Esto no se puede deshacer.'))) return
     const prev = notifs
     setNotifs([])
     const { error } = await supabase.from('notifications').delete().eq('user_id', user.id)
@@ -250,15 +251,15 @@ export default function Notifications({ user, onOpenGame, onGoHome }: { user: Us
     <div className="page-wrap narrow">
       <div className="flex items-start justify-between gap-3 mb-1">
         <div>
-          <h1 className="font-display text-4xl font-800">NOTIFICACIONES</h1>
-          <p className="text-[var(--color-text-muted)] text-sm">Tus avisos y la actividad reciente de tus ligas</p>
+          <h1 className="font-display text-4xl font-800">{tr('NOTIFICACIONES')}</h1>
+          <p className="text-[var(--color-text-muted)] text-sm">{tr('Tus avisos y la actividad reciente de tus ligas')}</p>
         </div>
         {hasUnread && (
           <button
             onClick={markAllRead}
             className="shrink-0 flex items-center gap-1.5 text-xs font-semibold text-[var(--color-light-amber)] hover:underline whitespace-nowrap mt-1"
           >
-            Marcar todas como leidas <IconCheck size={13} />
+            {tr('Marcar todas como leidas')} <IconCheck size={13} />
           </button>
         )}
       </div>
@@ -266,14 +267,14 @@ export default function Notifications({ user, onOpenGame, onGoHome }: { user: Us
       {notifs.length > 0 && (
         <div className="flex items-center justify-between gap-3 bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg px-4 py-3 mt-4">
           <div className="min-w-0">
-            <p className="text-sm font-semibold">Borrar historial</p>
-            <p className="text-[10px] text-[var(--color-text-muted)]">Elimina todas tus notificaciones de una vez</p>
+            <p className="text-sm font-semibold">{tr('Borrar historial')}</p>
+            <p className="text-[10px] text-[var(--color-text-muted)]">{tr('Elimina todas tus notificaciones de una vez')}</p>
           </div>
           <button
             onClick={deleteAllNotifs}
             className="shrink-0 flex items-center gap-1.5 text-xs font-semibold text-[var(--color-scoreboard-red)] border border-[var(--color-scoreboard-red)]/40 rounded-md px-3 py-1.5 hover:bg-[rgba(228,70,43,0.1)] transition"
           >
-            <IconTrash size={13} /> Eliminar todas
+            <IconTrash size={13} /> {tr('Eliminar todas')}
           </button>
         </div>
       )}
@@ -289,7 +290,7 @@ export default function Notifications({ user, onOpenGame, onGoHome }: { user: Us
                 : 'border-[var(--color-field-line)] text-[var(--color-text-muted)] hover:border-[var(--color-light-amber)]'
             }`}
           >
-            {f.label}
+            {tr(f.label)}
             <span
               className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold font-mono-score"
               style={{
@@ -304,32 +305,32 @@ export default function Notifications({ user, onOpenGame, onGoHome }: { user: Us
       </div>
 
       {loading ? (
-        <p className="text-[var(--color-text-muted)] text-sm">Cargando...</p>
+        <p className="text-[var(--color-text-muted)] text-sm">{tr('Cargando...')}</p>
       ) : notifs.length === 0 ? (
         <EmptyState
           icon={<IconBell size={32} />}
-          title="Todo tranquilo"
-          text="No tienes nuevas notificaciones. Cuando ocurra algo importante en tus quinielas aparecerá aquí."
-          actionLabel={onGoHome ? 'Ver jornadas' : undefined}
+          title={tr('Todo tranquilo')}
+          text={tr('No tienes nuevas notificaciones. Cuando ocurra algo importante en tus quinielas aparecerá aquí.')}
+          actionLabel={onGoHome ? tr('Ver jornadas') : undefined}
           onAction={onGoHome}
         />
       ) : filtered.length === 0 ? (
-        <p className="text-[var(--color-text-muted)] text-sm text-center py-8">No hay notificaciones en esta categoria.</p>
+        <p className="text-[var(--color-text-muted)] text-sm text-center py-8">{tr('No hay notificaciones en esta categoria.')}</p>
       ) : (
         <div className="space-y-6">
           {nuevas.length > 0 && (
             <div className="space-y-2">
-              <h2 className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-light-amber)]">Nuevas</h2>
+              <h2 className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-light-amber)]">{tr('Nuevas')}</h2>
               <div className="space-y-2">{nuevas.map(renderCard)}</div>
             </div>
           )}
           {anteriores.length > 0 && (
             <div className="space-y-2">
-              <h2 className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]">Anteriores</h2>
+              <h2 className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]">{tr('Anteriores')}</h2>
               <div className="space-y-2">{anteriores.map(renderCard)}</div>
             </div>
           )}
-          <p className="text-center text-xs text-[var(--color-text-muted)] pt-2">No hay mas notificaciones 🎉</p>
+          <p className="text-center text-xs text-[var(--color-text-muted)] pt-2">{tr('No hay mas notificaciones 🎉')}</p>
         </div>
       )}
     </div>

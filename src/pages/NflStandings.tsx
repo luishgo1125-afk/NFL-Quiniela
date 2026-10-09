@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { fetchNflStandings, type StandingsConference } from '../lib/espn'
 import { teamLogoUrl } from '../lib/teamLogos'
 import { IconShield } from '../components/icons'
+import { tr } from '../i18n'
 
 export default function NflStandings() {
   const [conferences, setConferences] = useState<StandingsConference[] | null>(null)
@@ -17,7 +18,7 @@ export default function NflStandings() {
         const data = await fetchNflStandings()
         if (!cancelled) setConferences(data)
       } catch (e: any) {
-        if (!cancelled) setErr(e?.message ?? 'No se pudieron cargar las posiciones.')
+        if (!cancelled) setErr(e?.message ?? tr('No se pudieron cargar las posiciones.'))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -29,12 +30,12 @@ export default function NflStandings() {
   return (
     <div className="page-wrap">
       <h1 className="font-display text-4xl font-800 flex items-center gap-3 mb-1">
-        <IconShield size={32} className="text-[var(--color-light-amber)]" /> POSICIONES NFL
+        <IconShield size={32} className="text-[var(--color-light-amber)]" /> {tr('POSICIONES NFL')}
       </h1>
-      <p className="text-[var(--color-text-muted)] text-sm mb-6">Tabla real de la liga por conferencia y division, directo de la NFL</p>
+      <p className="text-[var(--color-text-muted)] text-sm mb-6">{tr('Tabla real de la liga por conferencia y division, directo de la NFL')}</p>
 
       {loading && (
-        <p className="text-center text-xs text-[var(--color-text-muted)] py-10 font-mono-score animate-pulse">CARGANDO...</p>
+        <p className="text-center text-xs text-[var(--color-text-muted)] py-10 font-mono-score animate-pulse">{tr('CARGANDO...')}</p>
       )}
 
       {err && !loading && (
@@ -55,7 +56,7 @@ export default function NflStandings() {
                         className="grid gap-1 px-2.5 py-1.5 text-[9px] font-semibold text-[var(--color-text-muted)] uppercase border-b border-[var(--color-field-line)]"
                         style={{ gridTemplateColumns: '1fr repeat(5, 32px)' }}
                       >
-                        <span>Equipo</span>
+                        <span>{tr('Equipo')}</span>
                         <span className="text-center">W</span>
                         <span className="text-center">L</span>
                         <span className="text-center">T</span>

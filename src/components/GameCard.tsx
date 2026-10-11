@@ -41,7 +41,6 @@ interface MemberInfo {
   favorite_team: string | null
 }
 
-const LOCK_MINUTES = 30
 const WARNING_MINUTES = 150 // "cierra pronto" empieza 2.5h antes del cierre real (2h antes de kickoff)
 export default function GameCard({
   game,
@@ -55,6 +54,7 @@ export default function GameCard({
   pointsExact,
   pickMode = 'score',
   requiresTotal = false,
+  lockMinutes = 30,
 }: {
   game: Game
   userId: string
@@ -67,6 +67,7 @@ export default function GameCard({
   pointsExact?: number
   pickMode?: 'score' | 'winner'
   requiresTotal?: boolean
+  lockMinutes?: number
 }) {
   const [pick, setPick] = useState<Pick | null>(null)
   const [home, setHome] = useState('')
@@ -80,7 +81,7 @@ export default function GameCard({
   const [othersPicks, setOthersPicks] = useState<Record<string, { pred_home_score: number; pred_away_score: number; pred_winner?: string | null; pred_total?: number | null; points: number | null }>>({})
 
   const kickoffTime = new Date(game.kickoff).getTime()
-  const lockTime = kickoffTime - LOCK_MINUTES * 60 * 1000
+  const lockTime = kickoffTime - lockMinutes * 60 * 1000
   const naturallyLocked = lockTime <= Date.now()
   const locked = naturallyLocked || !!forceLocked || !!confirmLocked
   // la base de datos deja ver los pronosticos de los demas justo al kickoff
@@ -460,8 +461,8 @@ export default function GameCard({
           className="flex items-center gap-1.5 mt-4 flex-wrap w-full text-left hover:opacity-80 transition"
         >
           <IconUsers size={13} className="text-[var(--color-text-muted)] shrink-0" />
-          <span className="text-xs text-[var(--color-text-muted)] ">
-            {tr('{done}/{total}', { done: pickedUserIds.length, total: members.length })}
+          <span className="text-xs text-[var(--color-text-muted)] mr-1 underline decoration-dotted">
+            {tr('{done}/{total} han predicho', { done: pickedUserIds.length, total: members.length })}
           </span>
           {members.map((m) => {
             const done = pickedUserIds.includes(m.user_id)

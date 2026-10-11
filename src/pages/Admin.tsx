@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { tr, localeTag } from '../i18n'
 import { supabase } from '../lib/supabase'
-import { NFL_TEAMS, weekLabel, type Game, type Group } from '../lib/types'
+import { NFL_TEAMS, weekLabel, lockMinutesOf, type Game, type Group } from '../lib/types'
 import { compareWeekEntries } from '../lib/ranking'
 import { fetchEspnWeek, guessCurrentWeek, type SeasonType } from '../lib/espn'
 import { teamLogoUrl } from '../lib/teamLogos'
@@ -367,6 +367,13 @@ export default function Admin({
   }
 
   function onPickLogo(file: File | null) {
+    if (file) {
+      // solo imagenes comunes (sin SVG, que puede traer scripts) y maximo 2 MB
+      const okType = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)
+      if (!okType) { setGroupErr(tr('El logo debe ser una imagen JPG, PNG, WEBP o GIF.')); return }
+      if (file.size > 2 * 1024 * 1024) { setGroupErr(tr('El logo pesa mas de 2 MB. Elige una imagen mas ligera.')); return }
+      setGroupErr(null)
+    }
     setLogoFile(file)
     if (file) setLogoPreview(URL.createObjectURL(file))
   }
@@ -380,11 +387,12 @@ export default function Admin({
       let logoUrl = group.logo_url
 
       if (logoFile) {
-        const ext = logoFile.name.split('.').pop() ?? 'jpg'
+        const EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' }
+        const ext = EXT[logoFile.type] ?? 'jpg'
         const path = `${groupId}/logo.${ext}`
         const { error: upErr } = await supabase.storage
           .from('group-logos')
-          .upload(path, logoFile, { upsert: true })
+          .upload(path, logoFile, { upsert: true, contentType: logoFile.type })
         if (upErr) throw upErr
         const { data } = supabase.storage.from('group-logos').getPublicUrl(path)
         logoUrl = data.publicUrl
@@ -416,6 +424,25 @@ export default function Admin({
     })
     setSavingCopyToggle(false)
     if (!err) onGroupUpdated(data)
+  }
+
+  // tiempo de cierre de predicciones (minutos antes del kickoff)
+  const initLock = lockMinutesOf(group)
+  const [lockUnit, setLockUnit] = useState<'min' | 'h'>(initLock >= 60 && initLock % 60 === 0 ? 'h' : 'min')
+  const [lockValue, setLockValue] = useState(String(initLock >= 60 && initLock % 60 === 0 ? initLock / 60 : initLock))
+  const [savingLock, setSavingLock] = useState(false)
+  const [lockSaved, setLockSaved] = useState(false)
+  async function saveLockMinutes() {
+    const n = Number(lockValue)
+    const mins = Math.round(lockUnit === 'h' ? n * 60 : n)
+    if (!Number.isFinite(mins) || mins < 0 || mins > 4320) { alert(tr('Elige un tiempo entre 0 minutos y 72 horas')); return }
+    setSavingLock(true)
+    const { data, error: err } = await supabase.rpc('set_lock_minutes', { p_group_id: groupId, p_minutes: mins })
+    setSavingLock(false)
+    if (err) { alert(err.message); return }
+    onGroupUpdated(data)
+    setLockSaved(true)
+    setTimeout(() => setLockSaved(false), 2000)
   }
 
   const [savingConfirmToggle, setSavingConfirmToggle] = useState(false)
@@ -636,7 +663,7 @@ export default function Admin({
               </div>
               <input
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp,image/gif"
                 className="hidden"
                 onChange={(e) => onPickLogo(e.target.files?.[0] ?? null)}
               />
@@ -644,6 +671,7 @@ export default function Admin({
             </label>
             <input
               value={editName}
+              maxLength={60}
               onChange={(e) => setEditName(e.target.value)}
               required
               className="flex-1 bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
@@ -687,6 +715,37 @@ export default function Admin({
             >
               <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all" style={{ left: group.confirm_picks ? '22px' : '2px' }} />
             </button>
+          </div>
+          <div className="px-4 py-3.5">
+            <p className="text-sm font-semibold">{tr('Cierre de predicciones')}</p>
+            <p className="text-[10px] text-[var(--color-text-muted)]">{tr('Tiempo antes del inicio de cada juego en que ya no se pueden hacer ni cambiar predicciones. 0 = hasta el inicio del juego')}</p>
+            <div className="flex items-center gap-2 mt-2">
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={lockUnit === 'h' ? 72 : 4320}
+                value={lockValue}
+                onChange={(e) => setLockValue(e.target.value)}
+                aria-label={tr('Tiempo de cierre')}
+                className="w-24 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
+              />
+              <select
+                value={lockUnit}
+                onChange={(e) => setLockUnit(e.target.value as 'min' | 'h')}
+                className="bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none"
+              >
+                <option value="min">{tr('minutos')}</option>
+                <option value="h">{tr('horas')}</option>
+              </select>
+              <button
+                onClick={saveLockMinutes}
+                disabled={savingLock}
+                className="px-3 py-2 rounded-md text-sm font-semibold bg-[var(--color-light-amber)] text-black disabled:opacity-50"
+              >
+                {lockSaved ? '✓' : tr('Guardar')}
+              </button>
+            </div>
           </div>
           <div className="flex items-center gap-3 px-4 py-3.5">
             <div className="flex-1 min-w-0">

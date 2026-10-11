@@ -29,6 +29,7 @@ export interface Group {
   prize_split_3: number
   allow_copy_picks: boolean
   confirm_picks?: boolean
+  lock_minutes?: number
 }
 
 export interface GroupMember {
@@ -120,3 +121,8 @@ export const NFL_TEAMS = [
   'MIN', 'NE', 'NO', 'NYG', 'NYJ', 'PHI', 'PIT', 'SF', 'SEA', 'TB',
   'TEN', 'WSH'
 ]
+
+// minutos antes del kickoff en que se cierran las predicciones (configurable por el admin)
+export function lockMinutesOf(g: { lock_minutes?: number | null }): number {
+  return typeof g.lock_minutes === 'number' && g.lock_minutes >= 0 ? g.lock_minutes : 30
+}

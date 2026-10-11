@@ -146,4 +146,10 @@ export const dict: Record<string, string> = {
   'Ya se corrigio': 'Already corrected',
   'pt': 'pt',
   'Guardar': 'Save',
+  'Cierre de predicciones': 'Prediction deadline',
+  'Tiempo antes del inicio de cada juego en que ya no se pueden hacer ni cambiar predicciones. 0 = hasta el inicio del juego': 'How long before each game starts that picks can no longer be made or changed. 0 = until kickoff',
+  'Tiempo de cierre': 'Deadline time',
+  'minutos': 'minutes',
+  'horas': 'hours',
+  'Elige un tiempo entre 0 minutos y 72 horas': 'Choose a time between 0 minutes and 72 hours',
 }

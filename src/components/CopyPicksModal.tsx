@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { weekLabel, type Group } from '../lib/types'
+import { weekLabel, lockMinutesOf, type Group } from '../lib/types'
 import { tr } from '../i18n'
 import { IconCopy, IconCheck } from './icons'
 
-const LOCK_MINUTES = 30 // mismo margen que GameCard.tsx: se cierra 30 min antes del kickoff
 
 interface OtherGroup {
   id: string
@@ -97,7 +96,7 @@ export default function CopyPicksModal({
       if (!src) { noMatch++; continue }
       const theirPick = pickByGameId[src.id]
       if (!theirPick) { noPick++; continue }
-      const lockTime = new Date(dest.kickoff).getTime() - LOCK_MINUTES * 60 * 1000
+      const lockTime = new Date(dest.kickoff).getTime() - lockMinutesOf(currentGroup) * 60 * 1000
       if (lockTime <= Date.now()) { locked++; continue }
 
       const { error: upErr } = await supabase.from('picks').upsert(

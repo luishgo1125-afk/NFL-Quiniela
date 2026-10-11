@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import type { Game, Group } from '../lib/types'
-import { weekLabel } from '../lib/types'
+import { weekLabel, lockMinutesOf } from '../lib/types'
 import GameCard from '../components/GameCard'
 import Leaderboard from '../components/Leaderboard'
 import LeagueHeader from '../components/LeagueHeader'
@@ -274,7 +274,7 @@ export default function GroupDashboard({
     return () => clearInterval(id)
   }, [])
 
-  const PROGRESS_LOCK_MINUTES = 30 // mismo margen que GameCard.tsx
+  const PROGRESS_LOCK_MINUTES = lockMinutesOf(group)
   const weekPicksTotal = weekGames.length
   const weekPicksDone = weekGames.filter((g) => (pickedBy[g.id] ?? []).includes(user.id)).length
   const weekPicksMissing = weekPicksTotal - weekPicksDone
@@ -286,7 +286,7 @@ export default function GroupDashboard({
       .filter((lockTime) => lockTime > nowTick)
       .sort((a, b) => a - b)
     return upcoming[0] ?? null
-  }, [weekGames, nowTick])
+  }, [weekGames, nowTick, PROGRESS_LOCK_MINUTES])
 
   function formatCountdown(ms: number) {
     const totalMin = Math.max(0, Math.floor(ms / 60000))
@@ -709,6 +709,7 @@ export default function GroupDashboard({
                     pointsExact={group.pick_mode === 'winner' ? undefined : group.points_exact}
                     pickMode={group.pick_mode ?? 'score'}
                     requiresTotal={group.pick_mode === 'winner' && lastGameIds.has(g.id)}
+                    lockMinutes={lockMinutesOf(group)}
                   />
                 </div>
               ))}

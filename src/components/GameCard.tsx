@@ -77,6 +77,7 @@ export default function GameCard({
   const [total, setTotal] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [showPickers, setShowPickers] = useState(false)
   const [othersPicks, setOthersPicks] = useState<Record<string, { pred_home_score: number; pred_away_score: number; pred_winner?: string | null; pred_total?: number | null; points: number | null }>>({})
 
@@ -136,6 +137,7 @@ export default function GameCard({
   async function save() {
     if (winnerMode ? winner == null || (requiresTotal && total === '') : home === '' || away === '') return
     setSaving(true)
+    setSaveError(null)
     const payload: Record<string, any> = winnerMode
       ? {
           game_id: game.id,
@@ -153,6 +155,7 @@ export default function GameCard({
         }
     const { error, data } = await supabase.from('picks').upsert(payload, { onConflict: 'game_id,user_id' }).select().single()
     setSaving(false)
+    if (error) setSaveError(error.message)
     if (!error && data) {
       setPick(data)
       setSaved(true)
@@ -574,6 +577,9 @@ export default function GameCard({
             </button>
           )}
         </div>
+      )}
+      {!locked && saveError && (
+        <p className="mt-2 text-xs text-[var(--color-scoreboard-red)] break-words">{saveError}</p>
       )}
     </div>
   )

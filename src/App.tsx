@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState, lazy, Suspense } from 'react'
 import { useAuth } from './lib/useAuth'
 import { supabase } from './lib/supabase'
+import { fetchMyBalanceEntries, sumEntries, fmtMoney } from './lib/balance'
 import Login from './pages/Login'
 import Landing from './pages/Landing'
 import BottomNav, { type BottomTab } from './components/BottomNav'
@@ -128,6 +129,17 @@ function AppInner() {
       setFirstName(n || (user?.email ?? '').split('@')[0])
     })
   }, [user?.id, bottomTab])
+  // saldo virtual (fines didacticos): suma de todos los movimientos del usuario
+  const [balance, setBalance] = useState<{ total: number; has: boolean } | null>(null)
+  useEffect(() => {
+    if (!user) return
+    let alive = true
+    const load = () => fetchMyBalanceEntries(user.id).then((es) => { if (alive) setBalance({ total: sumEntries(es), has: es.length > 0 }) })
+    load()
+    const onVis = () => { if (document.visibilityState === 'visible') load() }
+    document.addEventListener('visibilitychange', onVis)
+    return () => { alive = false; document.removeEventListener('visibilitychange', onVis) }
+  }, [user?.id, bottomTab])
 
   // al tocar una notificacion de un partido, brinca a la liga correcta y le
   // pasa el id del partido a GroupDashboard para que se posicione ahi
@@ -153,7 +165,7 @@ function AppInner() {
       setJoinError(null)
       const code = pendingInviteCode!.trim().toUpperCase()
 
-      await supabase.rpc('join_group', { p_invite_code: code })
+      await supabase.rpc('join_group_limited', { p_invite_code: code })
       // sin importar si join_group trono (por ejemplo "ya eres miembro"),
       // igual checamos si de verdad quedo como miembro y lo abrimos
       const { data: membership } = await supabase
@@ -277,11 +289,23 @@ function AppInner() {
   }
 
   const onHome = bottomTab === 'quinielas' && !activeGroup
+  const balanceChip = balance && balance.has ? (
+    <button
+      onClick={() => setBottomTab('perfil')}
+      title={tr('Saldo virtual (con fines didacticos)')}
+      className={`balance-chip ${balance.total < 0 ? 'neg' : balance.total > 0 ? 'pos' : ''}`}
+    >
+      {fmtMoney(balance.total)}
+    </button>
+  ) : null
   const profileChip = bottomTab !== 'perfil' ? (
+    <>
+    {balanceChip}
     <button onClick={() => setBottomTab('perfil')} title={tr('Perfil')} className="profile-chip">
       <span className="profile-chip-ico"><IconUser size={14} /></span>
       {firstName && <span className="profile-chip-name">{firstName}</span>}
     </button>
+    </>
   ) : null
 
   return (

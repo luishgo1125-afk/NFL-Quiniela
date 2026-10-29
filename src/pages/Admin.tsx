@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { tr, localeTag } from '../i18n'
+import { fmtMoney } from '../lib/balance'
 import { supabase } from '../lib/supabase'
 import { NFL_TEAMS, weekLabel, lockMinutesOf, type Game, type Group } from '../lib/types'
-import { compareWeekEntries } from '../lib/ranking'
+import { compareWeekEntries, getGroupStandings } from '../lib/ranking'
 import { fetchEspnWeek, guessCurrentWeek, type SeasonType } from '../lib/espn'
 import { teamLogoUrl } from '../lib/teamLogos'
 import MembersManager from '../components/MembersManager'
+import BalanceLedgerModal from '../components/BalanceLedgerModal'
 import DangerZone from '../components/DangerZone'
 import { IconTrash, IconChevronRight, IconCheck, IconPencil, IconTarget, IconTrophy, IconUsers, IconCalendar, IconBookmark } from '../components/icons'
 
@@ -105,10 +107,13 @@ export default function Admin({
   // partido cuyas predicciones se estan corrigiendo a mano (modal), null = cerrado
   const [editPicksGame, setEditPicksGame] = useState<Game | null>(null)
   const [memberCount, setMemberCount] = useState<number | null>(null)
-  const [paymentMembers, setPaymentMembers] = useState<{ user_id: string; display_name: string; paid: boolean }[]>([])
+  const [paymentMembers, setPaymentMembers] = useState<{ user_id: string; display_name: string; paid: boolean; method: string | null }[]>([])
   const [payingId, setPayingId] = useState<string | null>(null)
   const [outOfWeek, setOutOfWeek] = useState<{ user_id: string; display_name: string }[]>([])
   const [allowingId, setAllowingId] = useState<string | null>(null)
+  const [firstKickMs, setFirstKickMs] = useState<number | null>(null)
+  const [confirmedWeek, setConfirmedWeek] = useState<{ user_id: string; display_name: string }[]>([])
+  const [unconfirmingId, setUnconfirmingId] = useState<string | null>(null)
   // en modo "semana a semana" el pago se marca por jornada; en los otros
   // modos hay un solo pago para toda la liga (paymentWeekKey se queda null)
   const [paymentWeekKey, setPaymentWeekKey] = useState<string | null>(null)
@@ -119,7 +124,7 @@ export default function Admin({
       const [y, st, w] = weekKey.split(':').map(Number)
       const [{ data: membersData }, { data: paymentsData }, { data: confData }, { data: gamesData }] = await Promise.all([
         supabase.from('group_members').select('user_id, profiles(display_name)').eq('group_id', groupId),
-        supabase.from('week_payments').select('user_id, paid').eq('group_id', groupId).eq('year', y).eq('season_type', st).eq('week', w),
+        supabase.from('week_payments').select('user_id, paid, method').eq('group_id', groupId).eq('year', y).eq('season_type', st).eq('week', w),
         supabase.from('week_confirmations').select('user_id, confirmed_at').eq('group_id', groupId).eq('year', y).eq('season_type', st).eq('week', w),
         supabase.from('games').select('kickoff').eq('group_id', groupId).eq('year', y).eq('season_type', st).eq('week', w).is('deleted_at', null),
       ])
@@ -127,6 +132,13 @@ export default function Admin({
       const kicks = (gamesData ?? []).map((g: any) => new Date(g.kickoff).getTime())
       const firstKick = kicks.length ? Math.min(...kicks) : null
       const okSet = new Set((confData ?? []).filter((c: any) => firstKick == null || new Date(c.confirmed_at).getTime() <= firstKick).map((c: any) => c.user_id))
+      setFirstKickMs(firstKick)
+      const confIds = new Set((confData ?? []).map((c: any) => c.user_id))
+      setConfirmedWeek(
+        (membersData ?? [])
+          .filter((m: any) => confIds.has(m.user_id))
+          .map((m: any) => ({ user_id: m.user_id, display_name: m.profiles?.display_name ?? tr('Jugador') }))
+      )
       setOutOfWeek(
         firstKick == null
           ? []
@@ -135,20 +147,22 @@ export default function Admin({
               .map((m: any) => ({ user_id: m.user_id, display_name: m.profiles?.display_name ?? tr('Jugador') }))
       )
       const paidMap = new Map((paymentsData ?? []).map((p: any) => [p.user_id, p.paid]))
+      const methodMap = new Map((paymentsData ?? []).map((p: any) => [p.user_id, p.method ?? null]))
       const list = (membersData ?? [])
-        .map((m: any) => ({ user_id: m.user_id, display_name: m.profiles?.display_name ?? tr('Jugador'), paid: paidMap.get(m.user_id) ?? false }))
+        .map((m: any) => ({ user_id: m.user_id, display_name: m.profiles?.display_name ?? tr('Jugador'), paid: paidMap.get(m.user_id) ?? false, method: methodMap.get(m.user_id) ?? null }))
         .sort((a, b) => Number(a.paid) - Number(b.paid))
       setPaymentMembers(list)
       setMemberCount(list.length)
       return
     }
     setOutOfWeek([])
+    setConfirmedWeek([])
     const { data } = await supabase
       .from('group_members')
-      .select('user_id, paid, profiles(display_name)')
+      .select('user_id, paid, paid_method, profiles(display_name)')
       .eq('group_id', groupId)
       .order('paid', { ascending: true })
-    const list = (data ?? []).map((m: any) => ({ user_id: m.user_id, display_name: m.profiles?.display_name ?? tr('Jugador'), paid: m.paid }))
+    const list = (data ?? []).map((m: any) => ({ user_id: m.user_id, display_name: m.profiles?.display_name ?? tr('Jugador'), paid: m.paid, method: m.paid_method ?? (m.paid ? 'cash' : null) }))
     setPaymentMembers(list)
     setMemberCount(list.length)
   }
@@ -157,6 +171,97 @@ export default function Admin({
     loadPaymentMembers(paymentWeekKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId, group.scoring_mode, paymentWeekKey])
+
+  // saldos virtuales (fines didacticos): acumulado por jugador en esta liga
+  const [balances, setBalances] = useState<{ user_id: string; balance: number }[]>([])
+  const [settlingId, setSettlingId] = useState<string | null>(null)
+  const [ledgerUser, setLedgerUser] = useState<{ user_id: string; name: string } | null>(null)
+  async function loadBalances() {
+    const { data } = await supabase.from('balance_entries').select('user_id, amount').eq('group_id', groupId)
+    const map = new Map<string, number>()
+    ;(data ?? []).forEach((e: any) => map.set(e.user_id, (map.get(e.user_id) ?? 0) + Number(e.amount)))
+    setBalances(Array.from(map.entries()).map(([user_id, b]) => ({ user_id, balance: Math.round(b * 100) / 100 })))
+  }
+  useEffect(() => { loadBalances() /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [groupId, paymentMembers.length])
+  // reparte de una vez los premios de TODAS las jornadas ya terminadas que aun no se han repartido
+  const [pastBusy, setPastBusy] = useState(false)
+  const [pastMsg, setPastMsg] = useState<string | null>(null)
+  async function distributePastPrizes() {
+    if (pastBusy || group.bet_amount <= 0) return
+    if (!window.confirm(tr('Se repartiran al saldo los premios de todas las jornadas terminadas que aun no se han repartido (y se cobrara la cuota a quien no la tenga). ¿Continuar?'))) return
+    setPastBusy(true)
+    setPastMsg(null)
+    try {
+      const [{ data: gm }, { data: done }, { data: mem }] = await Promise.all([
+        supabase.from('games').select('year, season_type, week, status').eq('group_id', groupId).is('deleted_at', null),
+        supabase.from('balance_entries').select('ref_key').eq('group_id', groupId).eq('kind', 'prize'),
+        supabase.from('group_members').select('user_id').eq('group_id', groupId),
+      ])
+      const memberIds = (mem ?? []).map((m: any) => m.user_id)
+      const doneRefs = new Set((done ?? []).map((d: any) => d.ref_key))
+      const targets: { ref: string; weekKey: string | null }[] = []
+      if (group.scoring_mode === 'weekly') {
+        const byWeek = new Map<string, boolean>()
+        ;(gm ?? []).forEach((g: any) => {
+          const k = `${g.year}:${g.season_type}:${g.week}`
+          byWeek.set(k, (byWeek.get(k) ?? true) && g.status === 'final')
+        })
+        Array.from(byWeek.entries())
+          .filter(([, allFinal]) => allFinal)
+          .map(([k]) => k)
+          .sort((a, b) => { const [ay, as, aw] = a.split(':').map(Number); const [by, bs, bw] = b.split(':').map(Number); return ay - by || as - bs || aw - bw })
+          .forEach((k) => { if (!doneRefs.has('w:' + k)) targets.push({ ref: 'w:' + k, weekKey: k }) })
+      } else if (group.finalized && !doneRefs.has('season')) {
+        targets.push({ ref: 'season', weekKey: null })
+      }
+      let weeksDone = 0
+      let total = 0
+      let failed = false
+      for (const t of targets) {
+        const standings = await getGroupStandings(group, memberIds, t.weekKey)
+        if (standings.length === 0 || standings[0].points <= 0) continue
+        const pool = group.bet_amount * standings.length
+        const splits = [group.prize_split_1, group.prize_split_2, group.prize_split_3]
+        const winners = standings.slice(0, 3)
+          .map((st, i) => ({ user_id: st.user_id, amount: Math.round(pool * splits[i]) / 100 }))
+          .filter((w) => w.amount > 0)
+        const { error: err } = await supabase.rpc('admin_distribute_prizes', {
+          p_group_id: groupId, p_ref_key: t.ref, p_participants: standings.map((st) => st.user_id), p_winners: winners,
+        })
+        if (err) { setPastMsg(err.message); failed = true; break }
+        weeksDone++
+        total += winners.reduce((a, w) => a + w.amount, 0)
+      }
+      if (!failed) setPastMsg(weeksDone > 0 ? tr('Listo: {n} jornada(s) repartidas, {amount} en premios.', { n: weeksDone, amount: fmtMoney(total) }) : tr('No hay jornadas terminadas pendientes de repartir.'))
+    } finally {
+      setPastBusy(false)
+      loadBalances()
+    }
+  }
+
+  async function settleBalance(userId: string, name: string, bal: number) {
+    if (bal <= 0) return
+    if (!window.confirm(tr('¿Confirmas que ya le pagaste {amount} a {name}? Su saldo en esta liga pasara a $0.00.', { amount: fmtMoney(bal), name }))) return
+    setSettlingId(userId)
+    const { error: err } = await supabase.rpc('admin_settle_balance', { p_group_id: groupId, p_user_id: userId })
+    setSettlingId(null)
+    if (err) { alert(err.message); return }
+    loadBalances()
+  }
+
+  async function unconfirmPlayerThisWeek(userId: string, name: string) {
+    if (!paymentWeekKey) return
+    if (!window.confirm(tr('¿Quitar la confirmacion de {name} para esta semana? Se revertira su cuota y su pago de esta jornada; sus predicciones no se borran.', { name }))) return
+    const [y, st, w] = paymentWeekKey.split(':').map(Number)
+    setUnconfirmingId(userId)
+    const { error: err } = await supabase.rpc('admin_unconfirm_week_player', {
+      p_group_id: groupId, p_user_id: userId, p_year: y, p_season_type: st, p_week: w,
+    })
+    setUnconfirmingId(null)
+    if (err) { alert(err.message); return }
+    loadPaymentMembers(paymentWeekKey)
+    loadBalances()
+  }
 
   async function allowPlayerThisWeek(userId: string) {
     if (!paymentWeekKey) return
@@ -170,28 +275,26 @@ export default function Admin({
     loadPaymentMembers(paymentWeekKey)
   }
 
-  async function toggleMemberPaid(userId: string, current: boolean) {
+  // marca el pago de un jugador: method 'cash' (efectivo), 'balance' (con su saldo) o null (deshacer)
+  async function payMember(userId: string, name: string, method: 'cash' | 'balance' | null) {
+    if (method === null && !window.confirm(tr('¿Quitar el pago de {name}?', { name }))) return
     setPayingId(userId)
     let err
     if (group.scoring_mode === 'weekly' && paymentWeekKey) {
       const [y, st, w] = paymentWeekKey.split(':').map(Number)
-      const res = await supabase.rpc('set_week_member_paid', {
-        p_group_id: groupId,
-        p_user_id: userId,
-        p_year: y,
-        p_season_type: st,
-        p_week: w,
-        p_paid: !current,
+      const res = await supabase.rpc('pay_week_member', {
+        p_group_id: groupId, p_user_id: userId, p_year: y, p_season_type: st, p_week: w,
+        p_paid: method !== null, p_method: method ?? 'cash',
       })
       err = res.error
     } else {
-      const res = await supabase.rpc('set_member_paid', { p_group_id: groupId, p_user_id: userId, p_paid: !current })
+      const res = await supabase.rpc('pay_member', { p_group_id: groupId, p_user_id: userId, p_paid: method !== null, p_method: method ?? 'cash' })
       err = res.error
     }
     setPayingId(null)
-    if (!err) {
-      setPaymentMembers((prev) => prev.map((m) => (m.user_id === userId ? { ...m, paid: !current } : m)))
-    }
+    if (err) { alert(err.message); return }
+    setPaymentMembers((prev) => prev.map((m) => (m.user_id === userId ? { ...m, paid: method !== null, method } : m)))
+    loadBalances()
   }
 
   const [week, setWeek] = useState(1)
@@ -1092,36 +1195,92 @@ export default function Admin({
 
           {(group.scoring_mode !== 'weekly' || paymentWeekKey) && (
           <div className="space-y-1.5">
-            {paymentMembers.map((m) => (
-              <button
+            {paymentMembers.map((m) => {
+              const bal = balances.find((b) => b.user_id === m.user_id)?.balance ?? 0
+              const canUseBalance = bal > 0
+              return (
+              <div
                 key={m.user_id}
-                onClick={() => toggleMemberPaid(m.user_id, m.paid)}
-                disabled={payingId === m.user_id}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-md border transition disabled:opacity-50"
+                className="flex items-center justify-between gap-2 px-3 py-2 rounded-md border transition"
                 style={{
                   background: m.paid ? 'rgba(61,139,95,0.08)' : 'var(--color-field-surface-raised)',
                   borderColor: m.paid ? 'var(--color-turf-green)' : 'var(--color-field-line)',
+                  opacity: payingId === m.user_id ? 0.5 : 1,
                 }}
               >
-                <span className="text-sm">{m.display_name}</span>
-                <span
-                  className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full"
-                  style={
-                    m.paid
-                      ? { background: 'rgba(61,139,95,0.15)', color: 'var(--color-turf-green)', border: '1px solid rgba(61,139,95,0.4)' }
-                      : { background: 'var(--color-field-line)', color: 'var(--color-text-muted)' }
-                  }
-                >
-                  {m.paid ? <><IconCheck size={11} /> {tr('Pago')}</> : tr('Pendiente')}
-                </span>
-              </button>
-            ))}
+                <div className="min-w-0">
+                  <p className="text-sm truncate">{m.display_name}</p>
+                  <p className="text-[10px] font-mono-score" style={{ color: bal > 0 ? 'var(--color-turf-green)' : bal < 0 ? 'var(--color-scoreboard-red)' : 'var(--color-text-muted)' }}>
+                    {tr('Saldo')}: {fmtMoney(bal)}
+                  </p>
+                </div>
+                {m.paid ? (
+                  <button
+                    onClick={() => payMember(m.user_id, m.display_name, null)}
+                    disabled={payingId === m.user_id}
+                    title={tr('Quitar pago')}
+                    className="shrink-0 flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full"
+                    style={{ background: 'rgba(61,139,95,0.15)', color: 'var(--color-turf-green)', border: '1px solid rgba(61,139,95,0.4)' }}
+                  >
+                    <IconCheck size={11} /> {m.method === 'balance' ? tr('Pago con saldo') : tr('Pago en efectivo')}
+                  </button>
+                ) : (
+                  <div className="shrink-0 flex items-center gap-1.5">
+                    <button
+                      onClick={() => payMember(m.user_id, m.display_name, 'cash')}
+                      disabled={payingId === m.user_id}
+                      className="text-[11px] font-bold px-2.5 py-1.5 rounded-full bg-[var(--color-light-amber)] text-black disabled:opacity-50"
+                    >
+                      {tr('Efectivo')}
+                    </button>
+                    <button
+                      onClick={() => payMember(m.user_id, m.display_name, 'balance')}
+                      disabled={payingId === m.user_id || !canUseBalance}
+                      title={canUseBalance ? tr('Descontar la cuota de su saldo') : tr('Su saldo no alcanza para cubrir la cuota')}
+                      className="text-[11px] font-bold px-2.5 py-1.5 rounded-full border border-[var(--color-turf-green)] text-[var(--color-turf-green)] disabled:opacity-30"
+                    >
+                      {tr('Con saldo')}
+                    </button>
+                  </div>
+                )}
+              </div>
+              )
+            })}
           </div>
+          )}
+          {group.scoring_mode === 'weekly' && paymentWeekKey && confirmedWeek.length > 0 && (
+            <div className="mt-4 space-y-1.5">
+              <p className="text-xs font-semibold">{tr('Confirmaron participar esta semana')}</p>
+              <p className="text-[10px] text-[var(--color-text-muted)]">{tr('Si confirmaste a alguien por error, quitale la confirmacion aqui.')}</p>
+              {confirmedWeek.map((m) => (
+                <div key={m.user_id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-md border border-[var(--color-field-line)] bg-[var(--color-field-surface-raised)]">
+                  <span className="text-sm truncate">{m.display_name}</span>
+                  <button
+                    onClick={() => unconfirmPlayerThisWeek(m.user_id, m.display_name)}
+                    disabled={unconfirmingId === m.user_id}
+                    className="shrink-0 text-[11px] font-bold px-3 py-1.5 rounded-full border border-[var(--color-scoreboard-red)] text-[var(--color-scoreboard-red)] disabled:opacity-50"
+                  >
+                    {unconfirmingId === m.user_id ? '...' : tr('Quitar confirmacion')}
+                  </button>
+                </div>
+              ))}
+            </div>
           )}
           {group.scoring_mode === 'weekly' && paymentWeekKey && outOfWeek.length > 0 && (
             <div className="mt-4 space-y-1.5">
-              <p className="text-xs font-semibold">{tr('Fuera de la tabla esta semana')}</p>
-              <p className="text-[10px] text-[var(--color-text-muted)]">{tr('No confirmaron antes del primer juego. Si los permites, entran a la tabla: los juegos que ya empezaron cuentan 0 puntos y +20 de penalizacion en el desempate cada uno.')}</p>
+              {(() => {
+                const beforeKick = firstKickMs != null && firstKickMs > Date.now()
+                return (
+                  <>
+                    <p className="text-xs font-semibold">{beforeKick ? tr('Pendientes de confirmar') : tr('Fuera de la tabla esta semana')}</p>
+                    <p className="text-[10px] text-[var(--color-text-muted)]">
+                      {beforeKick
+                        ? tr('Aun no confirman su participacion. Tienen hasta el primer juego ({date}); despues quedan fuera de la tabla de la semana. Tambien puedes confirmarlos tu.', { date: new Date(firstKickMs as number).toLocaleString(localeTag(), { weekday: 'short', hour: 'numeric', minute: '2-digit' }) })
+                        : tr('No confirmaron antes del primer juego. Si los permites, entran a la tabla: los juegos que ya empezaron cuentan 0 puntos y +20 de penalizacion en el desempate cada uno.')}
+                    </p>
+                  </>
+                )
+              })()}
               {outOfWeek.map((m) => (
                 <div key={m.user_id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-md border border-[var(--color-field-line)] bg-[var(--color-field-surface-raised)]">
                   <span className="text-sm truncate">{m.display_name}</span>
@@ -1130,13 +1289,75 @@ export default function Admin({
                     disabled={allowingId === m.user_id}
                     className="shrink-0 text-[11px] font-bold px-3 py-1.5 rounded-full bg-[var(--color-light-amber)] text-black disabled:opacity-50"
                   >
-                    {allowingId === m.user_id ? '...' : tr('Permitir esta semana')}
+                    {allowingId === m.user_id ? '...' : firstKickMs != null && firstKickMs > Date.now() ? tr('Confirmar participacion') : tr('Permitir esta semana')}
                   </button>
                 </div>
               ))}
             </div>
           )}
         </div>
+        )}
+        {betAmount > 0 && (
+        <div className="bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-lg p-4 space-y-2">
+          <div>
+            <h2 className="text-sm font-semibold">{tr('Premios de jornadas anteriores')}</h2>
+            <p className="text-[10px] text-[var(--color-text-muted)]">{tr('Suma a los saldos lo que ganaron en las jornadas que ya terminaron y aun no se han repartido.')}</p>
+          </div>
+          <button
+            onClick={distributePastPrizes}
+            disabled={pastBusy}
+            className="w-full bg-[var(--color-light-amber)] text-[var(--color-field-night)] font-semibold rounded-md py-2 text-sm hover:brightness-110 disabled:opacity-50"
+          >
+            {pastBusy ? tr('Repartiendo...') : tr('Repartir premios pendientes')}
+          </button>
+          {pastMsg && <p className="text-xs text-[var(--color-text-muted)]">{pastMsg}</p>}
+        </div>
+        )}
+        {betAmount > 0 && paymentMembers.length > 0 && (
+        <div className="bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-lg p-4 space-y-3">
+          <div>
+            <h2 className="text-sm font-semibold">{tr('Saldos de la liga')}</h2>
+            <p className="text-[10px] text-[var(--color-text-muted)]">{tr('Saldo virtual con fines didacticos. Positivo = ganancias del jugador: puedes retirarlo (pagarle, queda en $0) o dejarlo para pagar sus siguientes jornadas con "Con saldo". Negativo = cuotas pendientes de pagar.')}</p>
+            <p className="text-[10px] text-[var(--color-text-muted)] mt-1">{tr('Toca "Detalle" para ver su saldo jornada por jornada y ajustarlo.')}</p>
+          </div>
+          <div className="space-y-1.5">
+            {paymentMembers
+              .map((m) => ({ ...m, balance: balances.find((b) => b.user_id === m.user_id)?.balance ?? 0 }))
+              .sort((a, b) => b.balance - a.balance)
+              .map((m) => (
+                <div key={m.user_id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-md border border-[var(--color-field-line)] bg-[var(--color-field-surface)]">
+                  <span className="text-sm truncate">{m.display_name}</span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-mono-score text-sm font-bold" style={{ color: m.balance > 0 ? 'var(--color-turf-green)' : m.balance < 0 ? 'var(--color-scoreboard-red)' : 'var(--color-text-muted)' }}>{fmtMoney(m.balance)}</span>
+                    <button
+                      onClick={() => setLedgerUser({ user_id: m.user_id, name: m.display_name })}
+                      className="text-[11px] font-bold px-2.5 py-1.5 rounded-full border border-[var(--color-field-line)] hover:border-[var(--color-light-amber)] hover:text-[var(--color-light-amber)]"
+                    >
+                      {tr('Detalle')}
+                    </button>
+                    {m.balance > 0 && (
+                      <button
+                        onClick={() => settleBalance(m.user_id, m.display_name, m.balance)}
+                        disabled={settlingId === m.user_id}
+                        className="text-[11px] font-bold px-3 py-1.5 rounded-full bg-[var(--color-light-amber)] text-black disabled:opacity-50"
+                      >
+                        {settlingId === m.user_id ? '...' : tr('Retirar')}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+        )}
+        {ledgerUser && (
+          <BalanceLedgerModal
+            group={group}
+            userId={ledgerUser.user_id}
+            name={ledgerUser.name}
+            onClose={() => setLedgerUser(null)}
+            onChanged={loadBalances}
+          />
         )}
       </SettingsCard>
 

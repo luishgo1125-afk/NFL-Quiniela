@@ -2,6 +2,7 @@ import { RankAvatar, Podium, firstName } from './RankParts'
 import { useEffect, useState } from 'react'
 import { tr, localeTag } from '../i18n'
 import { supabase } from '../lib/supabase'
+import { fmtMoney } from '../lib/balance'
 import { teamLogoUrl } from '../lib/teamLogos'
 import { IconGlobe, IconMedal, IconClipboardX, IconCalendar, IconCoin } from './icons'
 import { weekLabel, type Group } from '../lib/types'
@@ -394,6 +395,27 @@ export default function Leaderboard({ group, weekKey = null, onRowsCount }: { gr
   const [loading, setLoading] = useState(true)
   const [sharing, setSharing] = useState(false)
   const [selectedPlayer, setSelectedPlayer] = useState<Row | null>(null)
+  // reparto de premios al saldo virtual (solo admin)
+  const [scope, setScope] = useState<{ refKey: string; complete: boolean } | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [prizesDone, setPrizesDone] = useState<boolean | null>(null)
+  const [prizeBusy, setPrizeBusy] = useState(false)
+  const [prizeTick, setPrizeTick] = useState(0)
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setIsAdmin(!!data.user && data.user.id === group.created_by))
+  }, [group.created_by])
+
+  useEffect(() => {
+    if (!isAdmin || !scope || group.bet_amount <= 0) { setPrizesDone(null); return }
+    supabase
+      .from('balance_entries')
+      .select('id', { count: 'exact', head: true })
+      .eq('group_id', group.id)
+      .eq('kind', 'prize')
+      .eq('ref_key', scope.refKey)
+      .then(({ count }) => setPrizesDone((count ?? 0) > 0))
+  }, [isAdmin, scope?.refKey, group.id, group.bet_amount, prizeTick])
 
   useEffect(() => {
     async function load() {
@@ -534,6 +556,15 @@ export default function Leaderboard({ group, weekKey = null, onRowsCount }: { gr
       // el orden ya viene decidido por buildStandings (mismo desempate que
       // "Tu posicion"); solo reordenamos result para que calce con standings
       result.sort((a, b) => standings.findIndex((s) => s.user_id === a.user_id) - standings.findIndex((s) => s.user_id === b.user_id))
+      if (group.scoring_mode === 'weekly' && activeWeekEntry) {
+        const wk = allGames.filter((g) => g.year === activeWeekEntry.year && g.season_type === activeWeekEntry.seasonType && g.week === activeWeekEntry.week)
+        setScope({
+          refKey: `w:${activeWeekEntry.year}:${activeWeekEntry.seasonType}:${activeWeekEntry.week}`,
+          complete: wk.length > 0 && wk.every((g) => g.status === 'final'),
+        })
+      } else {
+        setScope({ refKey: 'season', complete: !!group.finalized })
+      }
       setRows(result)
       onRowsCount?.(result.length)
       setLoading(false)
@@ -557,6 +588,37 @@ export default function Leaderboard({ group, weekKey = null, onRowsCount }: { gr
 
   const maxExact = Math.max(0, ...rows.map((r) => r.exactHits))
   const totalPrize = group.bet_amount > 0 ? group.bet_amount * rows.length : 0
+
+  async function distributePrizes() {
+    if (!scope || prizeBusy) return
+    const winners = rows.slice(0, 3).map((r, i) => ({
+      user_id: r.user_id,
+      name: firstName(r.display_name),
+      amount: Math.round(totalPrize * [group.prize_split_1, group.prize_split_2, group.prize_split_3][i]) / 100,
+    })).filter((w) => w.amount > 0)
+    const resumen = winners.map((w, i) => `${i + 1}. ${w.name}: ${fmtMoney(w.amount)}`).join('\n')
+    if (!window.confirm(tr('Se sumaran estos premios al saldo de los ganadores:') + '\n\n' + resumen + '\n\n' + tr('Y se cobrara la cuota a quien aun no la tenga. ¿Continuar?'))) return
+    setPrizeBusy(true)
+    const { error: err } = await supabase.rpc('admin_distribute_prizes', {
+      p_group_id: group.id,
+      p_ref_key: scope.refKey,
+      p_participants: rows.map((r) => r.user_id),
+      p_winners: winners.map((w) => ({ user_id: w.user_id, amount: w.amount })),
+    })
+    setPrizeBusy(false)
+    if (err) { alert(err.message); return }
+    setPrizeTick((n) => n + 1)
+  }
+
+  async function undoPrizes() {
+    if (!scope || prizeBusy) return
+    if (!window.confirm(tr('¿Deshacer el reparto de premios de esta jornada?'))) return
+    setPrizeBusy(true)
+    const { error: err } = await supabase.rpc('admin_undo_prizes', { p_group_id: group.id, p_ref_key: scope.refKey })
+    setPrizeBusy(false)
+    if (err) { alert(err.message); return }
+    setPrizeTick((n) => n + 1)
+  }
 
   async function handleShare() {
     setSharing(true)
@@ -583,6 +645,26 @@ export default function Leaderboard({ group, weekKey = null, onRowsCount }: { gr
           {sharing ? tr('Generando...') : tr('Compartir')}
         </button>
       </div>
+      {isAdmin && scope && group.bet_amount > 0 && (
+        <div className="flex items-center gap-3 rounded-lg border border-[var(--color-field-line)] bg-[var(--color-field-surface)] px-3 py-2.5">
+          <IconCoin size={16} className="text-[var(--color-light-amber)] shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold">{tr('Premios al saldo')}</p>
+            <p className="text-[10px] text-[var(--color-text-muted)] leading-snug">
+              {prizesDone ? tr('Ya se repartieron los premios de esta jornada.') : scope.complete ? tr('Todos los juegos terminaron. Suma los premios al saldo de los ganadores.') : tr('Disponible cuando terminen todos los juegos.')}
+            </p>
+          </div>
+          {prizesDone ? (
+            <button onClick={undoPrizes} disabled={prizeBusy} className="shrink-0 text-[11px] font-bold px-3 py-1.5 rounded-full border border-[var(--color-field-line)] text-[var(--color-text-muted)] disabled:opacity-50">
+              {tr('Deshacer')}
+            </button>
+          ) : (
+            <button onClick={distributePrizes} disabled={!scope.complete || prizeBusy || prizesDone === null} className="shrink-0 text-[11px] font-bold px-3 py-1.5 rounded-full bg-[var(--color-light-amber)] text-black disabled:opacity-40">
+              {prizeBusy ? '...' : tr('Repartir premios')}
+            </button>
+          )}
+        </div>
+      )}
       {(() => {
         const prizeFor = (i: number) => (group.bet_amount > 0 && i < 3 ? totalPrize * [group.prize_split_1, group.prize_split_2, group.prize_split_3][i] / 100 : null)
         const money = (n: number) => `$${n.toLocaleString(localeTag(), { minimumFractionDigits: 2 })}`

@@ -491,3 +491,9 @@ button.rk-pod:hover, .rk-pod:hover { transform: translateY(-2px); border-color: 
   .rk-podium.few.n2 { gap: 10px; }
   .rk-podium.few .rk-pod { padding-left: 6px; padding-right: 6px; }
 }
+
+/* saldo virtual junto al chip de perfil */
+.balance-chip { display: inline-flex; align-items: center; height: 34px; padding: 0 12px; margin-right: 8px; border-radius: 9999px; border: 1px solid var(--color-field-line); background: transparent; font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; color: var(--color-text-muted); cursor: pointer; white-space: nowrap; transition: border-color .15s; }
+.balance-chip.pos { color: var(--color-turf-green); border-color: rgba(61,139,95,0.5); background: rgba(61,139,95,0.08); }
+.balance-chip.neg { color: var(--color-scoreboard-red); border-color: rgba(228,70,43,0.5); background: rgba(228,70,43,0.08); }
+.balance-chip:hover { filter: brightness(1.15); }

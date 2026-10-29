@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { fetchMyGlobalRank } from '../lib/globalRank'
+import BalanceCard from '../components/BalanceCard'
 import { NFL_TEAMS } from '../lib/types'
 import { teamLogoUrl } from '../lib/teamLogos'
 import {
@@ -98,6 +99,7 @@ function EditProfileModal({
             <label className="text-xs text-[var(--color-text-muted)]">{tr('Nombre')}</label>
             <input
               value={n}
+              maxLength={40}
               onChange={(e) => setN(e.target.value)}
               className="w-full mt-1 bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
             />
@@ -403,6 +405,8 @@ export default function Profile({
           ))}
         </div>
       )}
+
+      <BalanceCard userId={user.id} />
 
       {/* Equipo favorito */}
       <div className="bg-[var(--color-field-surface)] border border-[var(--color-field-line)] rounded-lg p-4 relative overflow-hidden">

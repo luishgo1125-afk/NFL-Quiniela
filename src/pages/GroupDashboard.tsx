@@ -314,6 +314,7 @@ export default function GroupDashboard({
 
   const PROGRESS_LOCK_MINUTES = lockMinutesOf(group)
   const weekPicksTotal = weekGames.length
+  const memberIdSet = useMemo(() => new Set(members.map((m) => m.user_id)), [members])
   const weekPicksDone = weekGames.filter((g) => (pickedBy[g.id] ?? []).includes(user.id)).length
   const weekPicksMissing = weekPicksTotal - weekPicksDone
   const weekPicksPct = weekPicksTotal > 0 ? Math.round((weekPicksDone / weekPicksTotal) * 100) : 0
@@ -539,7 +540,7 @@ export default function GroupDashboard({
         onCopyCode={copyCode}
         isAdmin={isAdmin}
         onOpenAdmin={() => setTab('admin')}
-        prize={group.bet_amount > 0 ? group.bet_amount * (needsConfirmation ? (confirmedUserIds ? confirmedUserIds.size : 0) : members.length) : 0}
+        prize={group.bet_amount > 0 ? group.bet_amount * (needsConfirmation ? (confirmedUserIds ? Array.from(confirmedUserIds).filter((uid) => memberIdSet.has(uid)).length : 0) : members.length) : 0}
       />
 
       {tab === 'admin' && (
@@ -627,7 +628,7 @@ export default function GroupDashboard({
                 <span className="flex-1 min-w-0 text-sm font-semibold flex items-center gap-1.5">
                   {myPicksConfirmed ? <><IconLock size={14} className="text-[var(--color-turf-green)] shrink-0" /> {tr('Predicciones confirmadas')}</> : tr('Confirma tus predicciones')}
                 </span>
-                <span className="text-[11px] font-mono-score text-[var(--color-text-muted)] shrink-0">{pickConfirmedBy.size}/{members.length}</span>
+                <span className="text-[11px] font-mono-score text-[var(--color-text-muted)] shrink-0">{Array.from(pickConfirmedBy).filter((uid) => memberIdSet.has(uid)).length}/{members.length}</span>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-[var(--color-text-muted)] transition-transform" style={{ transform: confirmPanelOpen ? 'rotate(180deg)' : 'none' }}>
                   <polyline points="6 9 12 15 18 9" />
                 </svg>
@@ -661,7 +662,7 @@ export default function GroupDashboard({
                     )}
                   </div>
                   {confirmPicksErr && <p className="text-[11px] text-[var(--color-scoreboard-red)] mt-2">{confirmPicksErr}</p>}
-                  <p className="text-[10px] text-[var(--color-text-muted)] mt-2">{tr('{done}/{total} jugadores han confirmado', { done: pickConfirmedBy.size, total: members.length })}</p>
+                  <p className="text-[10px] text-[var(--color-text-muted)] mt-2">{tr('{done}/{total} jugadores han confirmado', { done: Array.from(pickConfirmedBy).filter((uid) => memberIdSet.has(uid)).length, total: members.length })}</p>
                 </div>
               )}
             </div>
@@ -739,7 +740,7 @@ export default function GroupDashboard({
                     game={g}
                     userId={user.id}
                     members={visibleMembers}
-                    pickedUserIds={pickedBy[g.id] ?? []}
+                    pickedUserIds={(pickedBy[g.id] ?? []).filter((uid) => memberIdSet.has(uid))}
                     forceLocked={needsConfirmation && weekConfirmed === false}
                     forceLockedReason={tr('Confirma tu participacion arriba para poder predecir')}
                     confirmLocked={myPicksConfirmed}

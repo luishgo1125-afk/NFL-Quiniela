@@ -107,6 +107,8 @@ export default function Admin({
   const [memberCount, setMemberCount] = useState<number | null>(null)
   const [paymentMembers, setPaymentMembers] = useState<{ user_id: string; display_name: string; paid: boolean }[]>([])
   const [payingId, setPayingId] = useState<string | null>(null)
+  const [outOfWeek, setOutOfWeek] = useState<{ user_id: string; display_name: string }[]>([])
+  const [allowingId, setAllowingId] = useState<string | null>(null)
   // en modo "semana a semana" el pago se marca por jornada; en los otros
   // modos hay un solo pago para toda la liga (paymentWeekKey se queda null)
   const [paymentWeekKey, setPaymentWeekKey] = useState<string | null>(null)
@@ -115,10 +117,23 @@ export default function Admin({
     if (group.scoring_mode === 'weekly') {
       if (!weekKey) { setPaymentMembers([]); return }
       const [y, st, w] = weekKey.split(':').map(Number)
-      const [{ data: membersData }, { data: paymentsData }] = await Promise.all([
+      const [{ data: membersData }, { data: paymentsData }, { data: confData }, { data: gamesData }] = await Promise.all([
         supabase.from('group_members').select('user_id, profiles(display_name)').eq('group_id', groupId),
         supabase.from('week_payments').select('user_id, paid').eq('group_id', groupId).eq('year', y).eq('season_type', st).eq('week', w),
+        supabase.from('week_confirmations').select('user_id, confirmed_at').eq('group_id', groupId).eq('year', y).eq('season_type', st).eq('week', w),
+        supabase.from('games').select('kickoff').eq('group_id', groupId).eq('year', y).eq('season_type', st).eq('week', w).is('deleted_at', null),
       ])
+      // quienes quedan fuera de la tabla de esta semana (no confirmaron antes del primer kickoff)
+      const kicks = (gamesData ?? []).map((g: any) => new Date(g.kickoff).getTime())
+      const firstKick = kicks.length ? Math.min(...kicks) : null
+      const okSet = new Set((confData ?? []).filter((c: any) => firstKick == null || new Date(c.confirmed_at).getTime() <= firstKick).map((c: any) => c.user_id))
+      setOutOfWeek(
+        firstKick == null
+          ? []
+          : (membersData ?? [])
+              .filter((m: any) => !okSet.has(m.user_id))
+              .map((m: any) => ({ user_id: m.user_id, display_name: m.profiles?.display_name ?? tr('Jugador') }))
+      )
       const paidMap = new Map((paymentsData ?? []).map((p: any) => [p.user_id, p.paid]))
       const list = (membersData ?? [])
         .map((m: any) => ({ user_id: m.user_id, display_name: m.profiles?.display_name ?? tr('Jugador'), paid: paidMap.get(m.user_id) ?? false }))
@@ -127,6 +142,7 @@ export default function Admin({
       setMemberCount(list.length)
       return
     }
+    setOutOfWeek([])
     const { data } = await supabase
       .from('group_members')
       .select('user_id, paid, profiles(display_name)')
@@ -141,6 +157,18 @@ export default function Admin({
     loadPaymentMembers(paymentWeekKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId, group.scoring_mode, paymentWeekKey])
+
+  async function allowPlayerThisWeek(userId: string) {
+    if (!paymentWeekKey) return
+    const [y, st, w] = paymentWeekKey.split(':').map(Number)
+    setAllowingId(userId)
+    const { error: err } = await supabase.rpc('admin_allow_week_player', {
+      p_group_id: groupId, p_user_id: userId, p_year: y, p_season_type: st, p_week: w,
+    })
+    setAllowingId(null)
+    if (err) { alert(err.message); return }
+    loadPaymentMembers(paymentWeekKey)
+  }
 
   async function toggleMemberPaid(userId: string, current: boolean) {
     setPayingId(userId)
@@ -1089,6 +1117,24 @@ export default function Admin({
               </button>
             ))}
           </div>
+          )}
+          {group.scoring_mode === 'weekly' && paymentWeekKey && outOfWeek.length > 0 && (
+            <div className="mt-4 space-y-1.5">
+              <p className="text-xs font-semibold">{tr('Fuera de la tabla esta semana')}</p>
+              <p className="text-[10px] text-[var(--color-text-muted)]">{tr('No confirmaron antes del primer juego. Si los permites, entran a la tabla: los juegos que ya empezaron cuentan 0 puntos y +20 de penalizacion en el desempate cada uno.')}</p>
+              {outOfWeek.map((m) => (
+                <div key={m.user_id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-md border border-[var(--color-field-line)] bg-[var(--color-field-surface-raised)]">
+                  <span className="text-sm truncate">{m.display_name}</span>
+                  <button
+                    onClick={() => allowPlayerThisWeek(m.user_id)}
+                    disabled={allowingId === m.user_id}
+                    className="shrink-0 text-[11px] font-bold px-3 py-1.5 rounded-full bg-[var(--color-light-amber)] text-black disabled:opacity-50"
+                  >
+                    {allowingId === m.user_id ? '...' : tr('Permitir esta semana')}
+                  </button>
+                </div>
+              ))}
+            </div>
           )}
         </div>
         )}

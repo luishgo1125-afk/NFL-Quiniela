@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import type { Group } from './types'
+import { fetchAllPages } from './fetchAll'
 
 export interface RankableGame {
   id: string
@@ -241,11 +242,14 @@ export async function getGroupStandings(group: Group, userIds: string[], weekKey
   const finalGameIds = finalGames.map((g) => g.id)
   let picks: RankablePick[] = []
   if (finalGameIds.length > 0) {
-    const { data } = await supabase
-      .from('picks')
-      .select('user_id, game_id, points, pred_home_score, pred_away_score, pred_total')
-      .in('game_id', finalGameIds)
-    picks = (data ?? []) as RankablePick[]
+    picks = await fetchAllPages<RankablePick>((from, to) =>
+      supabase
+        .from('picks')
+        .select('id, user_id, game_id, points, pred_home_score, pred_away_score, pred_total')
+        .in('game_id', finalGameIds)
+        .order('id')
+        .range(from, to) as any
+    )
   }
   return buildStandings(eligibleUserIds, finalGames, picks, group.points_exact, standingsOptionsFor(group, allGames))
 }

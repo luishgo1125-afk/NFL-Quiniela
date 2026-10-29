@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { tr, localeTag } from '../i18n'
 import { supabase } from '../lib/supabase'
 import { fmtMoney } from '../lib/balance'
+import { fetchAllPages } from '../lib/fetchAll'
 import { teamLogoUrl } from '../lib/teamLogos'
 import { IconGlobe, IconMedal, IconClipboardX, IconCalendar, IconCoin } from './icons'
 import { weekLabel, type Group } from '../lib/types'
@@ -452,11 +453,14 @@ export default function Leaderboard({ group, weekKey = null, onRowsCount }: { gr
 
       let picks: any[] = []
       if (finalGameIds.length) {
-        const { data } = await supabase
-          .from('picks')
-          .select('user_id, game_id, points, pred_home_score, pred_away_score, pred_winner, pred_total')
-          .in('game_id', finalGameIds)
-        picks = data ?? []
+        picks = await fetchAllPages<any>((from, to) =>
+          supabase
+            .from('picks')
+            .select('id, user_id, game_id, points, pred_home_score, pred_away_score, pred_winner, pred_total')
+            .in('game_id', finalGameIds)
+            .order('id')
+            .range(from, to)
+        )
       }
 
       // en modo semanal, a partir de la 2da semana, quien no confirmo su

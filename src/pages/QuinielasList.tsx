@@ -67,7 +67,10 @@ async function loadStats(group: Group, userId: string): Promise<GroupStats> {
 
   let picksDone = 0
   if (weekGameIds.length > 0) {
-    const { data: statusRows } = await supabase.rpc('group_pick_status', { p_group_id: group.id })
+    const wg = weekGames[0]
+    const { data: statusRows } = await supabase.rpc('group_pick_status_week', {
+      p_group_id: group.id, p_year: wg.year, p_season_type: wg.season_type, p_week: wg.week,
+    })
     picksDone = (statusRows ?? []).filter((r: any) => weekGameIds.includes(r.game_id)).length
   }
   const picksTotal = memberIds.length * weekGames.length

@@ -55,6 +55,7 @@ export default function GameCard({
   pickMode = 'score',
   requiresTotal = false,
   lockMinutes = 30,
+  onPickChanged,
 }: {
   game: Game
   userId: string
@@ -68,6 +69,7 @@ export default function GameCard({
   pickMode?: 'score' | 'winner'
   requiresTotal?: boolean
   lockMinutes?: number
+  onPickChanged?: () => void
 }) {
   const [pick, setPick] = useState<Pick | null>(null)
   const [home, setHome] = useState('')
@@ -158,6 +160,7 @@ export default function GameCard({
     if (error) setSaveError(error.message)
     if (!error && data) {
       setPick(data)
+      onPickChanged?.()
       setSaved(true)
       setTimeout(() => setSaved(false), 1500)
     }
@@ -172,6 +175,7 @@ export default function GameCard({
     setDeleting(false)
     if (!error && data && data.length > 0) {
       setPick(null)
+      onPickChanged?.()
       setHome('')
       setAway('')
       setWinner(null)

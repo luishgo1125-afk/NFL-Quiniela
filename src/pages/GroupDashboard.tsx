@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, lazy, Suspense } from 'react'
+import { useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import type { Game, Group } from '../lib/types'
@@ -60,6 +60,8 @@ export default function GroupDashboard({
   }
   const [games, setGames] = useState<Game[]>([])
   const [weekKey, setWeekKey] = useState<string | null>(null)
+  const weekKeyRef = useRef<string | null>(null)
+  weekKeyRef.current = weekKey
   const [copiedCode, setCopiedCode] = useState(false)
   const [boardCount, setBoardCount] = useState<number | null>(null)
   const [members, setMembers] = useState<{ user_id: string; display_name: string; favorite_team: string | null }[]>([])
@@ -68,6 +70,8 @@ export default function GroupDashboard({
   // se incrementa cuando llega un cambio en tiempo real de pagos (desde
   // otro dispositivo/pestaña), para forzar que se vuelva a consultar "cuanto debo"
   const [paymentRefreshTick, setPaymentRefreshTick] = useState(0)
+  // se incrementa cada vez que alguien de la liga hace algo (predice, confirma, entra...)
+  const [pulseTick, setPulseTick] = useState(0)
 
   async function copyCode() {
     try {
@@ -97,7 +101,12 @@ export default function GroupDashboard({
   }
 
   async function loadPickStatus() {
-    const { data } = await supabase.rpc('group_pick_status', { p_group_id: group.id })
+    // solo la semana en pantalla: la funcion vieja devolvia TODA la temporada y Supabase corta a 1000 filas
+    const wk = weekKeyRef.current
+    const [y, st, w] = wk ? wk.split(':').map(Number) : [null, null, null]
+    const { data } = wk
+      ? await supabase.rpc('group_pick_status_week', { p_group_id: group.id, p_year: y, p_season_type: st, p_week: w })
+      : await supabase.rpc('group_pick_status', { p_group_id: group.id })
     const map: Record<string, string[]> = {}
     ;(data ?? []).forEach((row: any) => {
       map[row.game_id] = map[row.game_id] ?? []
@@ -125,6 +134,8 @@ export default function GroupDashboard({
   }, [group.id, user.id])
 
   useEffect(() => { loadGames(); loadMembers(); loadPickStatus() }, [group.id])
+  // al cambiar de semana se piden los contadores de esa semana
+  useEffect(() => { if (weekKey) loadPickStatus() /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [weekKey])
 
   // el celular corta la conexion en tiempo real cuando se bloquea la pantalla
   // o la app pasa a segundo plano; al volver a abrirla, refresca todo de una
@@ -136,6 +147,8 @@ export default function GroupDashboard({
         loadGames()
         loadMembers()
         loadPickStatus()
+        setPulseTick((t) => t + 1)
+        setPaymentRefreshTick((t) => t + 1)
       }
     }
     document.addEventListener('visibilitychange', onVisible)
@@ -145,6 +158,20 @@ export default function GroupDashboard({
       window.removeEventListener('focus', onVisible)
     }
   }, [group.id])
+
+  // las predicciones de otros no llegan por tiempo real hasta el kickoff (RLS), asi que
+  // la base avisa con una "senal" de la liga cada vez que alguien predice, confirma o entra.
+  // Se agrupan las senales cercanas (400 ms) en un solo refresco.
+  const pulseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  function schedulePulseRefresh() {
+    if (pulseTimer.current) clearTimeout(pulseTimer.current)
+    pulseTimer.current = setTimeout(() => {
+      loadPickStatus()
+      loadMembers()
+      setPulseTick((t) => t + 1)
+      setPaymentRefreshTick((t) => t + 1)
+    }, 400)
+  }
 
   useEffect(() => {
     const channel = supabase
@@ -172,10 +199,18 @@ export default function GroupDashboard({
         { event: '*', schema: 'public', table: 'group_members', filter: `group_id=eq.${group.id}` },
         () => setPaymentRefreshTick((t) => t + 1)
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'group_pulse', filter: `group_id=eq.${group.id}` },
+        () => schedulePulseRefresh()
+      )
       .subscribe((status, err) => {
         console.log('[realtime] estado del canal games:', status, err ?? '')
       })
-    return () => { supabase.removeChannel(channel) }
+    return () => {
+      if (pulseTimer.current) clearTimeout(pulseTimer.current)
+      supabase.removeChannel(channel)
+    }
   }, [group.id])
 
   const weeks = useMemo(() => {
@@ -232,11 +267,14 @@ export default function GroupDashboard({
   const needsConfirmation = group.scoring_mode === 'weekly' && weekKey !== null && !isFirstWeek
   const [confirmedUserIds, setConfirmedUserIds] = useState<Set<string> | null>(null)
   const [confirming, setConfirming] = useState(false)
+  const confKeyRef = useRef<string | null>(null)
   const weekConfirmed = !needsConfirmation ? true : confirmedUserIds === null ? null : confirmedUserIds.has(user.id)
 
   useEffect(() => {
     if (!needsConfirmation || !weekKey) { setConfirmedUserIds(null); return }
-    setConfirmedUserIds(null)
+    // solo se vacia al cambiar de semana/liga; con una senal en vivo se refresca en silencio
+    const k = `${group.id}:${weekKey}`
+    if (confKeyRef.current !== k) { confKeyRef.current = k; setConfirmedUserIds(null) }
     const [y, st, w] = weekKey.split(':').map(Number)
     supabase
       .from('week_confirmations')
@@ -248,7 +286,7 @@ export default function GroupDashboard({
       .then(({ data }) => {
         setConfirmedUserIds(new Set((data ?? []).map((c: any) => c.user_id)))
       })
-  }, [needsConfirmation, weekKey, group.id])
+  }, [needsConfirmation, weekKey, group.id, pulseTick])
 
   async function confirmParticipation() {
     if (!weekKey || confirming) return
@@ -317,7 +355,7 @@ export default function GroupDashboard({
       .eq('group_id', group.id).eq('year', y).eq('season_type', st).eq('week', w)
       .then(({ data }) => { if (!cancelled) setPickConfirmedBy(new Set((data ?? []).map((c: any) => c.user_id))) })
     return () => { cancelled = true }
-  }, [confirmMode, weekKey, group.id, tab])
+  }, [confirmMode, weekKey, group.id, tab, pulseTick])
 
   const myPicksConfirmed = confirmMode && pickConfirmedBy.has(user.id)
   const allConfirmed = confirmMode && members.length > 0 && members.every((m) => pickConfirmedBy.has(m.user_id))
@@ -710,6 +748,7 @@ export default function GroupDashboard({
                     pickMode={group.pick_mode ?? 'score'}
                     requiresTotal={group.pick_mode === 'winner' && lastGameIds.has(g.id)}
                     lockMinutes={lockMinutesOf(group)}
+                    onPickChanged={loadPickStatus}
                   />
                 </div>
               ))}

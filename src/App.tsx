@@ -138,7 +138,11 @@ function AppInner() {
     load()
     const onVis = () => { if (document.visibilityState === 'visible') load() }
     document.addEventListener('visibilitychange', onVis)
-    return () => { alive = false; document.removeEventListener('visibilitychange', onVis) }
+    const ch = supabase
+      .channel(`balance-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'balance_entries', filter: `user_id=eq.${user.id}` }, () => load())
+      .subscribe()
+    return () => { alive = false; document.removeEventListener('visibilitychange', onVis); supabase.removeChannel(ch) }
   }, [user?.id, bottomTab])
 
   // al tocar una notificacion de un partido, brinca a la liga correcta y le
@@ -289,7 +293,7 @@ function AppInner() {
   }
 
   const onHome = bottomTab === 'quinielas' && !activeGroup
-  const balanceChip = balance && balance.has ? (
+  const balanceChip = balance ? (
     <button
       onClick={() => setBottomTab('perfil')}
       title={tr('Saldo virtual (con fines didacticos)')}

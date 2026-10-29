@@ -169,7 +169,7 @@ function AppInner() {
       setJoinError(null)
       const code = pendingInviteCode!.trim().toUpperCase()
 
-      await supabase.rpc('join_group_limited', { p_invite_code: code })
+      const { data: joinMsg, error: joinErr } = await supabase.rpc('join_group_limited', { p_invite_code: code })
       // sin importar si join_group trono (por ejemplo "ya eres miembro"),
       // igual checamos si de verdad quedo como miembro y lo abrimos
       const { data: membership } = await supabase
@@ -188,7 +188,9 @@ function AppInner() {
         setJoining(false)
       } else {
         setJoining(false)
-        setJoinError(tr('No pudimos usar ese link de invitacion. Revisa que el codigo siga siendo valido.'))
+        // si la base explico por que no (semana en juego, demasiados intentos, codigo invalido...), se lo mostramos
+        const reason = joinErr?.message ?? (joinMsg ? String(joinMsg) : null)
+        setJoinError(reason ?? tr('No pudimos usar ese link de invitacion. Revisa que el codigo siga siendo valido.'))
       }
     }
     processInvite()

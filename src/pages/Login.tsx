@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Captcha, { CAPTCHA_SITE_KEY } from '../components/Captcha'
 import { tr } from '../i18n'
 import { supabase } from '../lib/supabase'
 import { NFL_TEAMS } from '../lib/types'
@@ -21,17 +22,31 @@ export default function Login({ initialMode = 'signin', onBack }: { initialMode?
   const [busy, setBusy] = useState(false)
   const [forgotSent, setForgotSent] = useState(false)
   const [signupSent, setSignupSent] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const [captchaReset, setCaptchaReset] = useState(0)
+  const needCaptcha = !!CAPTCHA_SITE_KEY
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+    if (needCaptcha && !captchaToken) { setError(tr('Completa la verificacion de seguridad.')); return }
     setBusy(true)
     try {
       if (mode === 'signup') {
         const { data, error: signErr } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { display_name: displayName || email.split('@')[0] } },
+          options: {
+            data: { display_name: displayName || email.split('@')[0] },
+            captchaToken: captchaToken ?? undefined,
+            // si venia de un link de invitacion, el correo de confirmacion lo regresa a la misma liga
+            emailRedirectTo: (() => {
+              try {
+                const c = localStorage.getItem('pendingInvite')
+                return c ? `${window.location.origin}/?join=${encodeURIComponent(c)}` : window.location.origin
+              } catch { return window.location.origin }
+            })(),
+          },
         })
         if (signErr) throw signErr
         if (data.user) {
@@ -50,24 +65,28 @@ export default function Login({ initialMode = 'signin', onBack }: { initialMode?
           setSignupSent(true)
         }
       } else {
-        const { error: signErr } = await supabase.auth.signInWithPassword({ email, password })
+        const { error: signErr } = await supabase.auth.signInWithPassword({ email, password, options: { captchaToken: captchaToken ?? undefined } })
         if (signErr) throw signErr
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : tr('Algo salio mal'))
     } finally {
       setBusy(false)
+      if (needCaptcha) setCaptchaReset((n) => n + 1)
     }
   }
 
   async function handleForgot(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+    if (needCaptcha && !captchaToken) { setError(tr('Completa la verificacion de seguridad.')); return }
     setBusy(true)
     const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: window.location.origin,
+      captchaToken: captchaToken ?? undefined,
     })
     setBusy(false)
+    if (needCaptcha) setCaptchaReset((n) => n + 1)
     if (err) { setError(err.message); return }
     setForgotSent(true)
   }
@@ -123,7 +142,8 @@ export default function Login({ initialMode = 'signin', onBack }: { initialMode?
                   required
                   className="w-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
                 />
-                {error && <p className="text-[var(--color-scoreboard-red)] text-xs">{error}</p>}
+                <Captcha onToken={setCaptchaToken} resetKey={captchaReset} />
+              {error && <p className="text-[var(--color-scoreboard-red)] text-xs">{error}</p>}
                 <button
                   type="submit"
                   disabled={busy}
@@ -154,6 +174,7 @@ export default function Login({ initialMode = 'signin', onBack }: { initialMode?
                     type="text"
                     placeholder={tr('Tu nombre')}
                     value={displayName}
+                    maxLength={40}
                     onChange={(e) => setDisplayName(e.target.value)}
                     required
                     className="w-full bg-[var(--color-field-surface-raised)] border border-[var(--color-field-line)] rounded-md px-3 py-2 text-sm outline-none focus:border-[var(--color-light-amber)]"
@@ -199,6 +220,7 @@ export default function Login({ initialMode = 'signin', onBack }: { initialMode?
                   </span>
                 </label>
               )}
+              <Captcha onToken={setCaptchaToken} resetKey={captchaReset} />
               {error && <p className="text-[var(--color-scoreboard-red)] text-xs">{error}</p>}
               <button
                 type="submit"

@@ -82,6 +82,17 @@ function ResetPasswordScreen({ onDone }: { onDone: () => void }) {
   )
 }
 
+// codigo de invitacion: de la URL (?join=CODIGO) o, si ya no viene, del que se guardo en este dispositivo
+function readInviteCode(): string | null {
+  const fromUrl = new URLSearchParams(window.location.search).get('join')
+  try {
+    if (fromUrl) { localStorage.setItem('pendingInvite', fromUrl); return fromUrl }
+    return localStorage.getItem('pendingInvite')
+  } catch {
+    return fromUrl
+  }
+}
+
 function AppInner() {
   const { user, loading } = useAuth()
   const { lang, setLanguage } = useLang()
@@ -104,11 +115,13 @@ function AppInner() {
   const [listFilter, setListFilter] = useState<'activa' | 'todas'>('activa')
   const [hasUnread, setHasUnread] = useState(false)
   const [focusGameId, setFocusGameId] = useState<string | null>(null)
-  const [authView, setAuthView] = useState<null | 'signin' | 'signup'>(() => (new URLSearchParams(window.location.search).get('join') ? 'signup' : null))
+  // el codigo del link de invitacion se guarda tambien en el dispositivo: si la persona se registra y
+  // tiene que confirmar su correo, al volver desde el email el ?join= ya no viene en la URL
+  const [authView, setAuthView] = useState<null | 'signin' | 'signup'>(() => (readInviteCode() ? 'signup' : null))
 
   // si la URL trae ?join=CODIGO (link directo de invitacion de un admin),
   // lo guardamos para procesarlo en cuanto sepamos si hay sesion o no
-  const [pendingInviteCode, setPendingInviteCode] = useState<string | null>(() => new URLSearchParams(window.location.search).get('join'))
+  const [pendingInviteCode, setPendingInviteCode] = useState<string | null>(() => readInviteCode())
   const [joining, setJoining] = useState(!!pendingInviteCode)
   const [joinError, setJoinError] = useState<string | null>(null)
   const [showPrivacy, setShowPrivacy] = useState(() => window.location.hash === '#privacidad')
@@ -180,6 +193,7 @@ function AppInner() {
         .maybeSingle()
 
       window.history.replaceState({}, '', window.location.pathname)
+      try { localStorage.removeItem('pendingInvite') } catch { /* sin almacenamiento */ }
       setPendingInviteCode(null) // se usa una sola vez -- si luego alguien mas inicia sesion en esta misma pestana, ya no lo vuelve a unir
 
       if (membership?.groups) {
